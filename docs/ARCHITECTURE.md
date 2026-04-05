@@ -2,8 +2,8 @@
 
 ## Claude Academy Learning Platform
 
-**Document Version:** 1.0
-**Date:** 2026-04-04
+**Document Version:** 2.0
+**Date:** 2026-04-05
 **Status:** Active
 
 ---
@@ -16,7 +16,12 @@
 4. [Component Architecture](#4-component-architecture)
 5. [Routing Structure](#5-routing-structure)
 6. [Design System](#6-design-system)
-7. [Future Architecture (with Backend)](#7-future-architecture-with-backend)
+7. [DevSecOps Pipeline Architecture](#7-devsecops-pipeline-architecture)
+8. [E2E Test Architecture](#8-e2e-test-architecture)
+9. [Barrel Export Structure](#9-barrel-export-structure)
+10. [Deployment Architecture](#10-deployment-architecture)
+11. [data-testid Convention](#11-data-testid-convention)
+12. [Future Architecture (with Backend)](#12-future-architecture-with-backend)
 
 ---
 
@@ -660,9 +665,310 @@ a, button {
 
 ---
 
-## 7. Future Architecture (with Backend)
+## 7. DevSecOps Pipeline Architecture
 
-### 7.1 Supabase Integration Points
+### 7.1 Pipeline Overview
+
+The project uses 4 GitHub Actions workflows that together form a complete DevSecOps CI/CD pipeline. The pipeline enforces code quality, security scanning, and automated deployment on every push to `main`.
+
+```
+Push to main / PR opened
+        │
+        ├── ci.yml (parallel jobs)
+        │   ├── Lint (ESLint)
+        │   ├── Type Check (tsc --noEmit)
+        │   ├── Unit Tests + Coverage (Vitest)
+        │   │       └── Upload coverage artifact
+        │   ├── E2E Tests (Playwright) ← depends on lint + typecheck + test
+        │   │       └── Upload playwright-report + screenshots on failure
+        │   └── Build (next build) ← depends on all above
+        │           └── Upload build output artifact
+        │
+        ├── security.yml (parallel jobs)
+        │   ├── Dependency Audit (npm audit + audit-ci)
+        │   ├── CodeQL Analysis (JavaScript/TypeScript)
+        │   └── Secret Detection (TruffleHog)
+        │
+        ├── deploy.yml (sequential)
+        │   ├── CI Gate (lint + typecheck + test)
+        │   ├── GitHub Pages deploy ← depends on CI Gate
+        │   └── Vercel Production deploy ← depends on CI Gate
+        │
+        └── pr-preview.yml
+            └── Vercel Preview Deploy + PR comment with URL
+```
+
+### 7.2 Workflow Files
+
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| **CI** | `.github/workflows/ci.yml` | Push to `main`/`develop`, PRs to `main` | Lint, typecheck, unit tests, coverage, E2E tests, build |
+| **Security** | `.github/workflows/security.yml` | Push to `main`, PRs to `main`, weekly cron (Monday 8am UTC) | Dependency audit, CodeQL static analysis, secret scanning |
+| **Deploy** | `.github/workflows/deploy.yml` | Push to `main`, manual dispatch | CI gate then dual deploy to GitHub Pages + Vercel production |
+| **PR Preview** | `.github/workflows/pr-preview.yml` | PRs to `main` | Vercel preview deploy, auto-comments PR with preview URL |
+
+### 7.3 CI Job Dependency Graph
+
+```
+ci.yml:
+  lint ──────────┐
+  typecheck ─────┼──► e2e ──► build
+  test (unit) ───┘
+
+deploy.yml:
+  ci-gate ──┬──► deploy-github-pages
+            └──► deploy-vercel
+
+security.yml:
+  dependency-audit ─── (parallel)
+  codeql ──────────── (parallel)
+  secrets-scan ────── (parallel)
+```
+
+### 7.4 Artifacts
+
+| Artifact | Workflow | Retention | Contents |
+|----------|----------|-----------|----------|
+| `coverage-report` | ci.yml | 30 days | Vitest coverage output (`coverage/`) |
+| `playwright-report` | ci.yml | 30 days | Playwright HTML report |
+| `e2e-screenshots` | ci.yml (on failure) | 7 days | Failure screenshots from `test-results/` |
+| `build-output` | ci.yml | 7 days | Static site output (`out/`) |
+
+---
+
+## 8. E2E Test Architecture
+
+### 8.1 Page Object Model (POM) Pattern
+
+E2E tests use the Page Object Model pattern to decouple test logic from page structure. Each page in the application has a corresponding page object class in `e2e/pages/`.
+
+```
+e2e/
+├── pages/
+│   ├── index.ts               ← Barrel export (re-exports all page objects)
+│   ├── base.page.ts           ← BasePage: shared header, footer, logo, nav helpers
+│   ├── landing.page.ts        ← LandingPage extends BasePage
+│   ├── curriculum.page.ts     ← CurriculumPage extends BasePage
+│   ├── module.page.ts         ← ModulePage extends BasePage
+│   ├── lesson.page.ts         ← LessonPage extends BasePage
+│   ├── prompt-lab.page.ts     ← PromptLabPage extends BasePage
+│   ├── cheatsheet.page.ts     ← CheatsheetPage extends BasePage
+│   ├── templates.page.ts      ← TemplatesPage extends BasePage
+│   └── progress.page.ts       ← ProgressPage extends BasePage
+├── navigation.spec.ts          ← 12 tests: site navigation flows
+├── progress.spec.ts            ← 6 tests: progress tracking flows
+├── prompt-lab.spec.ts          ← 5 tests: prompt lab features
+├── cheatsheet.spec.ts          ← 4 tests: cheatsheet search and tabs
+├── templates.spec.ts           ← 4 tests: template library
+└── responsive.spec.ts          ← 5 tests: responsive layout at various viewports
+```
+
+### 8.2 POM Class Hierarchy
+
+```
+BasePage (base.page.ts)
+├── Locators: header, footer, logo
+├── Methods: navigateTo(), goToCurriculum(), goToPromptLab(), goToCheatsheet(), goToTemplates()
+│
+├── LandingPage extends BasePage
+│   Locators: heroHeading, startLearningBtn, arcCards, statsBar, footerCredit, mobileMenuBtn
+│   Methods: clickStartLearning(), isHeroVisible(), getStatsText()
+│
+├── CurriculumPage extends BasePage
+│   Locators: moduleCard(slug), arcSection(arc)
+│   Methods: clickModule(slug)
+│
+├── ModulePage extends BasePage
+│   Locators: moduleTitle, lessonItem(slug)
+│   Methods: clickLesson(slug)
+│
+├── LessonPage extends BasePage
+│   Locators: lessonTitle, markCompleteBtn, completedIndicator
+│   Methods: markAsComplete()
+│
+├── PromptLabPage extends BasePage
+│   Locators: heading, templateCards
+│   Methods: filterByCategory(cat)
+│
+├── CheatsheetPage extends BasePage
+│   Locators: searchInput, categoryTab(tab)
+│   Methods: search(query), selectTab(tab)
+│
+├── TemplatesPage extends BasePage
+│   Locators: templateCards, codeBlocks
+│
+└── ProgressPage extends BasePage
+    Locators: heading, statLessons, statQuizzes, statStreak, statAchievements, confirmResetBtn
+    Methods: clickReset()
+```
+
+### 8.3 Locator Strategy
+
+All page object locators use `page.getByTestId()` to select elements by their `data-testid` attribute. This provides:
+
+- **Stability**: Selectors do not break when CSS classes, text content, or DOM hierarchy change
+- **Decoupling**: Tests are independent of visual design and layout changes
+- **Clarity**: Test IDs are self-documenting (e.g., `data-testid="hero-heading"`)
+
+### 8.4 Test Execution
+
+Tests run on two browser projects via Playwright:
+
+| Project | Device | Viewport | Purpose |
+|---------|--------|----------|---------|
+| `chromium` | Desktop Chrome | 1280x720 | Desktop layout testing |
+| `mobile` | Pixel 7 | 412x915 | Mobile layout testing |
+
+Configuration is in `playwright.config.ts`. Tests run against a local dev server (`npm run dev`) with auto-start. In CI, retries are set to 2 and workers to 1 for deterministic results.
+
+---
+
+## 9. Barrel Export Structure
+
+### 9.1 Overview
+
+The project uses barrel exports (re-export files named `index.ts`) to provide clean import paths. Instead of importing from deep file paths, consumers import from the barrel.
+
+### 9.2 Barrel Files
+
+| Barrel | Location | Exports |
+|--------|----------|---------|
+| **Layout components** | `src/components/layout/index.ts` | SiteHeader, SiteFooter, SidebarNav, Breadcrumb, ThemeToggle |
+| **E2E Page Objects** | `e2e/pages/index.ts` | BasePage, LandingPage, CurriculumPage, ModulePage, LessonPage, PromptLabPage, CheatsheetPage, TemplatesPage, ProgressPage |
+
+### 9.3 Import Pattern
+
+```typescript
+// Without barrel exports (verbose):
+import { LandingPage } from './pages/landing.page';
+import { CurriculumPage } from './pages/curriculum.page';
+import { ModulePage } from './pages/module.page';
+
+// With barrel exports (clean):
+import { LandingPage, CurriculumPage, ModulePage } from './pages';
+```
+
+This pattern is used consistently in all 6 E2E spec files and in layout component imports.
+
+---
+
+## 10. Deployment Architecture
+
+### 10.1 Dual Deployment Strategy
+
+The project deploys to two platforms simultaneously for redundancy and different audiences:
+
+```
+git push main
+    │
+    ▼
+deploy.yml workflow
+    │
+    ├──► GitHub Pages
+    │    URL: https://khader9jber.github.io/claude-academy/
+    │    Method: actions/upload-pages-artifact + actions/deploy-pages
+    │    Environment variable: DEPLOY_TARGET=github-pages
+    │
+    └──► Vercel Production
+         URL: https://claude-academy-course.vercel.app
+         Method: vercel deploy --prod + vercel alias set
+         Org: claude-academy-org (Vercel team)
+```
+
+### 10.2 Deployment Details
+
+| Platform | URL | Method | CI Gate |
+|----------|-----|--------|---------|
+| **GitHub Pages** | `https://khader9jber.github.io/claude-academy/` | `actions/deploy-pages@v4` | lint + typecheck + test must pass |
+| **Vercel Production** | `https://claude-academy-course.vercel.app` | `vercel deploy --prod` + alias | lint + typecheck + test must pass |
+| **Vercel Preview** (PRs) | Dynamic URL per PR | `vercel deploy` (non-prod) | Build must succeed |
+
+### 10.3 Vercel Configuration
+
+- **Team/Org**: `claude-academy-org`
+- **Clean alias**: `claude-academy-course.vercel.app` (set via `vercel alias set` after each deploy)
+- **Secrets required**: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+
+### 10.4 PR Preview Flow
+
+```
+PR opened/updated
+    │
+    ▼
+pr-preview.yml
+    │
+    ├── Build (npm run build)
+    ├── Deploy to Vercel (non-prod)
+    └── Comment on PR with preview URL
+```
+
+---
+
+## 11. data-testid Convention
+
+### 11.1 Purpose
+
+All key interactive and structural elements in the application have `data-testid` attributes. These attributes serve as stable selectors for Playwright E2E tests via the Page Object Model.
+
+### 11.2 Naming Convention
+
+Test IDs follow a kebab-case pattern that describes the element's role:
+
+```
+data-testid="<component>-<element>"
+```
+
+### 11.3 Complete data-testid Map
+
+| data-testid | File | Element |
+|-------------|------|---------|
+| `site-header` | `src/components/layout/site-header.tsx` | `<header>` wrapper |
+| `site-footer` | `src/components/layout/site-footer.tsx` | `<footer>` wrapper |
+| `site-logo` | `src/components/layout/site-header.tsx` | Logo link in header |
+| `nav-curriculum` | `src/components/layout/site-header.tsx` | Curriculum nav link |
+| `nav-prompt-lab` | `src/components/layout/site-header.tsx` | Prompt Lab nav link |
+| `nav-cheatsheet` | `src/components/layout/site-header.tsx` | Cheatsheet nav link |
+| `nav-templates` | `src/components/layout/site-header.tsx` | Templates nav link |
+| `mobile-menu-btn` | `src/components/layout/site-header.tsx` | Mobile hamburger button |
+| `footer-credit` | `src/components/layout/site-footer.tsx` | "Built with heart by KK" text |
+| `hero-heading` | `src/app/page.tsx` | Hero section heading |
+| `start-learning-btn` | `src/app/page.tsx` | Start Learning CTA button |
+| `arc-cards` | `src/app/page.tsx` | Arc cards section |
+| `stats-bar` | `src/app/page.tsx` | Stats bar section |
+| `module-card-{slug}` | `src/app/curriculum/page.tsx` | Individual module card |
+| `arc-section-{arc}` | `src/app/curriculum/page.tsx` | Arc section wrapper |
+| `module-title` | `src/app/curriculum/[moduleSlug]/page.tsx` | Module page title |
+| `lesson-item-{slug}` | `src/app/curriculum/[moduleSlug]/page.tsx` | Lesson list item |
+| `lesson-title` | `src/app/curriculum/[moduleSlug]/[lessonSlug]/page.tsx` | Lesson page title |
+| `mark-complete-btn` | `src/app/curriculum/[moduleSlug]/[lessonSlug]/mark-complete.tsx` | Mark as Complete button |
+| `completed-indicator` | `src/app/curriculum/[moduleSlug]/[lessonSlug]/mark-complete.tsx` | Completed state indicator |
+| `progress-heading` | `src/app/progress/page.tsx` | Progress page heading |
+| `stat-lessons` | `src/components/progress/progress-dashboard.tsx` | Lessons completed stat |
+| `stat-quizzes` | `src/components/progress/progress-dashboard.tsx` | Quizzes taken stat |
+| `stat-streak` | `src/components/progress/progress-dashboard.tsx` | Current streak stat |
+| `stat-achievements` | `src/components/progress/progress-dashboard.tsx` | Achievements unlocked stat |
+| `reset-progress-btn` | `src/app/progress/page.tsx` | Reset progress button |
+| `confirm-reset-btn` | `src/app/progress/page.tsx` | Confirm reset button |
+| `prompt-lab-heading` | `src/app/prompt-lab/page.tsx` | Prompt Lab page heading |
+| `template-card` | `src/app/prompt-lab/page.tsx` | Prompt template cards |
+| `category-filter-{cat}` | `src/app/prompt-lab/page.tsx` | Category filter buttons |
+| `cheatsheet-search` | `src/app/cheatsheet/page.tsx` | Search input on cheatsheet |
+| `category-tab-{tab}` | `src/app/cheatsheet/page.tsx` | Category tab buttons |
+| `template-card` | `src/app/templates/page.tsx` | Template library cards |
+
+### 11.4 Guidelines for Adding New data-testid Attributes
+
+1. Use kebab-case: `data-testid="my-component-element"`
+2. Use dynamic suffixes for collections: `data-testid={`module-card-${slug}`}`
+3. Only add `data-testid` to elements that E2E tests need to interact with or assert on
+4. Corresponding page object locators should use `page.getByTestId('...')`
+5. Do not use `data-testid` for styling or non-test purposes
+
+---
+
+## 12. Future Architecture (with Backend)
+
+### 12.1 Supabase Integration Points
 
 When a backend is added, Supabase integrates at the following points:
 
@@ -686,7 +992,7 @@ When a backend is added, Supabase integrates at the following points:
 +-------------------------------------------------------------------+
 ```
 
-### 7.2 Auth Flow
+### 12.2 Auth Flow
 
 ```
 User visits site
@@ -701,7 +1007,7 @@ User visits site
         └── Achievements and certificates unlocked
 ```
 
-### 7.3 Data Sync Architecture
+### 12.3 Data Sync Architecture
 
 **Optimistic sync strategy:**
 
@@ -726,7 +1032,7 @@ Custom Storage Adapter
     └── Also write to localStorage (fallback)
 ```
 
-### 7.4 Database Schema (Planned)
+### 12.4 Database Schema (Planned)
 
 ```sql
 -- Users (managed by Supabase Auth)
@@ -757,7 +1063,7 @@ CREATE POLICY "Users can update own progress"
   USING (auth.uid() = user_id);
 ```
 
-### 7.5 API Route Structure (Planned)
+### 12.5 API Route Structure (Planned)
 
 If Next.js API routes are used instead of direct Supabase client access:
 
@@ -776,7 +1082,7 @@ src/app/api/
     └── route.ts              → POST /api/analytics (event tracking)
 ```
 
-### 7.6 Migration Impact Summary
+### 12.6 Migration Impact Summary
 
 | Layer | Changes Required | Effort |
 |-------|-----------------|--------|

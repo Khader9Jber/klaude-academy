@@ -2,9 +2,9 @@
 
 ## Claude Academy Learning Platform
 
-**Document Version:** 1.0
-**Date:** 2026-04-04
-**Status:** Draft (all test cases at "Not Run")
+**Document Version:** 2.0
+**Date:** 2026-04-05
+**Status:** Active (Suites 1-9 unit/component, Suites 10-15 E2E — all implemented)
 
 ---
 
@@ -19,9 +19,15 @@
 7. [Suite 7: Navigation (Component)](#suite-7-navigation-component)
 8. [Suite 8: Progress Components (Component)](#suite-8-progress-components-component)
 9. [Suite 9: Search (Component)](#suite-9-search-component)
-10. [Suite 10: Pages (E2E)](#suite-10-pages-e2e)
-11. [Suite 11: Accessibility (E2E)](#suite-11-accessibility-e2e)
-12. [Suite 12: Performance (E2E)](#suite-12-performance-e2e)
+10. [Suite 10: Navigation E2E](#suite-10-navigation-e2e)
+11. [Suite 11: Progress Tracking E2E](#suite-11-progress-tracking-e2e)
+12. [Suite 12: Prompt Lab E2E](#suite-12-prompt-lab-e2e)
+13. [Suite 13: Cheatsheet E2E](#suite-13-cheatsheet-e2e)
+14. [Suite 14: Templates E2E](#suite-14-templates-e2e)
+15. [Suite 15: Responsive Design E2E](#suite-15-responsive-design-e2e)
+16. [Suite 16: Pages (E2E) — Planned](#suite-16-pages-e2e--planned)
+17. [Suite 17: Accessibility (E2E) — Planned](#suite-17-accessibility-e2e--planned)
+18. [Suite 18: Performance (E2E) — Planned](#suite-18-performance-e2e--planned)
 
 ---
 
@@ -1141,7 +1147,535 @@
 
 ---
 
-## Suite 10: Pages (E2E -- Playwright)
+## Suite 10: Navigation E2E
+
+**File:** `e2e/navigation.spec.ts`
+**Target:** Site-wide navigation flows
+**Tool:** Playwright
+**Page Objects:** LandingPage, CurriculumPage, ModulePage, LessonPage (from `e2e/pages/`)
+**Tests:** 12
+
+### TC-NAV-E2E-001: Landing page loads with hero section
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-001 |
+| **Description** | The landing page at `/` loads and displays the hero heading and Start Learning button |
+| **Page Object** | LandingPage |
+| **Preconditions** | Application is built and served |
+| **Steps** | 1. Navigate to `/` via `landing.navigateTo('/')` 2. Assert `landing.heroHeading` is visible 3. Assert `landing.startLearningBtn` is visible |
+| **Expected Result** | Hero heading and Start Learning button are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-002: Landing page shows arc cards section
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-002 |
+| **Description** | The landing page displays the arc cards section |
+| **Page Object** | LandingPage |
+| **Preconditions** | Application is built and served |
+| **Steps** | 1. Navigate to `/` 2. Assert `landing.arcCards` is visible |
+| **Expected Result** | Arc cards section is visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-003: Landing page shows stats bar
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-003 |
+| **Description** | The landing page displays the stats bar with project statistics |
+| **Page Object** | LandingPage |
+| **Preconditions** | Application is built and served |
+| **Steps** | 1. Navigate to `/` 2. Assert `landing.statsBar` is visible |
+| **Expected Result** | Stats bar is visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-004: Start Learning button navigates to curriculum
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-004 |
+| **Description** | Clicking Start Learning navigates to the curriculum page |
+| **Page Object** | LandingPage |
+| **Preconditions** | Landing page is loaded |
+| **Steps** | 1. Call `landing.clickStartLearning()` 2. Assert URL matches `/curriculum` |
+| **Expected Result** | Browser navigates to `/curriculum` |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-005: Curriculum page shows module cards
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-005 |
+| **Description** | The curriculum page displays module cards for claude-fundamentals, prompt-engineering, and claude-code-basics |
+| **Page Object** | CurriculumPage |
+| **Preconditions** | Application is built with modules |
+| **Steps** | 1. Navigate to `/curriculum` 2. Assert `curriculum.moduleCard('claude-fundamentals')` is visible 3. Assert `curriculum.moduleCard('prompt-engineering')` is visible 4. Assert `curriculum.moduleCard('claude-code-basics')` is visible |
+| **Expected Result** | All three module cards are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-006: Curriculum page shows arc sections
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-006 |
+| **Description** | The curriculum page shows Foundation and Practitioner arc section headings |
+| **Page Object** | CurriculumPage |
+| **Preconditions** | Curriculum page is loaded |
+| **Steps** | 1. Assert `curriculum.arcSection('foundation')` is visible 2. Assert `curriculum.arcSection('practitioner')` is visible |
+| **Expected Result** | Both arc sections are visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-007: Clicking a module navigates to module page
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-007 |
+| **Description** | Clicking the claude-fundamentals module card navigates to its module page |
+| **Page Object** | CurriculumPage |
+| **Preconditions** | Curriculum page is loaded |
+| **Steps** | 1. Call `curriculum.clickModule('claude-fundamentals')` 2. Assert URL matches `/curriculum/claude-fundamentals` |
+| **Expected Result** | Browser navigates to `/curriculum/claude-fundamentals` |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-008: Module page shows title and lessons
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-008 |
+| **Description** | The module page displays the module title and at least the "what-is-claude" lesson item |
+| **Page Object** | ModulePage |
+| **Preconditions** | claude-fundamentals module has lessons |
+| **Steps** | 1. Navigate to `/curriculum/claude-fundamentals` 2. Assert `modulePage.moduleTitle` is visible 3. Assert `modulePage.lessonItem('what-is-claude')` is visible |
+| **Expected Result** | Module title and lesson item are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-009: Clicking a lesson navigates to lesson page
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-009 |
+| **Description** | Clicking a lesson item navigates to the lesson detail page |
+| **Page Object** | ModulePage |
+| **Preconditions** | Module page is loaded |
+| **Steps** | 1. Call `modulePage.clickLesson('what-is-claude')` 2. Assert URL matches `/curriculum/claude-fundamentals/what-is-claude` |
+| **Expected Result** | Browser navigates to the lesson page |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-010: Lesson page shows title
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-010 |
+| **Description** | The lesson page displays the lesson title |
+| **Page Object** | LessonPage |
+| **Preconditions** | Lesson exists |
+| **Steps** | 1. Navigate to `/curriculum/claude-fundamentals/what-is-claude` 2. Assert `lesson.lessonTitle` is visible |
+| **Expected Result** | Lesson title is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-011: Header navigation links work (desktop)
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-011 |
+| **Description** | Desktop header navigation links navigate to Prompt Lab, Cheatsheet, Templates, and Curriculum |
+| **Page Object** | LandingPage (inherits BasePage nav methods) |
+| **Preconditions** | Desktop viewport (skipped on mobile project) |
+| **Steps** | 1. Navigate to `/` 2. Call `landing.goToPromptLab()` and assert URL 3. Call `landing.goToCheatsheet()` and assert URL 4. Call `landing.goToTemplates()` and assert URL 5. Call `landing.goToCurriculum()` and assert URL |
+| **Expected Result** | Each navigation link navigates to the correct page |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-NAV-E2E-012: Footer shows credit text
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-NAV-E2E-012 |
+| **Description** | The footer displays the "Built with heart by KK" credit text, and both header and logo are visible |
+| **Page Object** | LandingPage |
+| **Preconditions** | Landing page is loaded |
+| **Steps** | 1. Assert `landing.header` is visible 2. Assert `landing.logo` is visible 3. Assert `landing.footer` is visible 4. Assert `landing.footerCredit` is visible |
+| **Expected Result** | Header, logo, footer, and footer credit text are all visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+---
+
+## Suite 11: Progress Tracking E2E
+
+**File:** `e2e/progress.spec.ts`
+**Target:** Progress tracking user flows
+**Tool:** Playwright
+**Page Objects:** LessonPage, ProgressPage (from `e2e/pages/`)
+**Tests:** 6
+
+### TC-PROG-E2E-001: Lesson shows Mark as Complete button
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-001 |
+| **Description** | The lesson page displays a Mark as Complete button |
+| **Page Object** | LessonPage |
+| **Preconditions** | localStorage cleared before test |
+| **Steps** | 1. Navigate to `/curriculum/claude-fundamentals/what-is-claude` 2. Assert `lesson.markCompleteBtn` is visible |
+| **Expected Result** | Mark as Complete button is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PROG-E2E-002: Clicking Mark as Complete changes button state
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-002 |
+| **Description** | Clicking Mark as Complete transitions the button to a completed state |
+| **Page Object** | LessonPage |
+| **Preconditions** | localStorage cleared, lesson page loaded |
+| **Steps** | 1. Call `lesson.markAsComplete()` 2. Assert `lesson.completedIndicator` is visible |
+| **Expected Result** | Completed indicator is visible (button shows completed state) |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PROG-E2E-003: Completed lesson persists after page reload
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-003 |
+| **Description** | After marking a lesson complete and reloading the page, the completed state persists via localStorage |
+| **Page Object** | LessonPage |
+| **Preconditions** | localStorage cleared, lesson marked complete |
+| **Steps** | 1. Mark lesson as complete 2. Assert completed indicator is visible 3. Reload the page 4. Assert completed indicator is still visible |
+| **Expected Result** | Completed state persists after reload |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PROG-E2E-004: Progress page loads with heading
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-004 |
+| **Description** | The progress page loads and displays its heading |
+| **Page Object** | ProgressPage |
+| **Preconditions** | Application is served |
+| **Steps** | 1. Navigate to `/progress` 2. Assert `progress.heading` is visible |
+| **Expected Result** | Progress page heading is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PROG-E2E-005: Progress dashboard shows stats
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-005 |
+| **Description** | The progress dashboard displays all four stat categories |
+| **Page Object** | ProgressPage |
+| **Preconditions** | Progress page is loaded |
+| **Steps** | 1. Assert `progress.statLessons` is visible 2. Assert `progress.statQuizzes` is visible 3. Assert `progress.statStreak` is visible 4. Assert `progress.statAchievements` is visible |
+| **Expected Result** | All four stat indicators are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PROG-E2E-006: Reset progress button exists with confirmation
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PROG-E2E-006 |
+| **Description** | Clicking reset progress shows a confirmation button |
+| **Page Object** | ProgressPage |
+| **Preconditions** | Progress page is loaded |
+| **Steps** | 1. Call `progress.clickReset()` 2. Assert `progress.confirmResetBtn` is visible |
+| **Expected Result** | Confirmation reset button appears after clicking reset |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+---
+
+## Suite 12: Prompt Lab E2E
+
+**File:** `e2e/prompt-lab.spec.ts`
+**Target:** Prompt Lab page features
+**Tool:** Playwright
+**Page Objects:** PromptLabPage (from `e2e/pages/`)
+**Tests:** 5
+
+### TC-PL-E2E-001: Prompt lab page loads with heading
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PL-E2E-001 |
+| **Description** | The Prompt Lab page loads and displays its heading |
+| **Page Object** | PromptLabPage |
+| **Preconditions** | Application is served |
+| **Steps** | 1. Navigate to `/prompt-lab` 2. Assert `promptLab.heading` is visible |
+| **Expected Result** | Prompt Lab heading is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PL-E2E-002: Template library shows template cards
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PL-E2E-002 |
+| **Description** | The Prompt Lab page displays prompt template cards |
+| **Page Object** | PromptLabPage |
+| **Preconditions** | Prompt Lab page is loaded |
+| **Steps** | 1. Assert `promptLab.templateCards` has count > 0 |
+| **Expected Result** | At least one template card is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PL-E2E-003: Category filter buttons work
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PL-E2E-003 |
+| **Description** | Clicking the "coding" category filter shows only coding templates |
+| **Page Object** | PromptLabPage |
+| **Preconditions** | Prompt Lab page is loaded |
+| **Steps** | 1. Call `promptLab.filterByCategory('coding')` 2. Assert template cards are still visible (filtered to coding) |
+| **Expected Result** | Template cards are visible after filtering |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-PL-E2E-004: All filter shows all templates
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PL-E2E-004 |
+| **Description** | After filtering by category, clicking "all" shows all templates again |
+| **Page Object** | PromptLabPage |
+| **Preconditions** | Prompt Lab page is loaded |
+| **Steps** | 1. Call `promptLab.filterByCategory('coding')` 2. Call `promptLab.filterByCategory('all')` 3. Assert template cards are visible |
+| **Expected Result** | All template cards are visible after clicking All |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+### TC-PL-E2E-005: Before/after examples are visible
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-PL-E2E-005 |
+| **Description** | The before/after prompt comparison examples are visible on the page |
+| **Page Object** | PromptLabPage |
+| **Preconditions** | Prompt Lab page is loaded |
+| **Steps** | 1. Locate text "Before" on the page 2. Assert at least one instance is visible |
+| **Expected Result** | Before/after comparison section is visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+---
+
+## Suite 13: Cheatsheet E2E
+
+**File:** `e2e/cheatsheet.spec.ts`
+**Target:** Cheatsheet page search and filtering
+**Tool:** Playwright
+**Page Objects:** CheatsheetPage (from `e2e/pages/`)
+**Tests:** 4
+
+### TC-CS-E2E-001: Cheatsheet page loads with search input
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-CS-E2E-001 |
+| **Description** | The cheatsheet page loads and displays the search input field |
+| **Page Object** | CheatsheetPage |
+| **Preconditions** | Application is served |
+| **Steps** | 1. Navigate to `/cheatsheet` 2. Assert `cheatsheet.searchInput` is visible |
+| **Expected Result** | Search input is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-CS-E2E-002: Search filters sections
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-CS-E2E-002 |
+| **Description** | Typing "compact" in the search input filters to show compact-related content |
+| **Page Object** | CheatsheetPage |
+| **Preconditions** | Cheatsheet page is loaded |
+| **Steps** | 1. Call `cheatsheet.search('compact')` 2. Assert page contains text matching "compact" (case-insensitive) |
+| **Expected Result** | Content matching "compact" is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-CS-E2E-003: Category tabs are visible and clickable
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-CS-E2E-003 |
+| **Description** | The All, CLI, and Commands category tabs are visible |
+| **Page Object** | CheatsheetPage |
+| **Preconditions** | Cheatsheet page is loaded |
+| **Steps** | 1. Assert `cheatsheet.categoryTab('all')` is visible 2. Assert `cheatsheet.categoryTab('cli')` is visible 3. Assert `cheatsheet.categoryTab('commands')` is visible |
+| **Expected Result** | All three tabs are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-CS-E2E-004: Clicking a tab filters content
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-CS-E2E-004 |
+| **Description** | Clicking the CLI tab filters to show CLI-related content |
+| **Page Object** | CheatsheetPage |
+| **Preconditions** | Cheatsheet page is loaded |
+| **Steps** | 1. Call `cheatsheet.selectTab('cli')` 2. Assert page contains text "claude" |
+| **Expected Result** | CLI-related content is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+---
+
+## Suite 14: Templates E2E
+
+**File:** `e2e/templates.spec.ts`
+**Target:** Template library page
+**Tool:** Playwright
+**Page Objects:** TemplatesPage (from `e2e/pages/`)
+**Tests:** 4
+
+### TC-TPL-E2E-001: Templates page loads
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-TPL-E2E-001 |
+| **Description** | The templates page loads and displays its h1 heading |
+| **Page Object** | TemplatesPage |
+| **Preconditions** | Application is served |
+| **Steps** | 1. Navigate to `/templates` 2. Assert `h1` heading is visible |
+| **Expected Result** | Page heading is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-TPL-E2E-002: Templates show template cards with copy buttons
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-TPL-E2E-002 |
+| **Description** | Template cards are displayed and each has a Copy button |
+| **Page Object** | TemplatesPage |
+| **Preconditions** | Templates page is loaded |
+| **Steps** | 1. Assert `templates.templateCards` has count > 0 2. Assert page contains text "Copy" |
+| **Expected Result** | Template cards and Copy buttons are visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-TPL-E2E-003: Template categories are filterable
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-TPL-E2E-003 |
+| **Description** | Clicking a category filter (e.g., Hooks) filters template cards |
+| **Page Object** | TemplatesPage |
+| **Preconditions** | Templates page is loaded |
+| **Steps** | 1. Locate Hooks filter button 2. Click it 3. Assert template cards are still visible (filtered) |
+| **Expected Result** | Template cards remain visible after filtering |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+### TC-TPL-E2E-004: Templates show code previews
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-TPL-E2E-004 |
+| **Description** | Templates display code preview blocks |
+| **Page Object** | TemplatesPage |
+| **Preconditions** | Templates page is loaded |
+| **Steps** | 1. Assert `templates.codeBlocks` has count > 0 |
+| **Expected Result** | Code blocks (pre/code elements) are visible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+---
+
+## Suite 15: Responsive Design E2E
+
+**File:** `e2e/responsive.spec.ts`
+**Target:** Layout across mobile, tablet, and desktop viewports
+**Tool:** Playwright
+**Page Objects:** LandingPage, CurriculumPage, LessonPage (from `e2e/pages/`)
+**Tests:** 5
+
+### TC-RES-E2E-001: Mobile: Landing page renders correctly
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-RES-E2E-001 |
+| **Description** | At 375x812 viewport, the landing page shows hero heading and Start Learning button |
+| **Page Object** | LandingPage |
+| **Preconditions** | Viewport set to 375x812 (iPhone-like) |
+| **Steps** | 1. Set viewport to 375x812 2. Navigate to `/` 3. Assert `landing.heroHeading` is visible 4. Assert `landing.startLearningBtn` is visible |
+| **Expected Result** | Hero and CTA are visible on mobile |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-RES-E2E-002: Mobile: Hamburger menu appears
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-RES-E2E-002 |
+| **Description** | At 375x812 viewport, the mobile hamburger menu button is visible |
+| **Page Object** | LandingPage |
+| **Preconditions** | Viewport set to 375x812 |
+| **Steps** | 1. Set viewport to 375x812 2. Navigate to `/` 3. Assert `landing.mobileMenuBtn` is visible |
+| **Expected Result** | Hamburger menu button is visible |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-RES-E2E-003: Tablet: Curriculum page shows module cards
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-RES-E2E-003 |
+| **Description** | At 768x1024 viewport, the curriculum page shows module cards |
+| **Page Object** | CurriculumPage |
+| **Preconditions** | Viewport set to 768x1024 (tablet) |
+| **Steps** | 1. Set viewport to 768x1024 2. Navigate to `/curriculum` 3. Assert `curriculum.moduleCard('claude-fundamentals')` is visible |
+| **Expected Result** | Module card is visible on tablet |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-RES-E2E-004: Desktop: Lesson page shows title
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-RES-E2E-004 |
+| **Description** | At 1280x800 viewport, the lesson page displays the lesson title |
+| **Page Object** | LessonPage |
+| **Preconditions** | Viewport set to 1280x800 (desktop) |
+| **Steps** | 1. Set viewport to 1280x800 2. Navigate to `/curriculum/claude-fundamentals/what-is-claude` 3. Assert `lesson.lessonTitle` is visible |
+| **Expected Result** | Lesson title is visible on desktop |
+| **Priority** | P1 |
+| **Status** | Passed |
+
+### TC-RES-E2E-005: Mobile: Lesson page is scrollable
+
+| Field | Value |
+|-------|-------|
+| **ID** | TC-RES-E2E-005 |
+| **Description** | At 375x812 viewport, the lesson page content is scrollable |
+| **Page Object** | LessonPage |
+| **Preconditions** | Viewport set to 375x812 |
+| **Steps** | 1. Set viewport to 375x812 2. Navigate to lesson page 3. Assert lesson title is visible 4. Scroll down 500px via `window.scrollTo(0, 500)` |
+| **Expected Result** | Page scrolls without error, content is accessible |
+| **Priority** | P2 |
+| **Status** | Passed |
+
+---
+
+## Suite 16: Pages (E2E -- Playwright) -- Planned
 
 **File:** `e2e/pages.spec.ts`
 **Target:** All page routes
@@ -1365,7 +1899,7 @@
 
 ---
 
-## Suite 11: Accessibility (E2E)
+## Suite 17: Accessibility (E2E) -- Planned
 
 **File:** `e2e/accessibility.spec.ts`
 **Target:** All pages
@@ -1457,7 +1991,7 @@
 
 ---
 
-## Suite 12: Performance (E2E)
+## Suite 18: Performance (E2E) -- Planned
 
 **File:** `e2e/performance.spec.ts`
 **Target:** Key pages

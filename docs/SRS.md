@@ -2,8 +2,8 @@
 
 ## Claude Academy Learning Platform
 
-**Document Version:** 1.0
-**Date:** 2026-04-04
+**Document Version:** 2.0
+**Date:** 2026-04-05
 **Status:** Active
 
 ---
@@ -202,6 +202,17 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | **FR-39** | The system shall support dark mode (default) and light mode. The theme is controlled via `next-themes` with `data-theme` attribute on the HTML element. Dark mode uses a dark background (#0a0a0d) with light text (#e8e6e3). Light mode uses a light background (#fafaf9) with dark text (#1c1917). The accent color shifts from #d4a053 (dark) to #b8860b (light). The theme toggle is accessible from the site header. | P1 |
 | **FR-40** | The system shall support keyboard navigation. All interactive elements (buttons, links, inputs) are focusable and operable via keyboard. Focus is indicated with a 2px accent-colored outline with 2px offset. The search dialog supports arrow key navigation through results and Enter to select. Quiz options can be tabbed to and activated. | P2 |
 
+#### FR-41 to FR-46: DevSecOps Pipeline and Testing Infrastructure
+
+| ID | Requirement | Priority |
+|----|------------|----------|
+| **FR-41** | The system shall have a CI workflow (`.github/workflows/ci.yml`) that runs on every push to `main` or `develop` and on every PR to `main`. The workflow shall execute lint (ESLint), type checking (`tsc --noEmit`), unit tests with coverage (Vitest), E2E tests (Playwright), and production build (`next build`) as separate jobs with a dependency graph: E2E depends on lint, typecheck, and test; build depends on all four. | P1 |
+| **FR-42** | The system shall have a security workflow (`.github/workflows/security.yml`) that runs on every push to `main`, on PRs to `main`, and on a weekly schedule (Monday 8am UTC). The workflow shall perform dependency auditing (`npm audit --audit-level=high` + `audit-ci`), CodeQL static analysis for JavaScript/TypeScript, and secret detection using TruffleHog with `--only-verified` flag. | P1 |
+| **FR-43** | The system shall have a deploy workflow (`.github/workflows/deploy.yml`) that runs on push to `main` and manual dispatch. The workflow shall include a CI gate job (lint + typecheck + test) that must pass before deployment. On success, it shall deploy to both GitHub Pages (via `actions/deploy-pages@v4`) and Vercel production (via `vercel deploy --prod` with alias to `claude-academy-course.vercel.app`). | P1 |
+| **FR-44** | The system shall have a PR preview workflow (`.github/workflows/pr-preview.yml`) that runs on PRs to `main`. The workflow shall build the site, deploy a preview to Vercel (non-production), and comment on the PR with the preview URL. | P2 |
+| **FR-45** | The CI workflow shall upload artifacts: coverage report (30-day retention), Playwright HTML report (30-day retention), E2E failure screenshots (7-day retention on failure only), and build output (7-day retention). | P2 |
+| **FR-46** | All key interactive and structural elements in the application shall have `data-testid` attributes following kebab-case naming convention. These attributes serve as stable selectors for E2E tests and must be present on: site header, site footer, site logo, navigation links, hero heading, Start Learning button, arc cards, stats bar, module cards, arc sections, module title, lesson items, lesson title, mark complete button, completed indicator, progress heading, progress stats, reset button, prompt lab heading, template cards, category filters, cheatsheet search input, and category tabs. | P1 |
+
 ### 3.2 Non-Functional Requirements
 
 | ID | Category | Requirement | Metric |
@@ -218,6 +229,8 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | **NFR-10** | Reliability | The system, as a static site deployed to a CDN, shall maintain 99.9% or higher uptime. There are no server-side components that can fail. | Uptime >= 99.9% |
 | **NFR-11** | Maintainability | The codebase shall use TypeScript in strict mode with no `any` types in production code. ESLint shall be configured with the `eslint-config-next` ruleset. All components use named exports. | TypeScript strict, ESLint clean |
 | **NFR-12** | Scalability | The system, as a statically generated site, shall handle unlimited concurrent users without performance degradation. Each user loads pre-built files from a CDN; there is no shared server resource. | Unlimited concurrent users |
+| **NFR-13** | Deployment | The CI pipeline (lint, typecheck, unit tests) must pass before any deployment to production. The deploy workflow includes a CI gate job that blocks deployment on failure. No code reaches GitHub Pages or Vercel production without passing the gate. | CI gate pass required |
+| **NFR-14** | Testing | E2E tests must pass on both desktop (Chromium, 1280x720) and mobile (Pixel 7, 412x915) viewports. The Playwright configuration defines two projects (`chromium` and `mobile`) and all 36 E2E tests run on both. Tests that are viewport-specific (e.g., desktop-only nav links) skip gracefully on the inapplicable viewport. | E2E pass on desktop + mobile |
 
 ---
 

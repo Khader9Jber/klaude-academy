@@ -2,9 +2,9 @@
 
 ## Claude Academy Learning Platform
 
-**Document Version:** 1.0
-**Date:** 2026-04-04
-**Status:** Draft (Phase 7 not yet started)
+**Document Version:** 2.0
+**Date:** 2026-04-05
+**Status:** Active (Phase 7 Complete)
 
 ---
 
@@ -16,6 +16,9 @@
 4. [Risk Assessment](#4-risk-assessment)
 5. [Test Environment](#5-test-environment)
 6. [Defect Management](#6-defect-management)
+7. [E2E Testing Strategy](#7-e2e-testing-strategy)
+8. [Testing Standards](#8-testing-standards)
+9. [CI Integration](#9-ci-integration)
 
 ---
 
@@ -359,3 +362,148 @@ jobs:
 ### 6.3 Regression Testing
 
 When a bug is fixed, a corresponding test case is added to prevent regression. The test is named to describe the bug scenario (e.g., "quiz score should not count unanswered questions as correct"). All regression tests run as part of the regular test suite.
+
+---
+
+## 7. E2E Testing Strategy
+
+### 7.1 Overview
+
+End-to-end tests are implemented with Playwright and validate complete user flows across the application. The E2E suite covers 36 tests across 6 test files, running on both desktop (Chromium) and mobile (Pixel 7) viewports.
+
+### 7.2 Page Object Model (POM)
+
+All E2E tests use the Page Object Model pattern. Each page in the application has a corresponding page object class in `e2e/pages/` that encapsulates:
+
+- **Locators**: Element selectors defined as class properties using `page.getByTestId()`
+- **Actions**: Methods that perform user interactions (e.g., `clickStartLearning()`, `markAsComplete()`)
+- **Assertions**: Helper methods for common checks (e.g., `isHeroVisible()`)
+
+**Why POM?**
+
+1. **Maintainability**: When the UI changes, only the page object needs updating -- not every test that uses that element
+2. **Reusability**: Multiple tests share the same page object, reducing duplication
+3. **Readability**: Tests read like user stories (`landing.clickStartLearning()` instead of `page.click('[data-testid="start-learning-btn"]')`)
+
+**Class hierarchy:**
+
+```
+BasePage (shared: header, footer, logo, navigation methods)
+├── LandingPage (hero, stats, arc cards, CTA)
+├── CurriculumPage (module cards, arc sections)
+├── ModulePage (module title, lesson items)
+├── LessonPage (lesson title, mark complete, completed indicator)
+├── PromptLabPage (heading, templates, category filters)
+├── CheatsheetPage (search input, category tabs)
+├── TemplatesPage (template cards, code blocks)
+└── ProgressPage (heading, stats, reset, confirm)
+```
+
+All page objects are re-exported through a barrel file (`e2e/pages/index.ts`) for clean imports in test files.
+
+### 7.3 Test Suite Summary
+
+| Suite | File | Tests | Coverage |
+|-------|------|-------|----------|
+| Navigation E2E | `e2e/navigation.spec.ts` | 12 | Landing page, curriculum, module, lesson, header nav, footer |
+| Progress Tracking E2E | `e2e/progress.spec.ts` | 6 | Mark complete, persistence, dashboard, reset |
+| Prompt Lab E2E | `e2e/prompt-lab.spec.ts` | 5 | Page load, templates, category filters, before/after |
+| Cheatsheet E2E | `e2e/cheatsheet.spec.ts` | 4 | Search, category tabs |
+| Templates E2E | `e2e/templates.spec.ts` | 4 | Template cards, copy buttons, category filters, code blocks |
+| Responsive Design E2E | `e2e/responsive.spec.ts` | 5 | Mobile landing, hamburger menu, tablet curriculum, desktop lesson, mobile scrolling |
+| **Total** | **6 files** | **36** | **All pages and critical user flows** |
+
+### 7.4 Viewport Strategy
+
+Tests run on two Playwright projects:
+
+| Project | Device | Viewport | Tests |
+|---------|--------|----------|-------|
+| `chromium` | Desktop Chrome | 1280x720 | All 36 tests |
+| `mobile` | Pixel 7 | 412x915 | All 36 tests (some skipped when not applicable, e.g., desktop-only nav) |
+
+The responsive test suite (`responsive.spec.ts`) explicitly sets viewports to test at 375px (mobile), 768px (tablet), and 1280px (desktop).
+
+---
+
+## 8. Testing Standards
+
+### 8.1 data-testid Convention
+
+All key interactive and structural elements have `data-testid` attributes. This is the primary locator strategy for E2E tests.
+
+**Rules:**
+
+- Every element that an E2E test needs to interact with or assert on must have a `data-testid`
+- Use kebab-case: `data-testid="hero-heading"`
+- Use dynamic suffixes for collections: `data-testid={`module-card-${slug}`}`
+- Page object locators use `page.getByTestId()` exclusively
+- `data-testid` attributes exist solely for testing and must not be used for styling
+
+**Benefits over other selector strategies:**
+
+| Strategy | Stability | Decoupling | Clarity |
+|----------|-----------|------------|---------|
+| CSS class selectors | Low (break on redesign) | Low | Medium |
+| Text selectors | Low (break on copy changes) | Low | High |
+| XPath | Low (break on DOM restructure) | Low | Low |
+| **data-testid** | **High** | **High** | **High** |
+
+### 8.2 Coverage Thresholds
+
+Coverage enforcement is configured in `vitest.config.ts` with the following thresholds for `src/lib/` files:
+
+| Metric | Threshold | Current |
+|--------|-----------|---------|
+| Statements | 90% | 97% |
+| Branches | 70% | Passing |
+| Functions | 90% | 100% |
+| Lines | 90% | 97% |
+
+Coverage is measured by the `v8` provider and reported in text, JSON summary, and HTML formats. The `coverage/` directory is uploaded as a CI artifact.
+
+**Files under coverage enforcement:**
+
+- `src/lib/utils.ts`
+- `src/lib/progress-store.ts`
+
+### 8.3 Test Naming Conventions
+
+- Unit tests: `describe('functionName')` > `it('should do expected behavior')`
+- E2E tests: `test.describe('Feature Area')` > `test('user-facing behavior description')`
+- Test files: `*.test.ts(x)` for unit/component, `*.spec.ts` for E2E
+
+---
+
+## 9. CI Integration
+
+### 9.1 Pipeline Position
+
+E2E tests run as part of the CI workflow (`.github/workflows/ci.yml`) after lint, typecheck, and unit tests pass:
+
+```
+lint ──────────┐
+typecheck ─────┼──► E2E Tests (Playwright) ──► Build
+unit tests ────┘
+```
+
+### 9.2 CI Configuration
+
+- **Browser**: Chromium only (installed via `npx playwright install chromium --with-deps`)
+- **Retries**: 2 retries in CI (`process.env.CI ? 2 : 0`)
+- **Workers**: 1 worker in CI for deterministic results
+- **Reporter**: HTML report (open: never) + GitHub reporter for inline annotations
+- **Screenshots**: Captured on failure only
+- **Traces**: Captured on first retry
+
+### 9.3 Artifacts Uploaded
+
+| Artifact | Condition | Retention | Path |
+|----------|-----------|-----------|------|
+| `playwright-report` | Always | 30 days | `playwright-report/` |
+| `e2e-screenshots` | On failure | 7 days | `test-results/` |
+| `coverage-report` | Always | 30 days | `coverage/` |
+
+### 9.4 Deploy Gate
+
+The deploy workflow (`.github/workflows/deploy.yml`) includes a CI gate job that runs lint, typecheck, and unit tests before allowing deployment. E2E tests run in the CI workflow but are not a direct blocker for deployment (they run in parallel via the `ci.yml` workflow). Both workflows trigger on push to `main`, ensuring E2E failures are visible before the next deploy cycle.
