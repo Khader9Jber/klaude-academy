@@ -14,7 +14,7 @@ test.describe('Cheatsheet', () => {
     const searchInput = page.locator('input[type="text"], input[type="search"]');
     await searchInput.fill('compact');
     // Should filter to show compact-related content
-    await expect(page.locator('text=/compact/i')).toHaveCount({ minimum: 1 });
+    await expect(page.locator('text=/compact/i')).not.toHaveCount(0);
   });
 
   test('category tabs are visible', async ({ page }) => {
@@ -28,6 +28,6 @@ test.describe('Cheatsheet', () => {
 
   test('cheatsheet shows CLI commands', async ({ page }) => {
     await page.goto('/cheatsheet');
-    await expect(page.locator('text=claude')).toHaveCount({ minimum: 1 });
+    await expect(page.locator('text=claude')).not.toHaveCount(0);
   });
 });

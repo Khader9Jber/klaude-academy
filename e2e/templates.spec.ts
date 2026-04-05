@@ -8,7 +8,7 @@ test.describe('Templates', () => {
 
   test('templates show copy buttons', async ({ page }) => {
     await page.goto('/templates');
-    await expect(page.locator('text=Copy')).toHaveCount({ minimum: 1 });
+    await expect(page.locator('text=Copy')).not.toHaveCount(0);
   });
 
   test('template categories are filterable', async ({ page }) => {
@@ -18,7 +18,7 @@ test.describe('Templates', () => {
     if (await hookFilter.count() > 0) {
       await hookFilter.click();
       // Should filter templates
-      await expect(page.locator('text=Hook')).toHaveCount({ minimum: 1 });
+      await expect(page.locator('text=Hook')).not.toHaveCount(0);
     }
   });
 
@@ -26,6 +26,6 @@ test.describe('Templates', () => {
     await page.goto('/templates');
     // Templates should have pre/code blocks
     const codeBlocks = page.locator('pre');
-    await expect(codeBlocks).toHaveCount({ minimum: 1 });
+    await expect(codeBlocks).not.toHaveCount(0);
   });
 });

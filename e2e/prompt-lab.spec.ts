@@ -9,7 +9,7 @@ test.describe('Prompt Lab', () => {
   test('template library shows templates', async ({ page }) => {
     await page.goto('/prompt-lab');
     // Should have template cards
-    await expect(page.locator('text=Copy')).toHaveCount({ minimum: 1 });
+    await expect(page.locator('text=Copy')).not.toHaveCount(0);
   });
 
   test('category filter buttons work', async ({ page }) => {
