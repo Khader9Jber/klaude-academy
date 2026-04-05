@@ -12,15 +12,7 @@ export function SiteFooter() {
               {SITE_NAME}
             </span>
             <p className="text-xs text-muted">
-              Built with{" "}
-              <a
-                href="https://claude.ai/code"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent hover:text-foreground transition-colors"
-              >
-                Claude Code
-              </a>
+              Built with <span className="text-red">&#9829;</span> by KK
             </p>
           </div>
 
