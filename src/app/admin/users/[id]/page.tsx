@@ -22,7 +22,6 @@ import { useAdmin } from "@/hooks/use-admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -56,86 +55,7 @@ interface Certificate {
   issued_at: string;
 }
 
-/* ── Demo data ─────────────────────────────────────────────────────── */
-
-const DEMO_PROFILE: UserProfile = {
-  id: "demo-1",
-  display_name: "Alice Johnson",
-  avatar_url: null,
-  email: "alice@example.com",
-  role: "admin",
-  created_at: "2025-09-01T10:00:00Z",
-};
-
-const DEMO_PROGRESS: LessonProgress[] = [
-  {
-    id: "lp-1",
-    lesson_slug: "what-is-claude",
-    module_slug: "getting-started",
-    completed_at: "2025-09-02T14:00:00Z",
-  },
-  {
-    id: "lp-2",
-    lesson_slug: "first-prompt",
-    module_slug: "getting-started",
-    completed_at: "2025-09-03T10:30:00Z",
-  },
-  {
-    id: "lp-3",
-    lesson_slug: "prompt-engineering-basics",
-    module_slug: "prompt-engineering",
-    completed_at: "2025-09-05T09:00:00Z",
-  },
-  {
-    id: "lp-4",
-    lesson_slug: "system-prompts",
-    module_slug: "prompt-engineering",
-    completed_at: "2025-09-07T16:20:00Z",
-  },
-  {
-    id: "lp-5",
-    lesson_slug: "claude-api-intro",
-    module_slug: "api-integration",
-    completed_at: "2025-09-10T11:45:00Z",
-  },
-];
-
-const DEMO_QUIZ_SCORES: QuizScore[] = [
-  {
-    id: "qs-1",
-    quiz_slug: "getting-started-quiz",
-    score: 9,
-    total: 10,
-    attempted_at: "2025-09-04T12:00:00Z",
-  },
-  {
-    id: "qs-2",
-    quiz_slug: "prompt-engineering-quiz",
-    score: 7,
-    total: 10,
-    attempted_at: "2025-09-08T14:30:00Z",
-  },
-  {
-    id: "qs-3",
-    quiz_slug: "api-basics-quiz",
-    score: 10,
-    total: 10,
-    attempted_at: "2025-09-11T10:00:00Z",
-  },
-];
-
-const DEMO_CERTIFICATES: Certificate[] = [
-  {
-    id: "cert-1",
-    type: "Getting Started",
-    issued_at: "2025-09-04T12:30:00Z",
-  },
-  {
-    id: "cert-2",
-    type: "Prompt Engineering",
-    issued_at: "2025-09-08T15:00:00Z",
-  },
-];
+/* (No demo data — only real Supabase data or empty states) */
 
 /* ── Component ─────────────────────────────────────────────────────── */
 
@@ -150,17 +70,16 @@ export default function AdminUserDetailPage() {
   const [quizScores, setQuizScores] = useState<QuizScore[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [supabaseReady, setSupabaseReady] = useState(true);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   /* ── Fetch user data ──────────────────────────────────────────── */
 
   const fetchData = useCallback(async () => {
-    if (!isSupabaseConfigured() || userId.startsWith("demo-")) {
-      setProfile(DEMO_PROFILE);
-      setProgress(DEMO_PROGRESS);
-      setQuizScores(DEMO_QUIZ_SCORES);
-      setCertificates(DEMO_CERTIFICATES);
+    if (!isSupabaseConfigured()) {
+      setSupabaseReady(false);
       setLoading(false);
       return;
     }
@@ -171,7 +90,7 @@ export default function AdminUserDetailPage() {
       const [profileRes, progressRes, quizRes, certRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, display_name, avatar_url, email, role, created_at")
+          .select("id, display_name, avatar_url, email, created_at")
           .eq("id", userId)
           .single(),
         supabase
@@ -192,25 +111,18 @@ export default function AdminUserDetailPage() {
       ]);
 
       if (profileRes.error || !profileRes.data) {
-        setProfile(DEMO_PROFILE);
-        setProgress(DEMO_PROGRESS);
-        setQuizScores(DEMO_QUIZ_SCORES);
-        setCertificates(DEMO_CERTIFICATES);
+        setNotFound(true);
       } else {
         setProfile({
           ...profileRes.data,
-          role:
-            profileRes.data.role === "admin" ? "admin" : "user",
+          role: "user" as const,
         } as UserProfile);
         setProgress((progressRes.data as LessonProgress[]) ?? []);
         setQuizScores((quizRes.data as QuizScore[]) ?? []);
         setCertificates((certRes.data as Certificate[]) ?? []);
       }
     } catch {
-      setProfile(DEMO_PROFILE);
-      setProgress(DEMO_PROGRESS);
-      setQuizScores(DEMO_QUIZ_SCORES);
-      setCertificates(DEMO_CERTIFICATES);
+      setNotFound(true);
     } finally {
       setLoading(false);
     }
@@ -245,12 +157,9 @@ export default function AdminUserDetailPage() {
       return;
     }
 
-    if (!isSupabaseConfigured() || userId.startsWith("demo-")) {
-      setProgress([]);
-      setQuizScores([]);
-      setCertificates([]);
+    if (!isSupabaseConfigured()) {
+      setActionMsg("Supabase is not configured. Cannot reset progress.");
       setResetConfirm(false);
-      setActionMsg("Progress has been reset (demo mode).");
       return;
     }
 
@@ -289,7 +198,39 @@ export default function AdminUserDetailPage() {
     );
   }
 
-  if (!isAdmin || !profile) return null;
+  if (!isAdmin) return null;
+
+  if (!supabaseReady) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-orange" />
+          <p className="text-sm text-orange">
+            Supabase required for this feature. Set{" "}
+            <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> environment variables.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-muted/50" />
+          <p className="text-lg font-medium text-foreground">User not found</p>
+          <button
+            onClick={() => router.push("/admin/users")}
+            className="mt-4 text-sm text-accent hover:text-accent/80 transition-colors"
+          >
+            Back to Users
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const userInitial =
     profile.display_name?.[0]?.toUpperCase() ??

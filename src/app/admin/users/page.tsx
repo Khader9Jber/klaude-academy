@@ -28,65 +28,6 @@ interface UserRow {
   lessons_completed: number;
 }
 
-/* ── Demo data (when Supabase is not configured) ───────────────────── */
-
-const DEMO_USERS: UserRow[] = [
-  {
-    id: "demo-1",
-    display_name: "Alice Johnson",
-    avatar_url: null,
-    email: "alice@example.com",
-    role: "admin",
-    created_at: "2025-09-01T10:00:00Z",
-    lessons_completed: 24,
-  },
-  {
-    id: "demo-2",
-    display_name: "Bob Smith",
-    avatar_url: null,
-    email: "bob@example.com",
-    role: "user",
-    created_at: "2025-10-15T08:30:00Z",
-    lessons_completed: 12,
-  },
-  {
-    id: "demo-3",
-    display_name: "Clara Reyes",
-    avatar_url: null,
-    email: "clara@example.com",
-    role: "user",
-    created_at: "2025-11-20T14:00:00Z",
-    lessons_completed: 7,
-  },
-  {
-    id: "demo-4",
-    display_name: "David Kim",
-    avatar_url: null,
-    email: "david.k@example.com",
-    role: "user",
-    created_at: "2026-01-05T09:15:00Z",
-    lessons_completed: 18,
-  },
-  {
-    id: "demo-5",
-    display_name: "Emilia Torres",
-    avatar_url: null,
-    email: "emilia.t@example.com",
-    role: "user",
-    created_at: "2026-02-14T16:45:00Z",
-    lessons_completed: 3,
-  },
-  {
-    id: "demo-6",
-    display_name: null,
-    avatar_url: null,
-    email: "anonymous@example.com",
-    role: "user",
-    created_at: "2026-03-01T11:00:00Z",
-    lessons_completed: 0,
-  },
-];
-
 const PAGE_SIZE = 10;
 
 /* ── Component ─────────────────────────────────────────────────────── */
@@ -98,6 +39,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [supabaseReady, setSupabaseReady] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -106,7 +48,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     async function fetchUsers() {
       if (!isSupabaseConfigured()) {
-        setUsers(DEMO_USERS);
+        setSupabaseReady(false);
         setLoading(false);
         return;
       }
@@ -114,13 +56,13 @@ export default function AdminUsersPage() {
       try {
         const supabase = createClient();
 
-        // Fetch profiles with joined progress counts
+        // Fetch profiles
         const { data: profiles, error: profileErr } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url, email, role, created_at");
+          .select("id, display_name, email, avatar_url, created_at");
 
         if (profileErr) {
-          setUsers(DEMO_USERS);
+          setError("Failed to load users: " + profileErr.message);
           setLoading(false);
           return;
         }
@@ -142,7 +84,7 @@ export default function AdminUsersPage() {
           display_name: p.display_name,
           avatar_url: p.avatar_url,
           email: p.email ?? "",
-          role: p.role === "admin" ? "admin" : "user",
+          role: "user" as const,
           created_at: p.created_at,
           lessons_completed: countMap[p.id] ?? 0,
         }));
@@ -150,7 +92,6 @@ export default function AdminUsersPage() {
         setUsers(rows);
       } catch {
         setError("Failed to load users.");
-        setUsers(DEMO_USERS);
       } finally {
         setLoading(false);
       }
@@ -250,6 +191,13 @@ export default function AdminUsersPage() {
             </div>
           </div>
 
+          {!supabaseReady && (
+            <div className="mb-4 rounded-lg border border-orange/30 bg-orange/10 px-4 py-3 text-sm text-orange">
+              Supabase required for this feature. Set <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+              <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> environment variables to enable user management.
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 rounded-lg border border-red/30 bg-red/10 px-4 py-3 text-sm text-red">
               {error}
@@ -276,7 +224,7 @@ export default function AdminUsersPage() {
             {paginated.length === 0 ? (
               <div className="px-4 py-12 text-center text-muted">
                 <Users className="h-10 w-10 mx-auto mb-3 text-muted/50" />
-                <p>No users found.</p>
+                <p>{search.trim() ? "No users found." : "No users registered yet."}</p>
               </div>
             ) : (
               paginated.map((user) => (

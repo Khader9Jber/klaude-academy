@@ -49,117 +49,15 @@ interface QuickAction {
   testId: string;
 }
 
-// ── Demo / placeholder data ─────────────────────────────────────────────
+// ── Stat definitions (values filled at runtime) ─────────────────────────
 
-const DEMO_STATS: StatCard[] = [
-  {
-    label: "Total Users",
-    value: 1_247,
-    icon: Users,
-    color: "text-blue",
-    testId: "stat-total-users",
-  },
-  {
-    label: "New Users (7d)",
-    value: 89,
-    icon: UserPlus,
-    color: "text-green",
-    testId: "stat-new-users",
-  },
-  {
-    label: "Lessons Completed",
-    value: 4_583,
-    icon: BookOpen,
-    color: "text-purple",
-    testId: "stat-lessons-completed",
-  },
-  {
-    label: "Quiz Attempts",
-    value: 2_341,
-    icon: Brain,
-    color: "text-orange",
-    testId: "stat-quiz-attempts",
-  },
-  {
-    label: "Certificates Issued",
-    value: 312,
-    icon: Award,
-    color: "text-accent",
-    testId: "stat-certificates",
-  },
-  {
-    label: "Published Lessons",
-    value: 48,
-    icon: FileText,
-    color: "text-cyan",
-    testId: "stat-published-lessons",
-  },
-];
-
-const DEMO_RECENT_USERS: RecentUser[] = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    email: "sarah.chen@example.com",
-    signedUpAt: "2026-04-04T14:32:00Z",
-  },
-  {
-    id: "2",
-    name: "Marcus Johnson",
-    email: "m.johnson@example.com",
-    signedUpAt: "2026-04-04T11:15:00Z",
-  },
-  {
-    id: "3",
-    name: "Amira Osman",
-    email: "amira.o@example.com",
-    signedUpAt: "2026-04-03T22:48:00Z",
-  },
-  {
-    id: "4",
-    name: "Lucas Weber",
-    email: "l.weber@example.com",
-    signedUpAt: "2026-04-03T18:05:00Z",
-  },
-  {
-    id: "5",
-    name: "Priya Sharma",
-    email: "priya.s@example.com",
-    signedUpAt: "2026-04-03T09:22:00Z",
-  },
-];
-
-const DEMO_RECENT_COMPLETIONS: RecentCompletion[] = [
-  {
-    id: "1",
-    userName: "Sarah Chen",
-    lessonTitle: "Introduction to Claude",
-    completedAt: "2026-04-04T15:10:00Z",
-  },
-  {
-    id: "2",
-    userName: "Marcus Johnson",
-    lessonTitle: "Prompt Engineering Basics",
-    completedAt: "2026-04-04T13:45:00Z",
-  },
-  {
-    id: "3",
-    userName: "Amira Osman",
-    lessonTitle: "Advanced Prompt Patterns",
-    completedAt: "2026-04-04T10:30:00Z",
-  },
-  {
-    id: "4",
-    userName: "Lucas Weber",
-    lessonTitle: "Working with Claude Code",
-    completedAt: "2026-04-03T20:15:00Z",
-  },
-  {
-    id: "5",
-    userName: "Priya Sharma",
-    lessonTitle: "Building AI Agents",
-    completedAt: "2026-04-03T16:00:00Z",
-  },
+const STAT_DEFS: Omit<StatCard, "value">[] = [
+  { label: "Total Users", icon: Users, color: "text-blue", testId: "stat-total-users" },
+  { label: "New Users (7d)", icon: UserPlus, color: "text-green", testId: "stat-new-users" },
+  { label: "Lessons Completed", icon: BookOpen, color: "text-purple", testId: "stat-lessons-completed" },
+  { label: "Quiz Attempts", icon: Brain, color: "text-orange", testId: "stat-quiz-attempts" },
+  { label: "Certificates Issued", icon: Award, color: "text-accent", testId: "stat-certificates" },
+  { label: "Published Lessons", icon: FileText, color: "text-cyan", testId: "stat-published-lessons" },
 ];
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -195,6 +93,12 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+function formatSlug(slug: string): string {
+  return slug
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -208,16 +112,22 @@ function formatRelativeTime(dateStr: string): string {
 // ── Component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<StatCard[]>(DEMO_STATS);
-  const [recentUsers, setRecentUsers] =
-    useState<RecentUser[]>(DEMO_RECENT_USERS);
+  const supabaseConfigured = isSupabaseConfigured();
+  const [stats, setStats] = useState<StatCard[]>([]);
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [recentCompletions, setRecentCompletions] = useState<
     RecentCompletion[]
-  >(DEMO_RECENT_COMPLETIONS);
-  const [dataSource, setDataSource] = useState<"demo" | "live">("demo");
+  >([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const dataSource: "loading" | "live" | "unconfigured" = !supabaseConfigured
+    ? "unconfigured"
+    : dataLoaded
+      ? "live"
+      : "loading";
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!supabaseConfigured) return;
 
     async function fetchLiveData() {
       try {
@@ -237,14 +147,14 @@ export default function AdminDashboardPage() {
           .select("*", { count: "exact", head: true })
           .gte("created_at", sevenDaysAgo);
 
-        // Fetch lesson completions
+        // Fetch lesson completions from user_progress
         const { count: lessonsCompleted } = await supabase
-          .from("lesson_completions")
+          .from("user_progress")
           .select("*", { count: "exact", head: true });
 
         // Fetch quiz attempts
         const { count: quizAttempts } = await supabase
-          .from("quiz_attempts")
+          .from("quiz_scores")
           .select("*", { count: "exact", head: true });
 
         // Fetch certificates
@@ -252,29 +162,35 @@ export default function AdminDashboardPage() {
           .from("certificates")
           .select("*", { count: "exact", head: true });
 
-        // Fetch published lessons
-        const { count: publishedLessons } = await supabase
-          .from("lessons")
-          .select("*", { count: "exact", head: true })
-          .eq("published", true);
-
-        // Only update if we got at least some data
-        if (totalUsers !== null) {
-          setStats([
-            { ...DEMO_STATS[0], value: totalUsers ?? 0 },
-            { ...DEMO_STATS[1], value: newUsers ?? 0 },
-            { ...DEMO_STATS[2], value: lessonsCompleted ?? 0 },
-            { ...DEMO_STATS[3], value: quizAttempts ?? 0 },
-            { ...DEMO_STATS[4], value: certificates ?? 0 },
-            { ...DEMO_STATS[5], value: publishedLessons ?? 0 },
-          ]);
-          setDataSource("live");
+        // Published lessons count — table may not exist, default to 0
+        let publishedLessons = 0;
+        try {
+          const { count } = await supabase
+            .from("managed_content")
+            .select("*", { count: "exact", head: true });
+          publishedLessons = count ?? 0;
+        } catch {
+          // table may not exist yet
         }
+
+        const values = [
+          totalUsers ?? 0,
+          newUsers ?? 0,
+          lessonsCompleted ?? 0,
+          quizAttempts ?? 0,
+          certificates ?? 0,
+          publishedLessons,
+        ];
+
+        setStats(
+          STAT_DEFS.map((def, i) => ({ ...def, value: values[i] }))
+        );
+        setDataLoaded(true);
 
         // Fetch recent signups
         const { data: recentSignups } = await supabase
           .from("profiles")
-          .select("id, full_name, email, created_at")
+          .select("id, display_name, email, created_at")
           .order("created_at", { ascending: false })
           .limit(5);
 
@@ -282,17 +198,17 @@ export default function AdminDashboardPage() {
           setRecentUsers(
             recentSignups.map((u) => ({
               id: u.id,
-              name: u.full_name ?? "Unknown",
+              name: u.display_name ?? "Unknown",
               email: u.email ?? "",
               signedUpAt: u.created_at,
             }))
           );
         }
 
-        // Fetch recent completions
+        // Fetch recent completions from user_progress joined with profiles
         const { data: recentCompletionData } = await supabase
-          .from("lesson_completions")
-          .select("id, user_id, lesson_title, completed_at, profiles(full_name)")
+          .from("user_progress")
+          .select("id, user_id, lesson_slug, completed_at, profiles(display_name)")
           .order("completed_at", { ascending: false })
           .limit(5);
 
@@ -301,20 +217,21 @@ export default function AdminDashboardPage() {
             recentCompletionData.map((c) => ({
               id: c.id,
               userName:
-                (c.profiles as unknown as { full_name: string })?.full_name ??
-                "Unknown",
-              lessonTitle: c.lesson_title ?? "Unknown Lesson",
+                (c.profiles as unknown as { display_name: string })
+                  ?.display_name ?? "Unknown",
+              lessonTitle: formatSlug(c.lesson_slug ?? "Unknown Lesson"),
               completedAt: c.completed_at,
             }))
           );
         }
       } catch {
-        // Supabase tables not set up yet — keep demo data
+        // Supabase query failed — show empty state, not fake data
+        setDataLoaded(true);
       }
     }
 
     fetchLiveData();
-  }, []);
+  }, [supabaseConfigured]);
 
   return (
     <div data-testid="admin-dashboard" className="space-y-8">
@@ -324,9 +241,18 @@ export default function AdminDashboardPage() {
         <p className="mt-1 text-sm text-muted">
           {dataSource === "live"
             ? "Showing live data from Supabase"
-            : "Showing demo data — connect Supabase to see live stats"}
+            : dataSource === "unconfigured"
+              ? "Supabase is not configured — connect it to see live stats"
+              : "Loading..."}
         </p>
       </div>
+
+      {dataSource === "unconfigured" && (
+        <div className="rounded-xl border border-orange/30 bg-orange/10 px-5 py-4 text-sm text-orange">
+          Supabase required for this feature. Set <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> environment variables to enable live data.
+        </div>
+      )}
 
       {/* Stats grid */}
       <div
@@ -376,22 +302,28 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {recentUsers.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between px-5 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-muted truncate">{user.email}</p>
-                </div>
-                <span className="shrink-0 text-xs text-muted">
-                  {formatRelativeTime(user.signedUpAt)}
-                </span>
+            {recentUsers.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-muted">
+                No users yet
               </div>
-            ))}
+            ) : (
+              recentUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between px-5 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-muted truncate">{user.email}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted">
+                    {formatRelativeTime(user.signedUpAt)}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -413,24 +345,30 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {recentCompletions.map((completion) => (
-              <div
-                key={completion.id}
-                className="flex items-center justify-between px-5 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {completion.lessonTitle}
-                  </p>
-                  <p className="text-xs text-muted truncate">
-                    by {completion.userName}
-                  </p>
-                </div>
-                <span className="shrink-0 text-xs text-muted">
-                  {formatRelativeTime(completion.completedAt)}
-                </span>
+            {recentCompletions.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-muted">
+                No completions yet
               </div>
-            ))}
+            ) : (
+              recentCompletions.map((completion) => (
+                <div
+                  key={completion.id}
+                  className="flex items-center justify-between px-5 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {completion.lessonTitle}
+                    </p>
+                    <p className="text-xs text-muted truncate">
+                      by {completion.userName}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted">
+                    {formatRelativeTime(completion.completedAt)}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
