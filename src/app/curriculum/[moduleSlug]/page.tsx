@@ -126,7 +126,7 @@ export default async function ModulePage({
                 Module {String(mod.order).padStart(2, "0")}
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+            <h1 data-testid="module-title" className="text-3xl sm:text-4xl font-bold text-foreground">
               {mod.title}
             </h1>
           </div>
@@ -235,6 +235,7 @@ export default async function ModulePage({
             <Link
               key={lesson.slug}
               href={`/curriculum/${mod.slug}/${lesson.slug}`}
+              data-testid={`lesson-item-${lesson.slug}`}
               className={cn(
                 "group flex items-center gap-4 rounded-xl p-4",
                 "bg-surface border border-border",

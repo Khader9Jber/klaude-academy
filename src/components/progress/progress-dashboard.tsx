@@ -69,21 +69,25 @@ export function ProgressDashboard() {
             icon={<BookOpen className="h-5 w-5 text-blue" />}
             label="Lessons"
             value={`${totalCompleted}/${totalLessons}`}
+            testId="stat-lessons"
           />
           <StatCard
             icon={<Brain className="h-5 w-5 text-purple" />}
             label="Quizzes"
             value={String(quizCount)}
+            testId="stat-quizzes"
           />
           <StatCard
             icon={<Flame className="h-5 w-5 text-orange" />}
             label="Streak"
             value={`${streak} day${streak !== 1 ? "s" : ""}`}
+            testId="stat-streak"
           />
           <StatCard
             icon={<Trophy className="h-5 w-5 text-accent" />}
             label="Achievements"
             value={`${achievements.filter((a) => a.unlocked).length}/${achievements.length}`}
+            testId="stat-achievements"
           />
         </div>
       </div>
@@ -128,13 +132,15 @@ function StatCard({
   icon,
   label,
   value,
+  testId,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  testId?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-2 p-3 text-center">
+    <div data-testid={testId} className="rounded-lg border border-border bg-surface-2 p-3 text-center">
       <div className="mb-1 flex justify-center">{icon}</div>
       <div className="text-lg font-bold text-text">{value}</div>
       <div className="text-xs text-muted">{label}</div>

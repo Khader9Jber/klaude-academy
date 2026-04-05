@@ -598,7 +598,7 @@ export default function PromptLabPage() {
             </div>
             <Badge variant="accent">Interactive</Badge>
           </div>
-          <h1 className="font-serif italic text-4xl sm:text-5xl text-foreground mb-4">
+          <h1 data-testid="prompt-lab-heading" className="font-serif italic text-4xl sm:text-5xl text-foreground mb-4">
             Prompt Engineering Lab
           </h1>
           <p className="text-lg text-muted max-w-2xl leading-relaxed">
@@ -667,6 +667,7 @@ export default function PromptLabPage() {
           <div className="flex flex-wrap gap-2 mb-8">
             <button
               onClick={() => setActiveCategory("All")}
+              data-testid="filter-all"
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 activeCategory === "All"
@@ -682,6 +683,7 @@ export default function PromptLabPage() {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
+                  data-testid={`filter-${cat.toLowerCase().replace(/\s+/g, "-")}`}
                   className={cn(
                     "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                     activeCategory === cat
@@ -757,7 +759,7 @@ function TemplateCard({ template }: { template: PromptTemplate }) {
   };
 
   return (
-    <div className="group rounded-xl border border-border bg-surface p-5 transition-colors hover:border-border-accent">
+    <div data-testid="template-card" className="group rounded-xl border border-border bg-surface p-5 transition-colors hover:border-border-accent">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <h3 className="font-semibold text-foreground mb-1.5">{template.title}</h3>

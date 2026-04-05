@@ -772,7 +772,7 @@ function TemplateBlock({ template }: { template: ConfigTemplate }) {
   const meta = CATEGORY_META[template.category];
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+    <div data-testid="template-card" className="rounded-xl border border-border bg-surface overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div className="flex items-center gap-3">

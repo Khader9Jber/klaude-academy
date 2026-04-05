@@ -1,33 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Cheatsheet', () => {
-  test('cheatsheet page loads with search', async ({ page }) => {
+  test('cheatsheet page loads with search input', async ({ page }) => {
     await page.goto('/cheatsheet');
-    await expect(page.locator('h1')).toBeVisible();
-    // Should have a search input
-    const searchInput = page.locator('input[type="text"], input[type="search"]');
-    await expect(searchInput).toBeVisible();
+    await expect(page.getByTestId('cheatsheet-search')).toBeVisible();
   });
 
   test('search filters sections', async ({ page }) => {
     await page.goto('/cheatsheet');
-    const searchInput = page.locator('input[type="text"], input[type="search"]');
-    await searchInput.fill('compact');
+    await page.getByTestId('cheatsheet-search').fill('compact');
     // Should filter to show compact-related content
     await expect(page.locator('text=/compact/i')).not.toHaveCount(0);
   });
 
-  test('category tabs are visible', async ({ page }) => {
+  test('category tabs are visible and clickable', async ({ page }) => {
     await page.goto('/cheatsheet');
-    // Should have tab buttons for categories
-    const allTab = page.locator('button:has-text("All")');
-    if (await allTab.count() > 0) {
-      await expect(allTab).toBeVisible();
-    }
+    await expect(page.getByTestId('cheatsheet-tab-all')).toBeVisible();
+    await expect(page.getByTestId('cheatsheet-tab-cli')).toBeVisible();
+    await expect(page.getByTestId('cheatsheet-tab-commands')).toBeVisible();
   });
 
-  test('cheatsheet shows CLI commands', async ({ page }) => {
+  test('clicking a tab filters content', async ({ page }) => {
     await page.goto('/cheatsheet');
+    await page.getByTestId('cheatsheet-tab-cli').click();
+    // Should show CLI-related content
     await expect(page.locator('text=claude')).not.toHaveCount(0);
   });
 });

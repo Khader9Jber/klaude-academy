@@ -3,81 +3,91 @@ import { test, expect } from '@playwright/test';
 test.describe('Site Navigation', () => {
   test('landing page loads with hero section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('text=Start Learning').first()).toBeVisible();
+    await expect(page.getByTestId('hero-heading')).toBeVisible();
+    await expect(page.getByTestId('start-learning-btn').first()).toBeVisible();
   });
 
-  test('landing page shows 4 arc cards', async ({ page }) => {
+  test('landing page shows arc cards section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('text=Foundation')).toBeVisible();
-    await expect(page.locator('text=Practitioner')).toBeVisible();
-    await expect(page.locator('text=Power User')).toBeVisible();
-    await expect(page.locator('text=Expert')).toBeVisible();
+    await expect(page.getByTestId('arc-cards')).toBeVisible();
+  });
+
+  test('landing page shows stats bar', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('stats-bar')).toBeVisible();
   });
 
   test('Start Learning button navigates to curriculum', async ({ page }) => {
     await page.goto('/');
-    await page.locator('text=Start Learning').first().click();
+    await page.getByTestId('start-learning-btn').first().click();
     await expect(page).toHaveURL(/curriculum/);
   });
 
-  test('curriculum page shows all 13 modules', async ({ page }) => {
+  test('curriculum page shows module cards', async ({ page }) => {
     await page.goto('/curriculum');
-    await expect(page.locator('text=Claude Fundamentals')).toBeVisible();
-    await expect(page.locator('text=Prompt Engineering')).toBeVisible();
-    await expect(page.locator('text=Claude Code Basics')).toBeVisible();
+    await expect(page.getByTestId('module-card-claude-fundamentals')).toBeVisible();
+    await expect(page.getByTestId('module-card-prompt-engineering')).toBeVisible();
+    await expect(page.getByTestId('module-card-claude-code-basics')).toBeVisible();
+  });
+
+  test('curriculum page shows arc sections', async ({ page }) => {
+    await page.goto('/curriculum');
+    await expect(page.getByTestId('arc-foundation')).toBeVisible();
+    await expect(page.getByTestId('arc-practitioner')).toBeVisible();
   });
 
   test('clicking a module navigates to module page', async ({ page }) => {
     await page.goto('/curriculum');
-    await page.click('text=Claude Fundamentals');
+    await page.getByTestId('module-card-claude-fundamentals').click();
     await expect(page).toHaveURL(/curriculum\/claude-fundamentals/);
   });
 
-  test('module page lists lessons', async ({ page }) => {
+  test('module page shows title and lessons', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals');
-    await expect(page.locator('text=What Is Claude')).toBeVisible();
+    await expect(page.getByTestId('module-title')).toBeVisible();
+    await expect(page.getByTestId('lesson-item-what-is-claude')).toBeVisible();
   });
 
   test('clicking a lesson navigates to lesson page', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals');
-    await page.click('text=What Is Claude');
+    await page.getByTestId('lesson-item-what-is-claude').click();
     await expect(page).toHaveURL(/curriculum\/claude-fundamentals\/what-is-claude/);
   });
 
-  test('lesson page shows title and content', async ({ page }) => {
+  test('lesson page shows title', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals/what-is-claude');
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.getByTestId('lesson-title')).toBeVisible();
   });
 
   test('header navigation links work', async ({ page }) => {
     await page.goto('/');
 
     // Navigate to Prompt Lab
-    await page.click('header >> text=Prompt Lab');
+    await page.getByTestId('nav-prompt-lab').click();
     await expect(page).toHaveURL(/prompt-lab/);
 
     // Navigate to Cheatsheet
-    await page.click('header >> text=Cheatsheet');
+    await page.getByTestId('nav-cheatsheet').click();
     await expect(page).toHaveURL(/cheatsheet/);
 
     // Navigate to Templates
-    await page.click('header >> text=Templates');
+    await page.getByTestId('nav-templates').click();
     await expect(page).toHaveURL(/templates/);
+
+    // Navigate to Curriculum
+    await page.getByTestId('nav-curriculum').click();
+    await expect(page).toHaveURL(/curriculum/);
   });
 
-  test('breadcrumb navigation shows on lesson page', async ({ page }) => {
-    await page.goto('/curriculum/claude-fundamentals/what-is-claude');
-    // Breadcrumb should have Home > Module > Lesson structure
-    const breadcrumb = page.locator('nav[aria-label="Breadcrumb"], [class*="breadcrumb"]');
-    if (await breadcrumb.count() > 0) {
-      await expect(breadcrumb).toBeVisible();
-    }
-  });
-
-  test('footer shows Built with heart by KK', async ({ page }) => {
+  test('header and logo are visible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('text=Built with')).toBeVisible();
-    await expect(page.locator('text=by KK')).toBeVisible();
+    await expect(page.getByTestId('site-header')).toBeVisible();
+    await expect(page.getByTestId('site-logo')).toBeVisible();
+  });
+
+  test('footer shows credit text', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('site-footer')).toBeVisible();
+    await expect(page.getByTestId('footer-credit')).toBeVisible();
   });
 });

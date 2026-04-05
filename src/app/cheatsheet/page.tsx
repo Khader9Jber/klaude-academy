@@ -330,6 +330,7 @@ export default function CheatsheetPage() {
               placeholder="Search commands, shortcuts, config..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              data-testid="cheatsheet-search"
               className="w-full rounded-xl border border-border bg-surface pl-12 pr-4 py-3 text-foreground placeholder:text-muted/50 outline-none transition-colors focus:border-accent"
             />
           </div>
@@ -340,6 +341,7 @@ export default function CheatsheetPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                data-testid={`cheatsheet-tab-${tab.id.toLowerCase()}`}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                   activeTab === tab.id

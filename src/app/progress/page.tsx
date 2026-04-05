@@ -33,7 +33,7 @@ export default function ProgressPage() {
             </div>
             <Badge variant="accent">Dashboard</Badge>
           </div>
-          <h1 className="font-serif italic text-4xl sm:text-5xl text-foreground mb-4">
+          <h1 data-testid="progress-heading" className="font-serif italic text-4xl sm:text-5xl text-foreground mb-4">
             Your Progress
           </h1>
           <p className="text-lg text-muted max-w-2xl leading-relaxed">
@@ -95,6 +95,7 @@ export default function ProgressPage() {
                 <Button
                   variant="outline"
                   onClick={() => setShowConfirm(true)}
+                  data-testid="reset-progress-btn"
                   className="shrink-0 border-red/30 text-red hover:bg-red/10 hover:border-red/50"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -110,6 +111,7 @@ export default function ProgressPage() {
                     variant="destructive"
                     size="sm"
                     onClick={handleReset}
+                    data-testid="confirm-reset-btn"
                   >
                     Yes, Reset
                   </Button>

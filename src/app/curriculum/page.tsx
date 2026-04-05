@@ -137,6 +137,7 @@ export default function CurriculumPage() {
         {arcGroups.map((arc) => (
           <motion.section
             key={arc.id}
+            data-testid={`arc-${arc.id}`}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-50px" }}
@@ -182,6 +183,7 @@ export default function CurriculumPage() {
                   >
                     <Link
                       href={`/curriculum/${mod.slug}`}
+                      data-testid={`module-card-${mod.slug}`}
                       className={cn(
                         "group flex flex-col h-full rounded-xl p-5",
                         "bg-surface border border-border",

@@ -9,46 +9,44 @@ test.describe('Progress Tracking', () => {
 
   test('lesson shows Mark as Complete button', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals/what-is-claude');
-    await expect(page.locator('text=Mark as Complete')).toBeVisible();
+    await expect(page.getByTestId('mark-complete-btn')).toBeVisible();
   });
 
   test('clicking Mark as Complete changes button state', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals/what-is-claude');
-    await page.click('text=Mark as Complete');
+    await page.getByTestId('mark-complete-btn').click();
     // Should show completed state
-    await expect(page.locator('text=Completed')).toBeVisible();
+    await expect(page.getByTestId('lesson-completed')).toBeVisible();
   });
 
   test('completed lesson persists after page reload', async ({ page }) => {
     await page.goto('/curriculum/claude-fundamentals/what-is-claude');
-    await page.click('text=Mark as Complete');
-    await expect(page.locator('text=Completed')).toBeVisible();
+    await page.getByTestId('mark-complete-btn').click();
+    await expect(page.getByTestId('lesson-completed')).toBeVisible();
 
     // Reload the page
     await page.reload();
     // Should still show completed
-    await expect(page.locator('text=Completed')).toBeVisible();
+    await expect(page.getByTestId('lesson-completed')).toBeVisible();
   });
 
-  test('progress page loads', async ({ page }) => {
+  test('progress page loads with heading', async ({ page }) => {
     await page.goto('/progress');
-    await expect(page.locator('text=Your Progress')).toBeVisible();
+    await expect(page.getByTestId('progress-heading')).toBeVisible();
   });
 
   test('progress dashboard shows stats', async ({ page }) => {
     await page.goto('/progress');
-    // Should show lesson count, module count
-    await expect(page.locator('text=Lessons')).toBeVisible();
-    await expect(page.locator('text=Modules')).toBeVisible();
+    await expect(page.getByTestId('stat-lessons')).toBeVisible();
+    await expect(page.getByTestId('stat-quizzes')).toBeVisible();
+    await expect(page.getByTestId('stat-streak')).toBeVisible();
+    await expect(page.getByTestId('stat-achievements')).toBeVisible();
   });
 
   test('reset progress button exists with confirmation', async ({ page }) => {
     await page.goto('/progress');
-    const resetButton = page.locator('text=Reset All');
-    if (await resetButton.count() > 0) {
-      await resetButton.click();
-      // Should show confirmation
-      await expect(page.locator('text=Are you sure')).toBeVisible();
-    }
+    await page.getByTestId('reset-progress-btn').click();
+    // Should show confirmation
+    await expect(page.getByTestId('confirm-reset-btn')).toBeVisible();
   });
 });

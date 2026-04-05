@@ -117,7 +117,7 @@ export default async function LessonPage({
               </span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+            <h1 data-testid="lesson-title" className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
               {lesson.title}
             </h1>
 

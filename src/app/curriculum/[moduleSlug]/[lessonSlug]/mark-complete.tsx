@@ -21,6 +21,7 @@ export function MarkCompleteButton({ lessonId, color }: MarkCompleteButtonProps)
         }
       }}
       disabled={completed}
+      data-testid={completed ? "lesson-completed" : "mark-complete-btn"}
       className={cn(
         "flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold",
         "transition-all duration-200 border",

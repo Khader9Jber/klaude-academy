@@ -6,8 +6,11 @@ test.describe('Templates', () => {
     await expect(page.locator('h1')).toBeVisible();
   });
 
-  test('templates show copy buttons', async ({ page }) => {
+  test('templates show template cards with copy buttons', async ({ page }) => {
     await page.goto('/templates');
+    const templateCards = page.getByTestId('template-card');
+    await expect(templateCards).not.toHaveCount(0);
+    // Each template should have a Copy button
     await expect(page.locator('text=Copy')).not.toHaveCount(0);
   });
 
@@ -17,8 +20,9 @@ test.describe('Templates', () => {
     const hookFilter = page.locator('button:has-text("Hook"), button:has-text("Hooks")');
     if (await hookFilter.count() > 0) {
       await hookFilter.click();
-      // Should filter templates
-      await expect(page.locator('text=Hook')).not.toHaveCount(0);
+      // Should still show template cards
+      const templateCards = page.getByTestId('template-card');
+      await expect(templateCards).not.toHaveCount(0);
     }
   });
 

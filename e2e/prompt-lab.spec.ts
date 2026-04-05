@@ -1,26 +1,34 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Prompt Lab', () => {
-  test('prompt lab page loads', async ({ page }) => {
+  test('prompt lab page loads with heading', async ({ page }) => {
     await page.goto('/prompt-lab');
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.getByTestId('prompt-lab-heading')).toBeVisible();
   });
 
-  test('template library shows templates', async ({ page }) => {
+  test('template library shows template cards', async ({ page }) => {
     await page.goto('/prompt-lab');
-    // Should have template cards
-    await expect(page.locator('text=Copy')).not.toHaveCount(0);
+    const templateCards = page.getByTestId('template-card');
+    await expect(templateCards).not.toHaveCount(0);
   });
 
   test('category filter buttons work', async ({ page }) => {
     await page.goto('/prompt-lab');
-    // Click a category filter if available
-    const codingFilter = page.locator('button:has-text("Coding")');
-    if (await codingFilter.count() > 0) {
-      await codingFilter.first().click();
-      // Should filter to show only coding templates
-      await expect(page.locator('text=Coding').first()).toBeVisible();
-    }
+    // Click the Coding filter
+    await page.getByTestId('filter-coding').click();
+    // Should still have template cards visible (filtered to coding)
+    const templateCards = page.getByTestId('template-card');
+    await expect(templateCards).not.toHaveCount(0);
+  });
+
+  test('All filter shows all templates', async ({ page }) => {
+    await page.goto('/prompt-lab');
+    // Click a specific filter first
+    await page.getByTestId('filter-coding').click();
+    // Then click All
+    await page.getByTestId('filter-all').click();
+    const templateCards = page.getByTestId('template-card');
+    await expect(templateCards).not.toHaveCount(0);
   });
 
   test('before/after examples are visible', async ({ page }) => {

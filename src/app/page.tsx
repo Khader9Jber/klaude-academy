@@ -109,6 +109,7 @@ export default function HomePage() {
             <motion.h1
               variants={fadeUp}
               transition={{ duration: 0.5, delay: 0.1 }}
+              data-testid="hero-heading"
               className="font-serif italic text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight max-w-4xl"
             >
               Master Claude{" "}
@@ -134,6 +135,7 @@ export default function HomePage() {
             >
               <Link
                 href="/curriculum"
+                data-testid="start-learning-btn"
                 className={cn(
                   "inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl",
                   "bg-accent text-background font-semibold text-base",
@@ -160,7 +162,7 @@ export default function HomePage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="border-y border-border bg-surface/50">
+      <section data-testid="stats-bar" className="border-y border-border bg-surface/50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <motion.div
             initial="hidden"
@@ -187,7 +189,7 @@ export default function HomePage() {
       </section>
 
       {/* Arc Cards */}
-      <section className="py-20 sm:py-28">
+      <section data-testid="arc-cards" className="py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             initial="hidden"
@@ -365,6 +367,7 @@ export default function HomePage() {
             >
               <Link
                 href="/curriculum"
+                data-testid="start-learning-btn"
                 className={cn(
                   "inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl",
                   "bg-accent text-background font-semibold text-base",
