@@ -15,10 +15,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── Gate: CI must pass first ──
+  # ── CI Gate: lint + typecheck + test must pass ──
   ci-gate:
     name: CI Gate
-    uses: ./.github/workflows/ci.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type Check
+        run: npx tsc --noEmit
+      - name: Test + Coverage
+        run: npm run test:coverage
 
   # ── Deploy to GitHub Pages ──
   deploy-github-pages:
@@ -49,9 +62,6 @@ jobs:
     name: Vercel Production
     needs: ci-gate
     runs-on: ubuntu-latest
-    environment:
-      name: vercel-production
-      url: ${{ steps.deploy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,14 +69,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Build for Vercel (no basePath)
+      - name: Build for Vercel
         run: npm run build
       - name: Deploy to Vercel
         id: deploy
         run: |
-          npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --scope claude-academy-org 2>&1 | tee deploy.log
-          URL=$(grep -o 'https://[^ ]*\.vercel\.app' deploy.log | tail -1)
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --scope claude-academy-org
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
