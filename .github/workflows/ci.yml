@@ -1,4 +1,4 @@
-name: CI — Lint, Type Check, Test
+name: CI — Lint, Type Check, Test, Coverage
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
       - run: npx tsc --noEmit
 
   test:
-    name: Unit Tests
+    name: Unit Tests + Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+      - name: Coverage summary
+        run: |
+          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat coverage/coverage-summary.json | npx -y json -a -d ' ' key statements.pct branches.pct functions.pct lines.pct 2>/dev/null || echo "See artifacts for full report"
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
   build:
     name: Build

@@ -18,6 +18,12 @@ const PARTICLE_COLORS = [
   "bg-cyan",
 ];
 
+// Pre-compute random positions for confetti particles at module level to keep renders pure
+const PARTICLE_POSITIONS = Array.from({ length: 12 }, () => ({
+  left: `${50 + (Math.random() - 0.5) * 60}%`,
+  top: `${50 + (Math.random() - 0.5) * 40}%`,
+}));
+
 export function LessonCompleteButton({ lessonSlug }: LessonCompleteButtonProps) {
   const completeLesson = useProgressStore((s) => s.completeLesson);
   const isLessonComplete = useProgressStore((s) => s.isLessonComplete);
@@ -61,7 +67,7 @@ export function LessonCompleteButton({ lessonSlug }: LessonCompleteButtonProps) 
       {/* Confetti particles */}
       {showConfetti && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          {Array.from({ length: 12 }).map((_, i) => (
+          {PARTICLE_POSITIONS.map((pos, i) => (
             <span
               key={i}
               className={cn(
@@ -69,8 +75,8 @@ export function LessonCompleteButton({ lessonSlug }: LessonCompleteButtonProps) 
                 PARTICLE_COLORS[i % PARTICLE_COLORS.length]
               )}
               style={{
-                left: `${50 + (Math.random() - 0.5) * 60}%`,
-                top: `${50 + (Math.random() - 0.5) * 40}%`,
+                left: pos.left,
+                top: pos.top,
                 animationDelay: `${i * 50}ms`,
               }}
             />

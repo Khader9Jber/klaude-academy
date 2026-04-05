@@ -41,11 +41,6 @@ export function Quiz({ questions, quizId }: QuizProps) {
       setSelectedAnswer(null);
       setAnswered(false);
     } else {
-      const finalScore = Math.round(
-        ((score + (selectedAnswer === currentQuestion.correct ? 0 : 0)) /
-          questions.length) *
-          100
-      );
       // Score is already accumulated; compute final
       const computedScore = Math.round((score / questions.length) * 100);
       saveQuizScore(quizId, computedScore);
@@ -55,8 +50,6 @@ export function Quiz({ questions, quizId }: QuizProps) {
     currentIndex,
     questions.length,
     score,
-    selectedAnswer,
-    currentQuestion.correct,
     saveQuizScore,
     quizId,
   ]);

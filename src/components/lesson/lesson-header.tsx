@@ -1,5 +1,4 @@
 import { Clock, CheckCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 interface LessonHeaderProps {

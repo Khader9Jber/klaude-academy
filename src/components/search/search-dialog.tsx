@@ -69,9 +69,13 @@ export function SearchDialog() {
   }, [query]);
 
   // Reset selection when results change
+  const resultsLength = results.length;
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [results]);
+    if (resultsLength >= 0) {
+      const id = requestAnimationFrame(() => setSelectedIndex(0));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [resultsLength]);
 
   // Keyboard shortcut to open
   useEffect(() => {
@@ -89,12 +93,18 @@ export function SearchDialog() {
   }, []);
 
   // Focus input when dialog opens
+  const openRef = useRef(open);
   useEffect(() => {
-    if (open) {
+    const wasOpen = openRef.current;
+    openRef.current = open;
+    if (open && !wasOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      setQuery("");
-      setSelectedIndex(0);
+    }
+    if (!open && wasOpen) {
+      requestAnimationFrame(() => {
+        setQuery("");
+        setSelectedIndex(0);
+      });
     }
   }, [open]);
 

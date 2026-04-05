@@ -18,7 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { PromptPlayground } from "@/components/interactive/prompt-playground";
-import { CopyButton } from "@/components/content/copy-button";
 
 // ---------------------------------------------------------------------------
 // Types

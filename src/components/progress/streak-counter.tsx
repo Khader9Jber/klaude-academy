@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProgressStore } from "@/lib/store";
+
+const subscribe = () => () => {};
+const useMounted = () => useSyncExternalStore(subscribe, () => true, () => false);
 
 export function StreakCounter() {
   const streak = useProgressStore((s) => s.streak);
   const longestStreak = useProgressStore((s) => s.longestStreak);
 
   // Hydration guard
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) {
     return (

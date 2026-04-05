@@ -20,7 +20,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ARC_DEFINITIONS, MODULE_ORDER } from "@/lib/constants";
+import { ARC_DEFINITIONS } from "@/lib/constants";
 import { useProgressStore } from "@/lib/progress-store";
 import { Breadcrumb } from "@/components/layout";
 

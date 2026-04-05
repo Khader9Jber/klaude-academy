@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   BookOpen,
   Brain,
   Flame,
   Trophy,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useProgressStore } from "@/lib/store";
+
+const subscribe = () => () => {};
+const useMounted = () => useSyncExternalStore(subscribe, () => true, () => false);
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { AchievementBadge } from "./achievement-badge";
 
@@ -20,10 +22,7 @@ export function ProgressDashboard() {
   const achievements = useProgressStore((s) => s.achievements);
 
   // Hydration guard
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) {
     return (

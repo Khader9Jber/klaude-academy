@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Terminal } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { TerminalStep } from "@/types";
 
 interface TerminalSimulatorProps {
@@ -30,9 +29,10 @@ export function TerminalSimulator({
 
   const step = steps[currentStep];
 
-  // Show initial prompt
+  // Show initial prompt when step changes
   useEffect(() => {
     if (!completed && step) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing prompt with step index
       setHistory((prev) => {
         // Don't duplicate the current prompt
         const lastPrompt = prev.findLast((e) => e.type === "prompt");

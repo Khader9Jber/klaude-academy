@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -8,7 +8,6 @@ import {
   RotateCcw,
   AlertTriangle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgressDashboard } from "@/components/progress/progress-dashboard";
@@ -17,11 +16,6 @@ import { useProgressStore } from "@/lib/store";
 export default function ProgressPage() {
   const resetProgress = useProgressStore((s) => s.resetProgress);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleReset = () => {
     resetProgress();
