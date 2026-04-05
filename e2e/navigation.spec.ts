@@ -4,7 +4,7 @@ test.describe('Site Navigation', () => {
   test('landing page loads with hero section', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('text=Start Learning')).toBeVisible();
+    await expect(page.locator('text=Start Learning').first()).toBeVisible();
   });
 
   test('landing page shows 4 arc cards', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('Site Navigation', () => {
 
   test('Start Learning button navigates to curriculum', async ({ page }) => {
     await page.goto('/');
-    await page.click('text=Start Learning');
+    await page.locator('text=Start Learning').first().click();
     await expect(page).toHaveURL(/curriculum/);
   });
 

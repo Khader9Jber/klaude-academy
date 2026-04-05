@@ -5,7 +5,7 @@ test.describe('Responsive Design', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
     await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('text=Start Learning')).toBeVisible();
+    await expect(page.locator('text=Start Learning').first()).toBeVisible();
   });
 
   test('mobile: hamburger menu appears', async ({ page }) => {

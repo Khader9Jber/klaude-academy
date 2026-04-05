@@ -17,9 +17,9 @@ test.describe('Prompt Lab', () => {
     // Click a category filter if available
     const codingFilter = page.locator('button:has-text("Coding")');
     if (await codingFilter.count() > 0) {
-      await codingFilter.click();
+      await codingFilter.first().click();
       // Should filter to show only coding templates
-      await expect(page.locator('text=Coding')).toBeVisible();
+      await expect(page.locator('text=Coding').first()).toBeVisible();
     }
   });
 
