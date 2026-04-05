@@ -507,3 +507,90 @@ unit tests ────┘
 ### 9.4 Deploy Gate
 
 The deploy workflow (`.github/workflows/deploy.yml`) includes a CI gate job that runs lint, typecheck, and unit tests before allowing deployment. E2E tests run in the CI workflow but are not a direct blocker for deployment (they run in parallel via the `ci.yml` workflow). Both workflows trigger on push to `main`, ensuring E2E failures are visible before the next deploy cycle.
+
+---
+
+## 10. Authentication Testing Strategy
+
+### 10.1 Overview
+
+Authentication testing covers the Supabase Auth integration, including email/password login, OAuth redirects, session persistence, and graceful degradation when Supabase is not configured.
+
+### 10.2 Login Flow Testing
+
+| Test Case | Type | What to Test |
+|-----------|------|-------------|
+| Email/password login | E2E | Enter valid credentials, verify redirect to home, verify user menu appears in header |
+| Email/password signup | E2E | Enter new email/password, verify account creation, verify auto-profile creation |
+| Invalid credentials | E2E | Enter wrong password, verify error message displayed, verify no redirect |
+| Empty form submission | E2E | Submit login form with empty fields, verify validation errors |
+| Login page rendering | E2E | Verify login form elements present via `data-testid` attributes |
+| Signup page rendering | E2E | Verify signup form elements present via `data-testid` attributes |
+
+### 10.3 OAuth Redirect Testing
+
+| Test Case | Type | What to Test |
+|-----------|------|-------------|
+| Google OAuth button | E2E | Click Google button, verify redirect to Google OAuth URL |
+| GitHub OAuth button | E2E | Click GitHub button, verify redirect to GitHub OAuth URL |
+| OAuth callback | Integration | Verify `/auth/callback` route processes the code and creates a session |
+| OAuth error handling | E2E | Verify graceful error display when OAuth fails or is cancelled |
+
+### 10.4 Session Persistence Testing
+
+| Test Case | Type | What to Test |
+|-----------|------|-------------|
+| Session survives refresh | E2E | Log in, refresh page, verify user is still logged in (header shows user menu) |
+| Session survives navigation | E2E | Log in, navigate to multiple pages, verify session persists |
+| Sign out | E2E | Click sign out, verify redirect to home, verify "Sign In" button reappears |
+| Expired session | Integration | Verify expired session redirects to login gracefully |
+
+### 10.5 Graceful Degradation Testing
+
+| Test Case | Type | What to Test |
+|-----------|------|-------------|
+| No Supabase env vars | Unit | Remove Supabase env vars, verify site loads without errors |
+| Auth UI hidden without Supabase | E2E | Without Supabase env vars, verify "Sign In" button is not rendered |
+| Guest progress works | E2E | Without auth, verify lesson completion saves to localStorage |
+| Content accessible without login | E2E | Verify all content pages load for unauthenticated users |
+
+---
+
+## 11. Database Testing Strategy
+
+### 11.1 Overview
+
+Database testing validates Row Level Security (RLS) policies, data isolation between users, and correct behavior of database triggers and views.
+
+### 11.2 RLS Policy Testing
+
+| Test Case | Table | What to Test |
+|-----------|-------|-------------|
+| User reads own progress | `user_progress` | Authenticated user can SELECT their own row |
+| User cannot read other progress | `user_progress` | Authenticated user gets empty result when querying another user's ID |
+| User writes own progress | `user_progress` | Authenticated user can INSERT/UPDATE their own row |
+| User cannot write other progress | `user_progress` | Authenticated user gets RLS error when inserting with a different user_id |
+| User reads own profile | `profiles` | Authenticated user can SELECT their own profile |
+| User updates own profile | `profiles` | Authenticated user can UPDATE their own display_name |
+| User cannot update other profile | `profiles` | Authenticated user gets RLS error when updating another user's profile |
+| User reads own certificates | `certificates` | Authenticated user can SELECT their own certificates |
+| User cannot delete other certificates | `certificates` | Authenticated user gets RLS error when deleting another user's certificate |
+| Leaderboard is publicly readable | `leaderboard` | Unauthenticated request can SELECT from leaderboard view |
+| Anonymous cannot write | All tables | Anonymous user gets RLS error on INSERT/UPDATE/DELETE |
+
+### 11.3 Data Isolation Testing
+
+| Test Case | What to Test |
+|-----------|-------------|
+| User A's progress invisible to User B | Create progress for User A, query as User B, verify empty result |
+| User A's scores invisible to User B | Create quiz scores for User A, query as User B, verify empty result |
+| Profile auto-creation | Create a new auth user, verify `profiles` row is auto-created via trigger |
+| Cascade delete | Delete an auth user, verify all related rows in `user_progress`, `completed_lessons`, `quiz_scores`, `certificates`, and `user_settings` are deleted |
+
+### 11.4 Leaderboard View Testing
+
+| Test Case | What to Test |
+|-----------|-------------|
+| Correct ranking | Create multiple users with different lesson counts, verify leaderboard sorts by total completed |
+| New completions reflected | User completes a lesson, verify leaderboard updates |
+| Display name shown | User sets display name, verify it appears in leaderboard |

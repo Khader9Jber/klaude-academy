@@ -213,6 +213,19 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | **FR-45** | The CI workflow shall upload artifacts: coverage report (30-day retention), Playwright HTML report (30-day retention), E2E failure screenshots (7-day retention on failure only), and build output (7-day retention). | P2 |
 | **FR-46** | All key interactive and structural elements in the application shall have `data-testid` attributes following kebab-case naming convention. These attributes serve as stable selectors for E2E tests and must be present on: site header, site footer, site logo, navigation links, hero heading, Start Learning button, arc cards, stats bar, module cards, arc sections, module title, lesson items, lesson title, mark complete button, completed indicator, progress heading, progress stats, reset button, prompt lab heading, template cards, category filters, cheatsheet search input, and category tabs. | P1 |
 
+#### FR-47 to FR-54: Authentication, Backend, and Theme
+
+| ID | Requirement | Priority |
+|----|------------|----------|
+| **FR-47** | The system shall support user registration with email and password via Supabase Auth. The signup page (`/auth/signup`) shall include email and password fields with validation, and a link to the login page. On successful registration, a profile row shall be auto-created in the `profiles` table via a database trigger. | P1 |
+| **FR-48** | The system shall support OAuth login with Google and GitHub via Supabase Auth. The login page (`/auth/login`) shall display OAuth buttons for each configured provider alongside the email/password form. OAuth redirects are handled via the `/auth/callback` route. | P1 |
+| **FR-49** | The system shall provide a user profile page (`/profile`) where authenticated users can view and edit their display name. The display name is stored in the `profiles` table and shown on the leaderboard. | P2 |
+| **FR-50** | The system shall sync progress to Supabase for authenticated users using a dual-write pattern. On every progress action (lesson complete, quiz score, exercise complete), the state is written to both localStorage (instant) and Supabase (async). On page load, authenticated users' state is fetched from Supabase and merged with local state. Guest users use localStorage only. | P1 |
+| **FR-51** | The system shall provide a public leaderboard page (`/leaderboard`) displaying the top users sorted by total lessons completed. The leaderboard is a database view joining `profiles` and `completed_lessons`. It is publicly readable without authentication. | P2 |
+| **FR-52** | The system shall generate completion certificates for each arc (Foundation, Practitioner, Power User, Expert). Certificates are stored in the `certificates` table with a unique certificate ID. Certificate pages (`/certificate/[id]`) display the user's name, arc name, and completion date. | P2 |
+| **FR-53** | The system shall make all content accessible without authentication. Lessons, quizzes, cheatsheet, templates, and prompt lab shall function identically for guest users and authenticated users. Authentication only enables progress sync, leaderboard, certificates, and user profile. | P1 |
+| **FR-54** | The system shall support a light mode / dark mode toggle with dark mode as the default. Theme switching uses class-based toggling via next-themes. Code blocks and terminal components shall remain dark-themed in both modes for readability. The theme preference persists across sessions. | P1 |
+
 ### 3.2 Non-Functional Requirements
 
 | ID | Category | Requirement | Metric |
@@ -231,6 +244,8 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | **NFR-12** | Scalability | The system, as a statically generated site, shall handle unlimited concurrent users without performance degradation. Each user loads pre-built files from a CDN; there is no shared server resource. | Unlimited concurrent users |
 | **NFR-13** | Deployment | The CI pipeline (lint, typecheck, unit tests) must pass before any deployment to production. The deploy workflow includes a CI gate job that blocks deployment on failure. No code reaches GitHub Pages or Vercel production without passing the gate. | CI gate pass required |
 | **NFR-14** | Testing | E2E tests must pass on both desktop (Chromium, 1280x720) and mobile (Pixel 7, 412x915) viewports. The Playwright configuration defines two projects (`chromium` and `mobile`) and all 36 E2E tests run on both. Tests that are viewport-specific (e.g., desktop-only nav links) skip gracefully on the inapplicable viewport. | E2E pass on desktop + mobile |
+| **NFR-15** | Security | All user data stored in Supabase shall be protected by Row Level Security (RLS). Each table's RLS policies shall ensure that authenticated users can only read and write their own data. The leaderboard view and certificate verification are the only publicly readable data. No user can access, modify, or delete another user's progress, scores, or profile. | Zero RLS bypass vulnerabilities |
+| **NFR-16** | Graceful Degradation | The Supabase environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) shall be optional. When not set, the system shall function as a fully static site with localStorage-only persistence. Auth-related UI elements (Sign In button, user menu) shall be hidden. No errors shall occur due to missing Supabase configuration. | Site fully functional without Supabase |
 
 ---
 

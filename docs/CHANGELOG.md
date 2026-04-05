@@ -11,10 +11,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Enrich lessons 50-100 with more specific examples and code snippets
 - Add Sandpack code exercises to Practitioner and Advanced modules
 - Arabic language support (RTL layout)
-- Backend with Supabase (user accounts, cross-device progress sync)
 - Accessibility audit (WCAG 2.1 AA compliance)
 - Fuse.js search integration (currently hardcoded search data)
 - OG images for social sharing
+
+---
+
+## [0.2.0] - 2026-04-05
+
+### Added
+
+- Supabase backend integration (auth, database, RLS)
+- User authentication: email/password + Google + GitHub OAuth
+- Login and signup pages with data-testid attributes
+- User profile page with editable display name
+- Public leaderboard (top users by lessons completed)
+- Certificate pages for each arc
+- PostgreSQL schema: 7 tables with Row Level Security
+- Progress sync hook (dual-write: localStorage + Supabase)
+- Auth provider context with useAuth() hook
+- Light mode theme support (dark mode remains default)
+- Code blocks and terminals stay dark in both themes
+- Snapshot v0.1.0 tag for reverting to pre-backend state
+
+### Changed
+
+- next.config.ts: SSR for Vercel, static export only for GitHub Pages
+- Site header: shows auth state (Sign In / user menu)
+- ThemeProvider: switched to class-based theme toggling
 
 ---
 

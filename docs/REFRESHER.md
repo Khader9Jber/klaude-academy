@@ -6,7 +6,7 @@ A personal refresher for when you come back to this project after a break.
 
 ## What You Built
 
-Claude Academy is a complete interactive learning website for mastering Claude and Claude Code. It has 74 lessons across 13 modules organized in 4 skill arcs (Foundation, Practitioner, Power User, Expert), 294 quiz questions, interactive exercises, a dark-mode-first design, and it's deployed to 2 platforms. The whole thing is a static site -- no backend, no database, zero hosting cost.
+Claude Academy is a complete interactive learning website for mastering Claude and Claude Code. It has 74 lessons across 13 modules organized in 4 skill arcs (Foundation, Practitioner, Power User, Expert), 294 quiz questions, interactive exercises, light/dark mode (dark default), and it's deployed to 2 platforms. It has an optional Supabase backend for authentication (email, Google, GitHub), cross-device progress sync, a public leaderboard, and completion certificates. The site works fully without a backend -- Supabase adds user accounts and sync on top.
 
 ---
 
@@ -15,7 +15,9 @@ Claude Academy is a complete interactive learning website for mastering Claude a
 - You write lessons as MDX files in `content/modules/`. Each module has a `_module.json` for metadata and numbered `.mdx` files for lessons.
 - Push to `main` and the pipeline kicks in: lint, typecheck, unit tests, E2E tests, security scan, then auto-deploys to both GitHub Pages and Vercel.
 - Progress (completed lessons, quiz scores, streaks, achievements) is tracked in the user's browser via localStorage. No accounts needed.
-- No backend. The entire site is pre-rendered to static HTML/CSS/JS at build time. Anyone can host it anywhere.
+- **Optional auth**: if Supabase env vars are set, users can sign up (email, Google, GitHub) to sync progress across devices, appear on the leaderboard, and earn certificates. Without Supabase, the site runs as a fully static app.
+- Logged-in users get dual-write: progress saves to both localStorage and Supabase. Guests use localStorage only.
+- Vercel deployment uses SSR (for auth callbacks). GitHub Pages deployment uses static export.
 
 ---
 
@@ -29,6 +31,20 @@ npm run test:coverage  # With coverage report
 npm run test:e2e       # Playwright E2E tests (36 tests)
 npm run lint           # ESLint
 git push               # Auto-deploys via pipeline
+```
+
+### Supabase Setup (one-time)
+
+```bash
+# 1. Copy env template and add your Supabase credentials
+cp .env.example .env.local
+# Edit .env.local → set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# 2. Run the migration in Supabase SQL Editor
+#    Paste contents of supabase/migrations/001_initial.sql and click Run
+
+# 3. Configure auth redirect URLs in Supabase dashboard:
+#    Authentication > URL Configuration > add http://localhost:3000/auth/callback
 ```
 
 ---
@@ -47,8 +63,10 @@ git push               # Auto-deploys via pipeline
 - 74 lessons, 294 quiz questions, 13 modules, 4 arcs
 - 46 unit tests, 36 E2E tests, 97% statement coverage, 100% function coverage
 - 4 CI/CD workflows, dual deployment (GitHub Pages + Vercel)
-- 6 project docs (SRS, Test Plan, Test Suites, Architecture, Implementation Plan, Glossary)
+- 7 project docs (SRS, Test Plan, Test Suites, Architecture, Implementation Plan, Glossary, Changelog)
 - QA reports: content validation, build report, completeness audit
+- Supabase backend: 7 database tables with RLS, 3 auth providers (email, Google, GitHub)
+- Light/dark theme support (dark default)
 
 ---
 
@@ -66,6 +84,13 @@ git push               # Auto-deploys via pipeline
 | Constants | `src/lib/constants.ts` (site name, arcs, module order, achievements) |
 | E2E tests | `e2e/*.spec.ts` |
 | Page objects | `e2e/pages/*.page.ts` |
+| Supabase client | `src/lib/supabase/` |
+| Auth pages | `src/app/auth/` (login, signup, callback) |
+| Profile page | `src/app/profile/` |
+| Leaderboard | `src/app/leaderboard/` |
+| Certificates | `src/app/certificate/` |
+| Auth components | `src/components/auth/` |
+| DB migrations | `supabase/migrations/001_initial.sql` |
 | CI pipeline | `.github/workflows/{ci,security,deploy,pr-preview}.yml` |
 | Vitest config | `vitest.config.ts` |
 | Playwright config | `playwright.config.ts` |
@@ -131,7 +156,7 @@ git push               # Auto-deploys via pipeline
 - [ ] Enrich lessons 50-100 with more specific examples and code snippets (currently more templated than lessons 1-20)
 - [ ] Add Sandpack code exercises to Practitioner and Advanced modules
 - [ ] Arabic language support (RTL layout, translated content)
-- [ ] Backend with Supabase (user accounts, cross-device progress sync)
+- [x] ~~Backend with Supabase (user accounts, cross-device progress sync)~~ -- DONE (v0.2.0)
 
 ### Medium Priority
 
@@ -145,8 +170,8 @@ git push               # Auto-deploys via pipeline
 
 ### Low Priority / Future
 
-- [ ] Completion certificates (PDF generation)
-- [ ] Leaderboards and gamification
+- [x] ~~Completion certificates (PDF generation)~~ -- DONE (v0.2.0, per-arc certificates)
+- [x] ~~Leaderboards and gamification~~ -- DONE (v0.2.0, public leaderboard by lessons completed)
 - [ ] Community comments on lessons
 - [ ] Payment integration for premium content
 - [ ] Mobile app (React Native)
@@ -215,3 +240,20 @@ Quick reference to key decisions. Full details in `docs/ARCHITECTURE.md` (Sectio
    - "Build fails" -- run `npm run build` locally and read the error. Usually a TypeScript error or missing content file.
    - "E2E test fails" -- check `playwright-report/index.html` for screenshots and traces. The most common cause is a missing `data-testid` on a new element.
    - "Deploy fails" -- check that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repo settings.
+
+---
+
+## Snapshots & Reverting
+
+The project uses Git tags as snapshots. If a major change breaks things, you can revert.
+
+```bash
+git tag -l                    # List all snapshots
+git reset --hard v0.1.0       # Revert to static-only version (no backend)
+git push --force              # Push revert (destructive — use with caution)
+```
+
+| Tag | Description |
+|-----|-------------|
+| `v0.1.0` | Static site, no backend, dark mode only |
+| `v0.2.0` | Supabase backend + light/dark mode support |

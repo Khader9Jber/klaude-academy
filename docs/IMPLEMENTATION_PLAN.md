@@ -32,8 +32,10 @@
 | 8 | DevSecOps Pipeline | DONE | 0.5 weeks |
 | 9 | Clean Architecture | DONE | 0.5 weeks |
 | 10 | Deployment | DONE | 0.5 weeks |
+| 11 | Supabase Backend | DONE | 1 week |
+| 12 | Light/Dark Mode | DONE | 0.5 weeks |
 
-**Total timeline:** ~12 weeks from project start. All phases complete.
+**Total timeline:** ~13.5 weeks from project start. All phases complete.
 
 ---
 
@@ -470,6 +472,64 @@ src/components/progress/progress-dashboard.tsx
 - Vercel site accessible at `https://claude-academy-course.vercel.app`
 - Both sites deploy automatically when CI passes
 - PR previews deploy on PR creation/update
+
+---
+
+### Phase 11: Supabase Backend (DONE)
+
+**Objective:** Add optional Supabase backend for authentication, progress sync, leaderboard, and certificates.
+
+**Deliverables:**
+
+- Supabase client setup in `src/lib/supabase/` (client creation, helpers, types)
+- Authentication pages: login (`src/app/auth/login/`), signup (`src/app/auth/signup/`), callback (`src/app/auth/callback/`)
+- Auth provider context with `useAuth()` hook for session management across the app
+- User profile page (`src/app/profile/`) with editable display name
+- Public leaderboard page (`src/app/leaderboard/`) showing top users by lessons completed
+- Certificate pages (`src/app/certificate/`) for each arc completion
+- Auth-related UI components in `src/components/auth/`
+- PostgreSQL schema: 7 tables (`profiles`, `user_progress`, `completed_lessons`, `quiz_scores`, `certificates`, `leaderboard`, `user_settings`) with Row Level Security
+- Database migration file: `supabase/migrations/001_initial.sql`
+- Auto-profile trigger: creates a `profiles` row on new user signup
+- Progress sync hook (`useProgressSync`): dual-write to localStorage + Supabase for authenticated users
+- Site header updated: shows "Sign In" when logged out, user menu when logged in
+- `next.config.ts` updated: SSR for Vercel, static export only when `DEPLOY_TARGET=github-pages`
+- Login and signup pages include `data-testid` attributes for E2E testing
+- Supabase env vars are optional -- site works without them as a fully static app
+
+**Acceptance Criteria:**
+
+- Users can sign up with email/password, Google, or GitHub
+- Logged-in users' progress syncs to Supabase
+- Guest users' progress saves to localStorage only (no errors)
+- Leaderboard page shows top users ranked by lessons completed
+- Certificate pages display arc name, user name, and completion date
+- Profile page allows editing display name
+- Site works identically when Supabase env vars are not set (auth UI hidden)
+- All auth pages have `data-testid` attributes
+- Snapshot `v0.1.0` tag preserves the pre-backend state
+
+---
+
+### Phase 12: Light/Dark Mode (DONE)
+
+**Objective:** Add full light mode theme support with dark mode remaining the default.
+
+**Deliverables:**
+
+- Light mode color palette defined as CSS custom property overrides in `src/app/globals.css`
+- ThemeProvider switched to class-based theme toggling via next-themes
+- Code blocks and terminal components remain dark in both themes for readability
+- All pages and components tested in both light and dark mode
+- Theme preference persists across sessions via next-themes
+
+**Acceptance Criteria:**
+
+- Theme toggle switches between dark and light mode on all pages
+- Code blocks and terminal outputs stay dark in light mode
+- All text meets WCAG AA contrast ratios in both themes
+- Theme preference persists after page reload
+- No flash of wrong theme on page load
 
 ---
 

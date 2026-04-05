@@ -21,7 +21,9 @@
 9. [Barrel Export Structure](#9-barrel-export-structure)
 10. [Deployment Architecture](#10-deployment-architecture)
 11. [data-testid Convention](#11-data-testid-convention)
-12. [Future Architecture (with Backend)](#12-future-architecture-with-backend)
+12. [Authentication Architecture](#12-authentication-architecture)
+13. [Database Architecture](#13-database-architecture)
+14. [Progress Sync Architecture](#14-progress-sync-architecture)
 
 ---
 
@@ -877,11 +879,13 @@ deploy.yml workflow
 
 ### 10.2 Deployment Details
 
-| Platform | URL | Method | CI Gate |
-|----------|-----|--------|---------|
-| **GitHub Pages** | `https://khader9jber.github.io/claude-academy/` | `actions/deploy-pages@v4` | lint + typecheck + test must pass |
-| **Vercel Production** | `https://claude-academy-course.vercel.app` | `vercel deploy --prod` + alias | lint + typecheck + test must pass |
-| **Vercel Preview** (PRs) | Dynamic URL per PR | `vercel deploy` (non-prod) | Build must succeed |
+| Platform | URL | Mode | Method | CI Gate |
+|----------|-----|------|--------|---------|
+| **Vercel Production** | `https://claude-academy-course.vercel.app` | SSR (serverless) | `vercel deploy --prod` + alias | lint + typecheck + test must pass |
+| **GitHub Pages** | `https://khader9jber.github.io/claude-academy/` | Static export | `actions/deploy-pages@v4` | lint + typecheck + test must pass |
+| **Vercel Preview** (PRs) | Dynamic URL per PR | SSR | `vercel deploy` (non-prod) | Build must succeed |
+
+**SSR vs Static**: Vercel runs the site as an SSR app, which supports auth callbacks (`/auth/callback`) and server-side session management. GitHub Pages uses static export (`output: 'export'`), which does not support auth features -- the site runs in guest-only mode on GitHub Pages.
 
 ### 10.3 Vercel Configuration
 
@@ -966,131 +970,144 @@ data-testid="<component>-<element>"
 
 ---
 
-## 12. Future Architecture (with Backend)
+## 12. Authentication Architecture
 
-### 12.1 Supabase Integration Points
+### 12.1 Overview
 
-When a backend is added, Supabase integrates at the following points:
-
-```
-+-------------------------------------------------------------------+
-|                     CURRENT (Static)                              |
-|                                                                   |
-|  Browser → Static Files → Zustand → localStorage                  |
-+-------------------------------------------------------------------+
-                              │
-                              ▼ (migration)
-+-------------------------------------------------------------------+
-|                     FUTURE (With Backend)                         |
-|                                                                   |
-|  Browser → Next.js (SSR) → Supabase SDK                          |
-|                                │                                  |
-|                    ┌───────────┼───────────┐                      |
-|                    ▼           ▼           ▼                      |
-|              Supabase Auth  Supabase DB  Supabase Edge Functions  |
-|              (login/signup) (PostgreSQL)  (certificates, etc.)    |
-+-------------------------------------------------------------------+
-```
+Authentication is powered by Supabase Auth and is entirely optional. The site functions fully without it. When Supabase env vars are configured, auth features become available.
 
 ### 12.2 Auth Flow
 
 ```
 User visits site
     │
-    ├── Not logged in → Anonymous mode (current behavior, localStorage)
+    ├── Not logged in → Anonymous mode
+    │   └── Progress stored in localStorage only
+    │   └── No leaderboard, no certificates
     │
     └── Logged in → Authenticated mode
         │
-        ├── Supabase Auth session token in httpOnly cookie
-        ├── Progress synced to PostgreSQL
+        ├── Supabase Auth session managed via proxy.ts (cookie-based)
+        ├── Progress dual-written to localStorage + Supabase
         ├── Cross-device access enabled
-        └── Achievements and certificates unlocked
+        ├── Leaderboard ranking active
+        └── Arc certificates available
 ```
 
-### 12.3 Data Sync Architecture
+### 12.3 Supported Auth Providers
 
-**Optimistic sync strategy:**
+| Provider | Type | Notes |
+|----------|------|-------|
+| Email/Password | Native | Built-in Supabase Auth, email confirmation optional |
+| Google | OAuth | Requires Google OAuth client ID/secret in Supabase dashboard |
+| GitHub | OAuth | Requires GitHub OAuth app client ID/secret in Supabase dashboard |
 
-1. User actions update the Zustand store immediately (optimistic update).
-2. The custom storage adapter asynchronously writes to Supabase.
-3. If the write fails, the local state is preserved and retried on next action.
-4. On page load, state is fetched from Supabase and merged with any pending local changes.
+### 12.4 Session Management
+
+Sessions are managed via `@supabase/ssr` using cookie-based storage. The auth callback route (`src/app/auth/callback/`) handles the OAuth redirect flow. The `proxy.ts` helper manages Supabase client creation with proper cookie handling for both server and client components.
+
+### 12.5 Auth UI
+
+- **Site header**: shows "Sign In" button when logged out, user menu (profile, sign out) when logged in
+- **Login page** (`src/app/auth/login/`): email/password form + OAuth buttons, `data-testid` attributes for E2E testing
+- **Signup page** (`src/app/auth/signup/`): registration form + OAuth buttons
+- **Auth context**: `useAuth()` hook provides session, user, loading state, and sign-out function across the app
+
+### 12.6 Auth Gating
+
+Content is never gated behind auth. All lessons, quizzes, cheatsheet, templates, and prompt lab work without login. Auth only unlocks:
+- Progress sync to Supabase
+- Leaderboard participation
+- Arc completion certificates
+- User profile with display name
+
+---
+
+## 13. Database Architecture
+
+### 13.1 Overview
+
+The database uses Supabase PostgreSQL with 7 tables. All tables are protected by Row Level Security (RLS). The schema is defined in `supabase/migrations/001_initial.sql`.
+
+### 13.2 Tables
+
+| Table | Purpose | RLS Policy |
+|-------|---------|-----------|
+| `profiles` | User display names and avatars | Users can read/update own profile. Public read for leaderboard. |
+| `user_progress` | Serialized ProgressState JSON per user | Users can read/write own progress only |
+| `completed_lessons` | Individual lesson completion records with timestamps | Users can read/write own records only |
+| `quiz_scores` | Quiz attempts with score, total, bestScore | Users can read/write own scores only |
+| `certificates` | Arc completion certificates with unique certificate IDs | Users can read own certificates. Public read for verification. |
+| `leaderboard` | Materialized view of top users by lessons completed | Public read |
+| `user_settings` | User preferences (theme, notification settings) | Users can read/write own settings only |
+
+### 13.3 Auto-Profile Trigger
+
+A PostgreSQL trigger automatically creates a `profiles` row when a new user signs up via Supabase Auth:
+
+```sql
+-- Trigger on auth.users insert → create profiles row
+-- Sets default display_name from email prefix
+```
+
+### 13.4 Leaderboard View
+
+The leaderboard is a database view that joins `profiles` with `completed_lessons` to rank users by total lessons completed. It is publicly readable (no auth required to view the leaderboard page).
+
+### 13.5 RLS Policies
+
+All tables enforce Row Level Security. The general pattern:
+- **SELECT**: `auth.uid() = user_id` (users see only their own data)
+- **INSERT**: `auth.uid() = user_id` (users can only insert their own data)
+- **UPDATE**: `auth.uid() = user_id` (users can only update their own data)
+- **DELETE**: `auth.uid() = user_id` (users can only delete their own data)
+
+Exceptions: `leaderboard` view and certificate verification are publicly readable.
+
+---
+
+## 14. Progress Sync Architecture
+
+### 14.1 Dual-Write Pattern
+
+Progress is stored using a dual-write strategy:
 
 ```
-User Action
+User Action (e.g., markLessonComplete)
     │
     ▼
 Zustand set() ──────────► UI updates immediately
     │
-    ▼
-Custom Storage Adapter
+    ├── Guest user:
+    │   └── Write to localStorage only
     │
-    ├── Write to Supabase (async, non-blocking)
-    │   └── Success: done
-    │   └── Failure: queue for retry
-    │
-    └── Also write to localStorage (fallback)
+    └── Logged-in user:
+        ├── Write to localStorage (instant, offline-capable)
+        └── Write to Supabase (async, non-blocking)
+            ├── Success: done
+            └── Failure: localStorage has the data, retry on next action
 ```
 
-### 12.4 Database Schema (Planned)
+### 14.2 Why Dual-Write?
 
-```sql
--- Users (managed by Supabase Auth)
--- auth.users table is built-in
+- **Instant feedback**: localStorage writes are synchronous, so the UI updates immediately
+- **Offline resilience**: if the network is down, progress is preserved locally
+- **Graceful degradation**: if Supabase is unreachable, the site still works
+- **Migration path**: guest users who later sign up can have their localStorage progress merged
 
--- User progress
-CREATE TABLE user_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  state JSONB NOT NULL,  -- Serialized ProgressState
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id)
-);
+### 14.3 useProgressSync Hook
 
--- Row-Level Security
-ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
+The `useProgressSync` hook handles the dual-write logic:
+1. Subscribes to Zustand store changes
+2. On each change, writes to localStorage (via Zustand persist middleware)
+3. If user is authenticated, also writes to Supabase `user_progress` table
+4. On page load for authenticated users, fetches from Supabase and merges with local state
 
-CREATE POLICY "Users can read own progress"
-  ON user_progress FOR SELECT
-  USING (auth.uid() = user_id);
+### 14.4 Deployment Modes
 
-CREATE POLICY "Users can upsert own progress"
-  ON user_progress FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+| Platform | Mode | Auth | Progress Storage |
+|----------|------|------|-----------------|
+| Vercel | SSR | Full (email, Google, GitHub) | localStorage + Supabase |
+| GitHub Pages | Static export | None (auth features hidden) | localStorage only |
 
-CREATE POLICY "Users can update own progress"
-  ON user_progress FOR UPDATE
-  USING (auth.uid() = user_id);
-```
-
-### 12.5 API Route Structure (Planned)
-
-If Next.js API routes are used instead of direct Supabase client access:
-
-```
-src/app/api/
-├── auth/
-│   ├── login/route.ts       → POST /api/auth/login
-│   ├── signup/route.ts      → POST /api/auth/signup
-│   └── logout/route.ts      → POST /api/auth/logout
-├── progress/
-│   ├── route.ts             → GET, PUT /api/progress
-│   └── reset/route.ts       → POST /api/progress/reset
-├── certificates/
-│   └── [courseId]/route.ts   → GET /api/certificates/:courseId
-└── analytics/
-    └── route.ts              → POST /api/analytics (event tracking)
-```
-
-### 12.6 Migration Impact Summary
-
-| Layer | Changes Required | Effort |
-|-------|-----------------|--------|
-| Content (MDX files) | None | 0 |
-| UI Components | None | 0 |
-| Page Components | None (or minimal auth-gating) | Minimal |
-| State Management | Replace persist storage adapter | Small (~50 lines) |
-| Configuration | Remove `output: 'export'`, add env vars | Small |
-| New Code | Auth pages, Supabase setup, storage adapter | Medium (~200-400 lines) |
-| Deployment | Switch from static to serverless | Small (Vercel config change) |
-| **Total estimated effort** | | **2-3 developer days** |
+The `next.config.ts` conditionally applies `output: 'export'` when `DEPLOY_TARGET=github-pages`. On Vercel, it runs as a standard Next.js SSR app with full auth support.

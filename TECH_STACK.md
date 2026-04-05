@@ -59,9 +59,20 @@ Claude Academy is a comprehensive interactive learning website for mastering Cla
 | JetBrains Mono | Code blocks, terminal output, monospace content |
 | Instrument Serif | Large headings, hero text, decorative typography |
 
+### Theme — Light/Dark Mode
+
+| Technology | Purpose |
+|-----------|---------|
+| next-themes | Theme management — class-based toggling, persists preference across sessions |
+| CSS custom properties | Theme tokens — colors swap between dark and light via `[data-theme]` overrides |
+
+Dark mode is the default. Light mode uses warm, high-contrast colors. Code blocks and terminal components stay dark in both themes for readability.
+
 ### Design System
 
 Colors extracted from the Claude cheatsheet branding:
+
+**Dark theme (default):**
 ```
 Background:    #0a0a0d
 Surface:       #121218
@@ -81,15 +92,37 @@ Orange:        #d6885e
 Pink:          #d65ea0
 ```
 
+**Light theme:**
+```
+Background:    #fafaf9
+Surface:       #ffffff
+Surface 2:     #f5f5f4
+Surface 3:     #e7e5e4
+Border:        #d6d3d1
+Border Accent: #a8a29e
+Text:          #1c1917
+Muted:         #78716c
+Accent (gold): #b8860b
+```
+
 Arc color coding:
 - Foundation → Green (#5cb870)
 - Practitioner → Blue (#5e9ed6)
 - Power User → Purple (#a07ed6)
 - Expert → Gold (#d4a053)
 
-### Backend
+### Backend — Supabase (Optional)
 
-**None currently.** The site is fully static (`output: 'export'` in next.config.ts). The build step generates plain HTML/CSS/JS files. No server runs in production.
+| Technology | Purpose |
+|-----------|---------|
+| Supabase | Backend-as-a-service — provides PostgreSQL database, Auth, and Row Level Security. Free tier supports 50K users. |
+| Supabase Auth | User authentication — email/password, Google OAuth, GitHub OAuth |
+| Supabase PostgreSQL | Relational database — 7 tables for profiles, progress, scores, certificates, leaderboard, settings |
+| Row Level Security (RLS) | Database security — users can only read/write their own data |
+| @supabase/supabase-js | JavaScript/TypeScript SDK for client-side Supabase access |
+| @supabase/ssr | Server-side helpers for Supabase auth in Next.js |
+
+The backend is optional. Without Supabase env vars, the site runs as a fully static app with localStorage-only progress. With Supabase configured, users can sign up, sync progress across devices, appear on the leaderboard, and earn certificates. On Vercel, the site uses SSR for auth callbacks. On GitHub Pages, it deploys as a static export.
 
 ### Testing (Planned — Phase 7)
 
@@ -112,64 +145,54 @@ Arc color coding:
 
 ---
 
-## Future Architecture (Phase 2 — With Backend)
+## Current Backend Architecture (Supabase)
 
-When the project needs user accounts, cross-device progress sync, certificates, analytics, or payments, here is the planned backend stack. All technologies are JavaScript/TypeScript to keep a single-language stack.
+The backend was added in v0.2.0. It uses Supabase as a backend-as-a-service, keeping the entire stack in JavaScript/TypeScript.
 
-### Backend Framework
-
-| Technology | Purpose |
-|-----------|---------|
-| Next.js API Routes | Server-side endpoints — stays within the same Next.js project, no separate server needed |
-| OR Express.js / Fastify | Standalone Node.js server — if we want to separate backend from frontend |
-
-When adding a backend, we remove `output: 'export'` from next.config.ts and deploy to Vercel as a serverless app instead of a static site. The frontend stays exactly the same.
-
-### Database
+### Backend Stack
 
 | Technology | Purpose |
 |-----------|---------|
-| Supabase | Backend-as-a-service — provides PostgreSQL database + Auth + Edge Functions. Free tier supports 50K users. JS/TS SDK. |
-| OR PostgreSQL + Prisma | Self-hosted database with Prisma ORM (TypeScript). More control, more setup. |
-| OR MongoDB + Mongoose | Document database — flexible schema, good for user profiles and progress data. JS/TS native. |
+| Supabase | Backend-as-a-service — PostgreSQL database + Auth + Row Level Security |
+| Supabase Auth | Email/password, Google OAuth, GitHub OAuth — built-in, free |
+| Supabase PostgreSQL | Relational database for user data, progress, scores, certificates |
+| @supabase/supabase-js | Client-side SDK for database and auth operations |
+| @supabase/ssr | Server-side auth helpers for Next.js (cookie-based sessions) |
 
-**Recommended: Supabase** — fastest path, free tier is generous, built-in auth, TypeScript SDK, integrates with Next.js in ~50 lines of code.
+### What the Backend Handles
 
-### Authentication
+| Feature | Status | Implementation |
+|---------|--------|---------------|
+| User accounts | DONE | Supabase Auth — signup, login, sessions via email/Google/GitHub |
+| Progress sync | DONE | Dual-write: localStorage + Supabase for logged-in users |
+| Certificates | DONE | Per-arc completion certificates with unique IDs |
+| Leaderboards | DONE | Public leaderboard view sorted by lessons completed |
+| User profiles | DONE | Editable display name, auto-created on signup |
+| Analytics | Future | Track lesson views, quiz pass rates, drop-off points |
+| Comments / Q&A | Future | Store and display user discussions per lesson |
+| Payments | Future | Stripe (JS SDK) for premium content tiers |
+| Admin panel | Future | Dashboard to manage content, view analytics, moderate comments |
 
-| Technology | Purpose |
-|-----------|---------|
-| Supabase Auth | Email/password, Google, GitHub login — built into Supabase, free |
-| OR NextAuth.js (Auth.js) | Flexible auth library for Next.js — supports 50+ providers |
-| OR Clerk | Drop-in auth UI components — premium but fastest to implement |
+### Database Schema Summary
 
-### What the Backend Would Handle
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User display names and avatars (auto-created via trigger) |
+| `user_progress` | Serialized progress state per user |
+| `completed_lessons` | Individual lesson completion records with timestamps |
+| `quiz_scores` | Quiz attempt records with score tracking |
+| `certificates` | Arc completion certificates with unique IDs |
+| `leaderboard` | Materialized view — top users by lessons completed |
+| `user_settings` | User preferences (theme, notifications) |
 
-| Feature | Implementation |
-|---------|---------------|
-| User accounts | Supabase Auth — signup, login, sessions |
-| Progress sync | Save Zustand state to Supabase PostgreSQL instead of localStorage |
-| Certificates | Generate PDF certificates on lesson completion (server-side) |
-| Analytics | Track lesson views, quiz pass rates, drop-off points |
-| Comments / Q&A | Store and display user discussions per lesson |
-| Payments | Stripe (JS SDK) for premium content tiers |
-| Leaderboards | Query top users by completion %, streak, quiz scores |
-| Admin panel | Dashboard to manage content, view analytics, moderate comments |
+### Deployment Model
 
-### Migration Path (localStorage → Supabase)
+| Platform | Mode | Auth Support |
+|----------|------|-------------|
+| Vercel | SSR (serverless) | Full auth with callbacks via `src/app/auth/callback/` |
+| GitHub Pages | Static export | Auth features hidden, localStorage only |
 
-The current Zustand store in `src/lib/progress-store.ts` uses localStorage persist middleware. Migrating to Supabase requires:
-
-1. Remove `output: 'export'` from next.config.ts
-2. Install `@supabase/supabase-js`
-3. Create Supabase project (free at supabase.com)
-4. Add auth routes (login/signup pages)
-5. Swap the Zustand persist middleware from localStorage to a custom Supabase adapter
-6. Deploy to Vercel as serverless instead of static
-
-The frontend components, pages, and content remain **completely unchanged**. Only the storage layer changes.
-
-### Estimated backend addition: ~50-100 lines of new code + Supabase setup
+The `next.config.ts` conditionally sets `output: 'export'` when `DEPLOY_TARGET=github-pages`. On Vercel, it runs as a standard SSR app.
 
 ---
 
@@ -247,6 +270,6 @@ claude-academy/
 
 5. **No UI component library (shadcn/ui approach)**: Components are built from scratch with Tailwind, copied into the project (not installed as a dependency). Full control, no version lock-in.
 
-6. **Dark-mode default**: Matches Claude's brand identity. Light mode available via toggle.
+6. **Dark-mode default, light mode supported**: Matches Claude's brand identity. Full light mode via toggle using class-based theming. Code blocks stay dark in both themes.
 
 7. **Progressive enhancement**: The site works as pure HTML content. JavaScript adds interactivity (quizzes, progress) on top. If JS fails to load, users can still read lessons.
