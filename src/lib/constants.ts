@@ -1,6 +1,6 @@
 import type { Achievement } from "@/types/progress";
 
-export const SITE_NAME = "Claude Academy";
+export const SITE_NAME = "Klaude Academy";
 
 export const SITE_DESCRIPTION =
   "Master Claude from zero to hero. A free, comprehensive learning path covering everything from AI fundamentals to advanced agent workflows.";

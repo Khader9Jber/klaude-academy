@@ -49,9 +49,9 @@ const EMPTY_FORM: FormData = {
 const DEMO_ANNOUNCEMENTS: Announcement[] = [
   {
     id: "ann-1",
-    title: "Welcome to Claude Academy!",
+    title: "Welcome to Klaude Academy!",
     content:
-      "We are excited to launch Claude Academy. Start your learning journey today with our comprehensive curriculum.",
+      "We are excited to launch Klaude Academy. Start your learning journey today with our comprehensive curriculum.",
     type: "info",
     active: true,
     starts_at: "2025-09-01T00:00:00Z",

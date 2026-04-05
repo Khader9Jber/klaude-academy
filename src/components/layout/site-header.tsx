@@ -55,7 +55,7 @@ export function SiteHeader() {
         {/* Logo */}
         <Link href="/" data-testid="site-logo" className="flex items-center gap-2 shrink-0">
           <span className="font-serif text-xl italic text-accent">
-            Claude Academy
+            Klaude Academy
           </span>
         </Link>
 

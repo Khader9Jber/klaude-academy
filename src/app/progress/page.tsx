@@ -37,7 +37,7 @@ export default function ProgressPage() {
             Your Progress
           </h1>
           <p className="text-lg text-muted max-w-2xl leading-relaxed">
-            Track your learning journey through Claude Academy. Complete lessons,
+            Track your learning journey through Klaude Academy. Complete lessons,
             ace quizzes, and earn achievements as you master Claude from zero to hero.
           </p>
 

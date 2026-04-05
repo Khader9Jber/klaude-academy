@@ -69,7 +69,7 @@ export function AdminSidebar() {
       {/* Brand / title */}
       <div className="mb-6 px-3">
         <h2 className="text-lg font-semibold text-foreground">Admin</h2>
-        <p className="text-xs text-muted">Claude Academy</p>
+        <p className="text-xs text-muted">Klaude Academy</p>
       </div>
 
       {/* Navigation links */}

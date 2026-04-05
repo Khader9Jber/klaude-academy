@@ -27,8 +27,8 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: {
-    default: "Claude Academy",
-    template: "%s | Claude Academy",
+    default: "Klaude Academy",
+    template: "%s | Klaude Academy",
   },
   description: "Master Claude from zero to hero. A free, comprehensive learning path covering everything from AI fundamentals to advanced agent workflows.",
 };

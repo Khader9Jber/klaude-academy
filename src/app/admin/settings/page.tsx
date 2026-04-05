@@ -41,7 +41,7 @@ interface SettingsState {
 
 const DEFAULT_SETTINGS: SettingsState = {
   general: {
-    site_name: "Claude Academy",
+    site_name: "Klaude Academy",
     site_description:
       "Master Claude from zero to hero. A free, comprehensive learning path.",
   },
@@ -312,7 +312,7 @@ export default function AdminSettingsPage() {
             Site Settings
           </h1>
           <p className="text-lg text-muted max-w-2xl leading-relaxed">
-            Configure global settings for Claude Academy.
+            Configure global settings for Klaude Academy.
           </p>
         </div>
       </section>

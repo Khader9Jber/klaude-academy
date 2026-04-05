@@ -52,7 +52,7 @@ const CERTIFICATE_CONFIG: Record<
     color: "#d4a053",
   },
   full: {
-    title: "Claude Academy Master",
+    title: "Klaude Academy Master",
     description: "Completed every module in the curriculum",
     requiredModules: [
       "claude-fundamentals",
@@ -270,10 +270,10 @@ export function CertificateClient() {
               </div>
             </div>
 
-            {/* Claude Academy branding */}
+            {/* Klaude Academy branding */}
             <div className="mt-10 pt-6 border-t border-border">
               <p className="font-serif italic text-lg text-accent">
-                Claude Academy
+                Klaude Academy
               </p>
               <p className="text-xs text-muted mt-1">
                 Master Claude from Zero to Hero
@@ -290,8 +290,8 @@ export function CertificateClient() {
             onClick={() => {
               if (navigator.share) {
                 navigator.share({
-                  title: `${config.title} - Claude Academy`,
-                  text: `I earned the ${config.title} from Claude Academy!`,
+                  title: `${config.title} - Klaude Academy`,
+                  text: `I earned the ${config.title} from Klaude Academy!`,
                   url: window.location.href,
                 });
               } else {
