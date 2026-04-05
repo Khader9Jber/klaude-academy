@@ -18,12 +18,12 @@ export function TerminalBlock({
   const copyText = [command ? `$ ${command}` : "", output].filter(Boolean).join("\n");
 
   return (
-    <div className="group relative my-4 overflow-hidden rounded-lg border border-border bg-surface-2">
+    <div className="group relative my-4 overflow-hidden rounded-lg border border-[#28283a] bg-[#1a1a22]">
       {/* Title bar */}
-      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
+      <div className="flex items-center justify-between border-b border-[#28283a] bg-[#121218] px-4 py-2">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-muted" />
-          <span className="text-xs font-medium text-muted">{title}</span>
+          <Terminal className="h-4 w-4 text-[#8a8a9a]" />
+          <span className="text-xs font-medium text-[#8a8a9a]">{title}</span>
         </div>
         <CopyButton
           text={copyText}
@@ -33,15 +33,15 @@ export function TerminalBlock({
 
       {/* Terminal content */}
       <pre className="overflow-x-auto border-0 bg-transparent p-4 m-0 rounded-none">
-        <code className="text-sm leading-relaxed">
+        <code className="text-sm leading-relaxed text-[#e8e6e3]">
           {command && (
             <div>
-              <span className="text-green font-bold select-none">$ </span>
-              <span className="text-text">{command}</span>
+              <span className="text-[#5cb870] font-bold select-none">$ </span>
+              <span className="text-[#e8e6e3]">{command}</span>
             </div>
           )}
           {output && (
-            <div className={cn("text-muted", command && "mt-1")}>
+            <div className={cn("text-[#8a8a9a]", command && "mt-1")}>
               {output}
             </div>
           )}

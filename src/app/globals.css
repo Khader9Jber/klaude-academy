@@ -1,6 +1,26 @@
 @import "tailwindcss";
 
 :root {
+  /* Light mode defaults */
+  --background: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --surface-3: #eeeeee;
+  --border: #e0e0e0;
+  --border-accent: #d0d0d0;
+  --foreground: #1a1a2e;
+  --muted: #6b7280;
+  --accent: #b8860b;
+  --green: #16a34a;
+  --blue: #2563eb;
+  --red: #dc2626;
+  --purple: #7c3aed;
+  --cyan: #0891b2;
+  --orange: #ea580c;
+  --pink: #db2777;
+}
+
+.dark {
   --background: #0a0a0d;
   --surface: #121218;
   --surface-2: #1a1a22;
@@ -112,6 +132,15 @@ code {
   padding: 0.15em 0.35em;
 }
 
+/* Theme transition for smooth toggling */
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
 /* Headings in content */
 .prose h1,
 .prose h2,
@@ -215,19 +244,6 @@ a,
 button {
   transition: color 0.15s ease, background-color 0.15s ease,
     border-color 0.15s ease, opacity 0.15s ease;
-}
-
-/* Light theme overrides (when next-themes sets data-theme="light") */
-[data-theme="light"] {
-  --background: #fafaf9;
-  --surface: #ffffff;
-  --surface-2: #f5f5f4;
-  --surface-3: #e7e5e4;
-  --border: #d6d3d1;
-  --border-accent: #a8a29e;
-  --foreground: #1c1917;
-  --muted: #78716c;
-  --accent: #b8860b;
 }
 
 /* Completion confetti animation */

@@ -21,10 +21,10 @@ export function CodeBlock({
   const lines = children.trimEnd().split("\n");
 
   return (
-    <div className="group relative my-4 overflow-hidden rounded-lg border border-border bg-surface-2">
+    <div className="group relative my-4 overflow-hidden rounded-lg border border-[#28283a] bg-[#1a1a22]">
       {/* Header bar with filename and/or language */}
       {(filename || language) && (
-        <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
+        <div className="flex items-center justify-between border-b border-[#28283a] bg-[#121218] px-4 py-2">
           <div className="flex items-center gap-3">
             {/* Colored dots */}
             <div className="flex items-center gap-1.5">
@@ -33,11 +33,11 @@ export function CodeBlock({
               <span className="h-3 w-3 rounded-full bg-green/60" />
             </div>
             {filename && (
-              <span className="text-xs font-medium text-muted">{filename}</span>
+              <span className="text-xs font-medium text-[#8a8a9a]">{filename}</span>
             )}
           </div>
           {language && (
-            <span className="text-xs text-muted uppercase tracking-wider">
+            <span className="text-xs text-[#8a8a9a] uppercase tracking-wider">
               {language}
             </span>
           )}
@@ -57,7 +57,7 @@ export function CodeBlock({
 
       {/* Code area */}
       <pre className="overflow-x-auto border-0 bg-transparent p-4 m-0 rounded-none">
-        <code className="text-sm leading-relaxed">
+        <code className="text-sm leading-relaxed text-[#e8e6e3]">
           {lines.map((line, i) => {
             const lineNum = i + 1;
             const isHighlighted = highlight.includes(lineNum);
@@ -71,7 +71,7 @@ export function CodeBlock({
                 )}
               >
                 {showLineNumbers && (
-                  <span className="mr-4 inline-block w-8 text-right text-muted/50 select-none">
+                  <span className="mr-4 inline-block w-8 text-right text-[#8a8a9a]/50 select-none">
                     {lineNum}
                   </span>
                 )}
