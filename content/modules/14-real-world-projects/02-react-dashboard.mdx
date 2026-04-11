@@ -1,0 +1,362 @@
+---
+title: "Build an Admin Dashboard"
+slug: "react-dashboard"
+order: 2
+difficulty: "intermediate"
+duration: 25
+tags: ["project", "react", "dashboard", "typescript", "frontend"]
+objectives:
+  - "Build a complete admin dashboard with React, TypeScript, and Tailwind using Claude Code"
+  - "Use component-first prompting to generate consistent, reusable UI"
+  - "Apply Claude Code effectively for layout, data fetching, and state management"
+quiz:
+  - id: "dashboard-1"
+    question: "What is the best approach for building a dashboard with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to build the entire dashboard in one prompt"
+      - "Build the layout shell first, then add pages one at a time, each with their own data fetching and components"
+      - "Start with individual components and assemble later"
+      - "Copy a template and modify it"
+    correct: 1
+    explanation: "Building the layout shell (sidebar, header, content area) first establishes the visual framework. Then each page (users, analytics, settings) is added one at a time with its own components and data fetching. This approach keeps context manageable and produces consistent results."
+  - id: "dashboard-2"
+    question: "Why is it important to give Claude a design system reference when building UI?"
+    type: "multiple-choice"
+    options:
+      - "Claude cannot style components without one"
+      - "A design system ensures visual consistency — spacing, colors, typography, and component patterns stay uniform across all pages"
+      - "It reduces tokens"
+      - "It is required by React"
+    correct: 1
+    explanation: "Without a design system reference, Claude makes different visual decisions on each page — different spacing, slightly different colors, inconsistent button styles. Providing Tailwind class conventions, color tokens, and component patterns in CLAUDE.md ensures every page looks like it belongs to the same application."
+  - id: "dashboard-3"
+    question: "How should you handle data tables in a dashboard built with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Use HTML tables directly"
+      - "Build a reusable DataTable component first with sorting, pagination, and filtering, then use it on every page"
+      - "Use a different table library for each page"
+      - "Avoid tables"
+    correct: 1
+    explanation: "A reusable DataTable component with built-in sorting, pagination, and filtering eliminates redundancy and ensures consistency. Build it once with Claude, add it to your component library, then reference it in CLAUDE.md. Every page that needs a table uses the same component with different columns and data."
+  - id: "dashboard-4"
+    question: "What is the most token-efficient way to add a new dashboard page?"
+    type: "multiple-choice"
+    options:
+      - "Describe every visual detail"
+      - "Reference an existing page as a pattern — 'Create a Products page following the same layout and component patterns as the Users page'"
+      - "Paste a screenshot"
+      - "Write the HTML manually"
+    correct: 1
+    explanation: "Referencing an existing page as a pattern lets Claude read one file for the conventions (layout, data fetching, component usage) instead of you describing everything from scratch. Claude reads the Users page, understands the pattern, and replicates it for Products with different data and columns."
+---
+
+## What We Are Building
+
+An admin dashboard with sidebar navigation, data tables, charts, and forms. The stack: React 18 (or Next.js), TypeScript, Tailwind CSS, and a component library we build as we go.
+
+This project focuses on the Claude Code workflow — how to prompt for UI components, maintain visual consistency, and build pages efficiently.
+
+## Phase 1: Project Setup and Design System
+
+### The Setup Prompt
+
+```
+"Create a new React + TypeScript project using Vite for an admin dashboard.
+
+Stack:
+- React 18 + TypeScript
+- Tailwind CSS 3
+- React Router 6 for navigation
+- Recharts for data visualization
+- React Hook Form + Zod for forms
+
+Install all dependencies and create the basic Vite config.
+
+Create a design system file at src/styles/tokens.ts with:
+- Colors: primary (blue-600), secondary (gray-600), success (green-600), 
+  danger (red-600), warning (amber-500)
+- Spacing: consistent with Tailwind defaults
+- Border radius: rounded-lg as default
+- Shadow: shadow-sm for cards, shadow-md for modals
+
+Create a dark-mode-first Tailwind config with these tokens."
+```
+
+### The CLAUDE.md (Create Immediately)
+
+```markdown
+# Admin Dashboard
+
+## Stack
+React 18 + TypeScript + Tailwind CSS + Vite
+
+## Component Conventions
+- All components in src/components/ with PascalCase names
+- Each component in its own directory: ComponentName/index.tsx
+- Use named exports, not default exports
+- Props interface defined above the component
+- Tailwind classes only — no CSS files or styled-components
+
+## UI Conventions
+- Dark mode first (bg-gray-900, text-gray-100)
+- Cards: bg-gray-800 rounded-lg p-6 shadow-sm
+- Buttons: rounded-lg px-4 py-2 font-medium
+  - Primary: bg-blue-600 hover:bg-blue-700 text-white
+  - Secondary: bg-gray-700 hover:bg-gray-600 text-gray-200
+  - Danger: bg-red-600 hover:bg-red-700 text-white
+- Tables: bg-gray-800 rounded-lg, striped rows with bg-gray-750
+- Inputs: bg-gray-700 border-gray-600 rounded-lg text-gray-100
+- Spacing: p-6 for card padding, gap-6 for grid gaps, space-y-4 for stacks
+
+## Layout
+- Sidebar: fixed left, w-64, bg-gray-900, border-r border-gray-700
+- Header: sticky top, h-16, bg-gray-900, border-b border-gray-700
+- Content: ml-64 pt-16 p-6
+```
+
+## Phase 2: Layout Shell
+
+### Build the Layout First
+
+```
+"Create the dashboard layout with:
+
+1. Sidebar (src/components/Sidebar/index.tsx):
+   - Logo area at top (just text 'Admin' for now)
+   - Navigation links: Dashboard, Users, Products, Orders, Analytics, Settings
+   - Each link has an icon (use simple SVG icons or Lucide React)
+   - Active state: bg-gray-800 text-blue-400
+   - Collapsed state (icon only) controlled by a toggle button
+
+2. Header (src/components/Header/index.tsx):
+   - Search bar on the left
+   - Notification bell icon with badge count
+   - User avatar + dropdown (Profile, Settings, Logout)
+
+3. Layout wrapper (src/components/Layout/index.tsx):
+   - Combines Sidebar + Header + content area
+   - Content area scrolls independently
+   - Responsive: sidebar collapses to icons on medium screens, 
+     hidden on small screens
+
+4. Set up React Router with the layout wrapping all pages.
+   Create placeholder pages for each nav item."
+```
+
+This one prompt gives you the complete layout shell. Every page you build later drops into the content area.
+
+### Pro tip
+
+After the layout is built, verify it visually:
+
+```
+"Start the dev server and tell me the URL. 
+List any visual issues you can identify from the code — 
+overlapping elements, missing padding, z-index conflicts."
+```
+
+Claude will review its own code and often catch issues like the header being hidden behind the sidebar or content not accounting for the sidebar width.
+
+## Phase 3: Reusable Components
+
+Build the component library before building pages. This is the critical efficiency step.
+
+### DataTable Component
+
+```
+"Create a reusable DataTable component at src/components/DataTable/index.tsx.
+
+Features:
+- Generic TypeScript props: DataTable<T> with columns and data arrays
+- Column definition: { key: keyof T, label: string, sortable?: boolean, 
+  render?: (value, row) => ReactNode }
+- Built-in sorting (click column header to sort asc/desc)
+- Built-in pagination (10/25/50 rows per page selector)
+- Built-in search/filter (search across all string columns)
+- Loading state (skeleton rows)
+- Empty state ('No data found' message)
+- Row click handler (optional)
+- Checkbox selection (optional)
+
+Follow the UI conventions in CLAUDE.md for styling."
+```
+
+### StatsCard Component
+
+```
+"Create a StatsCard component for dashboard metrics:
+
+Props:
+- title: string (e.g., 'Total Users')
+- value: string | number (e.g., '12,453')
+- change: number (e.g., +12.5 or -3.2)
+- changeLabel: string (e.g., 'vs last month')
+- icon: ReactNode
+
+Display:
+- Card with the value prominently displayed
+- Change percentage in green (positive) or red (negative)
+- Icon in top-right corner with colored background circle
+
+Follow CLAUDE.md card styling."
+```
+
+### Modal, Form Components
+
+```
+"Create these reusable components:
+
+1. Modal (src/components/Modal/index.tsx):
+   - Overlay with backdrop blur
+   - Content card with title, body, and footer slots
+   - Close on backdrop click and Escape key
+   - Animate in/out
+
+2. FormField (src/components/FormField/index.tsx):
+   - Label + input + error message
+   - Works with React Hook Form (register prop)
+   - Variants: text, email, password, number, select, textarea
+
+3. ConfirmDialog (src/components/ConfirmDialog/index.tsx):
+   - Uses Modal internally
+   - Title, message, confirm button (danger style), cancel button
+   - Loading state on confirm button"
+```
+
+Building these three component prompts takes about 15 minutes. Every page you build after this uses them — no reinventing buttons, tables, or modals.
+
+## Phase 4: Dashboard Page
+
+```
+"Build the Dashboard (home) page at src/pages/Dashboard/index.tsx.
+
+Layout:
+1. Top row: 4 StatsCards in a grid
+   - Total Users (12,453 | +12.5%)
+   - Total Orders (3,842 | +8.3%)
+   - Revenue ($284,520 | +15.2%)
+   - Active Products (847 | -2.1%)
+
+2. Middle row: 2 charts side by side
+   - Left: Revenue line chart (last 12 months) using Recharts
+   - Right: Orders bar chart (last 7 days) using Recharts
+
+3. Bottom row: Recent Orders table
+   - Last 10 orders using DataTable
+   - Columns: Order ID, Customer, Product, Amount, Status, Date
+   - Status as colored badges (pending=yellow, completed=green, refunded=red)
+
+Use mock data for now. Create a src/data/mock.ts file with realistic data."
+```
+
+## Phase 5: Users Page (The Pattern Page)
+
+```
+"Build the Users management page at src/pages/Users/index.tsx.
+
+Features:
+1. Header row: 'Users' title + 'Add User' button
+2. DataTable with users data:
+   - Columns: Avatar+Name, Email, Role, Status, Joined Date, Actions
+   - Actions column: Edit button, Delete button
+3. Add User: Opens Modal with FormField components
+   - Fields: Name, Email, Role (select: admin/member/viewer)
+   - Validation with Zod: email required, name 2-100 chars
+4. Edit User: Same modal, pre-filled with user data
+5. Delete User: ConfirmDialog
+
+Use the DataTable, Modal, FormField, and ConfirmDialog components 
+we already built. Use mock data.
+
+This page will be the pattern for all other CRUD pages."
+```
+
+## Phase 6: Replicate the Pattern
+
+Now the Users page exists, every other CRUD page is one prompt:
+
+```
+"Create a Products management page following the exact same 
+pattern as the Users page.
+
+Columns: Image, Name, Category, Price, Stock, Status, Actions
+Filters: Category dropdown, Status dropdown
+Add/Edit form: Name, Description, Category, Price, Stock, Status
+
+Read src/pages/Users/index.tsx for the pattern."
+```
+
+```
+"Create an Orders page following the Users page pattern.
+
+Columns: Order ID, Customer (link), Items count, Total, 
+Status (badge), Payment Status (badge), Date
+Filters: Status, Date range
+Detail view: click row to see order details in a slide-over panel"
+```
+
+Each additional page takes one prompt and 5-8 minutes. Claude reads the Users page, understands the pattern, and adapts it with the new data and columns.
+
+## Phase 7: Analytics Page
+
+```
+"Build the Analytics page with multiple chart types:
+
+1. Top section: Date range selector (Last 7 days, 30 days, 90 days, 
+   12 months, custom range)
+
+2. Revenue section:
+   - Line chart: daily revenue for selected period
+   - Comparison overlay: previous period in dashed line
+
+3. Users section:
+   - Area chart: new signups per day
+   - Donut chart: users by role
+
+4. Products section:
+   - Horizontal bar chart: top 10 products by revenue
+   - Table: product performance metrics
+
+All charts use Recharts with our dark theme colors.
+Generate realistic mock data for each chart."
+```
+
+## Time and Token Budget
+
+| Phase | Time | Tokens | Messages |
+|---|---|---|---|
+| Setup + design system | 10 min | 30,000 | 3 |
+| Layout shell | 15 min | 60,000 | 4 |
+| Reusable components | 15 min | 80,000 | 5 |
+| Dashboard page | 10 min | 50,000 | 3 |
+| Users page (pattern) | 15 min | 60,000 | 4 |
+| Products + Orders pages | 15 min | 60,000 | 4 |
+| Analytics page | 15 min | 60,000 | 4 |
+| **Total** | **~95 min** | **~400,000** | **~27** |
+
+## Common Mistakes
+
+### Mistake 1: Not Building Components First
+
+Without reusable components, Claude creates slightly different tables, buttons, and modals on every page. Build the component library first — 15 minutes that saves hours.
+
+### Mistake 2: Describing Visual Details Instead of Referencing Patterns
+
+```
+❌ "Make a table with gray-800 background, rounded-lg corners, 
+    striped rows using gray-750..."
+
+✅ "Use the DataTable component with these columns..."
+```
+
+The first prompt wastes tokens on styling. The second references existing patterns.
+
+### Mistake 3: Trying to Build Responsive Layout Last
+
+Add responsive behavior from the start. The layout prompt includes responsive breakpoints. Retrofitting responsiveness is painful and breaks things.
+
+## Key Takeaway
+
+Building a dashboard with Claude Code is a five-phase process: set up the project and CLAUDE.md with UI conventions, build the layout shell, create 4-5 reusable components (DataTable, StatsCard, Modal, FormField, ConfirmDialog), build one complete CRUD page as the pattern, then replicate that pattern for every additional page. The reusable components are the force multiplier — they turn each new page from a 15-minute task to a 5-minute task. Total time for a complete dashboard with 5 pages, charts, and CRUD functionality: about 95 minutes.

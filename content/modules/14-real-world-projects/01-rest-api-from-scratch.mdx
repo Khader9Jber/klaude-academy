@@ -1,0 +1,335 @@
+---
+title: "Build a REST API from Scratch"
+slug: "rest-api-from-scratch"
+order: 1
+difficulty: "intermediate"
+duration: 25
+tags: ["project", "api", "express", "typescript", "rest"]
+objectives:
+  - "Build a complete REST API using Claude Code from project init to working endpoints"
+  - "Use Claude effectively for project scaffolding, route creation, and database setup"
+  - "Apply prompt patterns that produce production-quality API code on the first try"
+quiz:
+  - id: "rest-api-1"
+    question: "What is the most effective first prompt when starting an API project with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Build me an API"
+      - "A detailed prompt specifying the tech stack, directory structure, database choice, and the first 2-3 endpoints to implement"
+      - "Create a Node.js project"
+      - "Install Express"
+    correct: 1
+    explanation: "The first prompt sets the foundation for the entire project. Specifying the tech stack (Express + TypeScript), directory structure (routes, services, middleware), database (PostgreSQL + Prisma), and initial endpoints gives Claude enough context to scaffold a consistent, well-structured project. Vague first prompts lead to rework."
+  - id: "rest-api-2"
+    question: "When should you create the CLAUDE.md file during a new project?"
+    type: "multiple-choice"
+    options:
+      - "At the end of the project"
+      - "After the first working endpoint — capture the patterns Claude established so they stay consistent for the rest of the project"
+      - "Never — CLAUDE.md is optional"
+      - "Before writing any code"
+    correct: 1
+    explanation: "After the first endpoint works, you have established patterns: file naming, error handling, response format, import style. Capture these in CLAUDE.md immediately. Every subsequent endpoint Claude creates will follow these patterns automatically, preventing drift as the project grows."
+  - id: "rest-api-3"
+    question: "How should you handle database setup with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Let Claude create raw SQL files"
+      - "Use an ORM like Prisma — have Claude define the schema, generate the client, and create migrations"
+      - "Set up the database manually"
+      - "Use a NoSQL database to avoid migrations"
+    correct: 1
+    explanation: "An ORM like Prisma gives Claude type-safe database access and migration management. Claude defines the schema in schema.prisma, runs npx prisma generate to create the typed client, and npx prisma migrate dev to create migrations. This produces type-safe queries and version-controlled schema changes."
+  - id: "rest-api-4"
+    question: "What is the best order for building API endpoints with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Build all endpoints at once"
+      - "Build one complete CRUD resource first (routes + service + tests), then use it as a pattern for all other resources"
+      - "Start with the most complex endpoint"
+      - "Build all routes first, then all services, then all tests"
+    correct: 1
+    explanation: "Building one complete CRUD resource (e.g., users: list, get, create, update, delete + service layer + tests) establishes every pattern: routing, validation, error handling, database queries, and testing. Claude then replicates this pattern for every subsequent resource with high consistency."
+---
+
+## What We Are Building
+
+A task management REST API with Express, TypeScript, Prisma, and PostgreSQL. By the end, you will have:
+
+- CRUD endpoints for projects and tasks
+- JWT authentication
+- Input validation with Zod
+- Error handling middleware
+- Database with migrations
+- Tests for every endpoint
+
+This is not a tutorial about Express — it is a tutorial about using Claude Code effectively to build a production-quality API.
+
+## Phase 1: Project Scaffolding
+
+### The First Prompt
+
+This prompt does 80% of the setup work:
+
+```
+Create a new Express + TypeScript REST API project called "taskflow-api".
+
+Tech stack:
+- Express 4 with TypeScript
+- Prisma ORM with PostgreSQL
+- Zod for request validation
+- JWT for authentication (jsonwebtoken)
+- Vitest + Supertest for testing
+
+Directory structure:
+src/
+├── routes/       — Express route handlers
+├── services/     — Business logic
+├── middleware/    — Auth, validation, error handling
+├── types/        — TypeScript types and interfaces
+└── lib/          — Utilities (db client, jwt helpers)
+
+Setup:
+1. Initialize the project with package.json
+2. Create tsconfig.json (strict mode, ES2022 target)
+3. Create a basic Express app in src/index.ts with JSON parsing, 
+   CORS, and error handling middleware
+4. Create the Prisma schema with a User model (id, email, name, 
+   passwordHash, createdAt, updatedAt)
+5. Create a health check endpoint at GET /health
+
+Do not create any route handlers yet — just the skeleton.
+```
+
+### What Claude Produces
+
+Claude creates 8-10 files:
+
+```
+taskflow-api/
+├── package.json
+├── tsconfig.json
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   ├── index.ts          — Express app setup
+│   ├── lib/
+│   │   ├── prisma.ts     — Prisma client singleton
+│   │   └── jwt.ts        — JWT sign/verify helpers
+│   ├── middleware/
+│   │   ├── auth.ts       — JWT authentication middleware
+│   │   ├── validate.ts   — Zod validation middleware
+│   │   └── error.ts      — Global error handler
+│   └── types/
+│       └── express.d.ts  — Request type extensions
+```
+
+### Verify and Install
+
+```
+"Run npm install, then npx prisma generate. Show me any errors."
+```
+
+Claude runs the install, fixes any TypeScript or dependency issues, and confirms the project compiles.
+
+## Phase 2: First CRUD Resource
+
+### Build Users — The Pattern Resource
+
+```
+"Create the complete Users CRUD resource:
+
+1. Validation schemas (src/schemas/user.ts) using Zod:
+   - CreateUserSchema: email (email format), name (2-100 chars), password (8+ chars)
+   - UpdateUserSchema: name (optional), email (optional)
+
+2. Service (src/services/user-service.ts):
+   - createUser(data) — hash password, create in DB, return user without password
+   - getUserById(id) — return user or throw NotFoundError
+   - listUsers(page, limit) — cursor-based pagination
+   - updateUser(id, data) — partial update, return updated user
+   - deleteUser(id) — soft delete (add deletedAt field to schema)
+
+3. Routes (src/routes/users.ts):
+   - POST /api/v1/users — create user (public)
+   - GET /api/v1/users — list users (authenticated)
+   - GET /api/v1/users/:id — get user (authenticated)
+   - PUT /api/v1/users/:id — update user (authenticated, owner only)
+   - DELETE /api/v1/users/:id — delete user (authenticated, owner only)
+
+4. Register routes in src/index.ts
+
+Use the validation middleware for request body validation.
+Use the auth middleware for protected routes.
+Follow REST conventions: 201 for create, 200 for get/update, 204 for delete."
+```
+
+### Why This Prompt Works
+
+It specifies the exact files, function signatures, validation rules, and HTTP status codes. Claude does not have to make decisions — it implements a clear specification. The output is consistent and predictable.
+
+### Pro tip
+
+After Claude creates the users resource, immediately test it:
+
+```
+"Start the dev server and test the create user endpoint with curl:
+curl -X POST http://localhost:3000/api/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"test@test.com","name":"Test User","password":"password123"}'
+
+Show me the response."
+```
+
+Fix any issues while the pattern is fresh. Everything built after this copies the users pattern.
+
+## Phase 3: Capture the Pattern
+
+### Create CLAUDE.md
+
+After the users resource works, capture every pattern:
+
+```
+"Create a CLAUDE.md file for this project. Include:
+- The tech stack and directory structure
+- How routes, services, and schemas are organized
+- The error handling pattern (what error classes to use)
+- The validation middleware pattern
+- The response format (how we structure JSON responses)
+- The authentication pattern
+- Database query conventions (Prisma patterns we use)
+- Testing conventions (we'll add tests next)
+
+Base everything on the actual code we just wrote."
+```
+
+Claude reads the existing code and generates a CLAUDE.md that documents the real patterns — not generic conventions, but the exact conventions already in the codebase.
+
+## Phase 4: Build More Resources
+
+Now the pattern is established. Adding new resources is fast:
+
+```
+"Create the complete Projects CRUD resource following 
+the exact same pattern as Users:
+- Schema, service, routes
+- Projects have: id, name, description, ownerId (FK to User), 
+  status (active/archived), createdAt, updatedAt
+- Only the owner can update or delete a project
+- List endpoint supports filtering by status"
+```
+
+```
+"Create the Tasks resource:
+- Tasks belong to a Project
+- Fields: id, title, description, status (todo/in-progress/done), 
+  priority (low/medium/high), assigneeId (FK to User), 
+  projectId (FK to Project), dueDate, createdAt, updatedAt
+- Only project members can create/view tasks
+- List endpoint supports filtering by status, priority, and assignee"
+```
+
+Because CLAUDE.md captures the patterns, each new resource follows the same structure. File naming, error handling, validation, response format — all consistent.
+
+## Phase 5: Add Tests
+
+```
+"Write tests for the Users routes in tests/routes/users.test.ts.
+
+Use Vitest + Supertest. Follow this pattern:
+- beforeAll: set up test database, create test user
+- afterAll: clean up and close connections
+- Group tests by endpoint (describe block per endpoint)
+- Test: success case, validation errors, auth errors, not found
+
+Start with these test cases:
+- POST /users: valid input → 201, missing email → 400, duplicate email → 409
+- GET /users: authenticated → 200 with pagination, unauthenticated → 401
+- GET /users/:id: valid id → 200, invalid id → 404
+- PUT /users/:id: owner → 200, non-owner → 403
+- DELETE /users/:id: owner → 204, non-owner → 403"
+```
+
+Then:
+
+```
+"Run the tests and fix any failures."
+```
+
+Claude runs `npx vitest run`, reads the output, and fixes test issues. This cycle — write tests, run them, fix failures — usually takes 2-3 iterations for a complete resource.
+
+## Phase 6: Authentication Flow
+
+```
+"Add authentication endpoints:
+- POST /api/v1/auth/login — email + password → JWT token
+- POST /api/v1/auth/register — same as create user but returns token
+- POST /api/v1/auth/refresh — refresh token → new access token
+- GET /api/v1/auth/me — return current user from JWT
+
+Use access tokens (15min expiry) and refresh tokens (7 day expiry).
+Store refresh tokens in the database with a RefreshToken model."
+```
+
+## The Complete Project Structure
+
+After all phases, your project looks like this:
+
+```
+taskflow-api/
+├── CLAUDE.md
+├── package.json
+├── tsconfig.json
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── src/
+│   ├── index.ts
+│   ├── routes/
+│   │   ├── users.ts
+│   │   ├── projects.ts
+│   │   ├── tasks.ts
+│   │   └── auth.ts
+│   ├── services/
+│   │   ├── user-service.ts
+│   │   ├── project-service.ts
+│   │   ├── task-service.ts
+│   │   └── auth-service.ts
+│   ├── schemas/
+│   │   ├── user.ts
+│   │   ├── project.ts
+│   │   ├── task.ts
+│   │   └── auth.ts
+│   ├── middleware/
+│   │   ├── auth.ts
+│   │   ├── validate.ts
+│   │   └── error.ts
+│   ├── lib/
+│   │   ├── prisma.ts
+│   │   └── jwt.ts
+│   └── types/
+│       └── express.d.ts
+└── tests/
+    └── routes/
+        ├── users.test.ts
+        ├── projects.test.ts
+        └── auth.test.ts
+```
+
+## Time and Token Budget
+
+| Phase | Time | Tokens | Messages |
+|---|---|---|---|
+| Scaffolding | 10 min | 40,000 | 3-4 |
+| Users CRUD | 15 min | 80,000 | 5-7 |
+| CLAUDE.md | 5 min | 20,000 | 2 |
+| Projects + Tasks | 20 min | 100,000 | 6-8 |
+| Tests | 20 min | 80,000 | 8-10 |
+| Auth flow | 15 min | 60,000 | 4-6 |
+| **Total** | **~85 min** | **~380,000** | **~30** |
+
+Building this API manually would take a full workday. With Claude Code and structured prompts, it takes about 90 minutes.
+
+## Key Takeaway
+
+Building a REST API with Claude Code is about establishing patterns early and replicating them. The first resource (Users) takes the most prompts because you are defining conventions. Every resource after that is faster because CLAUDE.md captures the patterns. The workflow is: scaffold the project with one detailed prompt, build one complete CRUD resource, capture the patterns in CLAUDE.md, then replicate for every additional resource. Test after each resource, not at the end. The total time for a complete API with auth, validation, and tests is about 90 minutes and 380,000 tokens.

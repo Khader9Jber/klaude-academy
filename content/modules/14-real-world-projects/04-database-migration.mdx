@@ -1,0 +1,353 @@
+---
+title: "Database Migration with Zero Downtime"
+slug: "database-migration"
+order: 4
+difficulty: "intermediate"
+duration: 22
+tags: ["project", "database", "migration", "prisma", "postgresql"]
+objectives:
+  - "Plan and execute a complex database migration using Claude Code"
+  - "Apply the expand-contract pattern for zero-downtime schema changes"
+  - "Use Claude to generate migration scripts, data backfills, and rollback plans"
+quiz:
+  - id: "db-migration-1"
+    question: "What is the expand-contract pattern for database migrations?"
+    type: "multiple-choice"
+    options:
+      - "Making the database bigger then smaller"
+      - "First add new columns/tables (expand) while keeping old ones working, then remove old columns/tables (contract) after all code is updated"
+      - "Creating a new database and copying data"
+      - "Running migrations during maintenance windows"
+    correct: 1
+    explanation: "Expand-contract has two phases. Expand: add the new schema alongside the old one, with code that writes to both. Contract: once all code reads from the new schema, remove the old one. This ensures zero downtime because the old schema works throughout the migration."
+  - id: "db-migration-2"
+    question: "Why should you ask Claude to generate both the migration AND the rollback script?"
+    type: "multiple-choice"
+    options:
+      - "Rollbacks are optional"
+      - "Because if the migration fails halfway, you need a tested rollback that reverses exactly what the migration did — and it is cheapest to generate both at the same time while Claude has full context"
+      - "Rollbacks are automatic"
+      - "Claude cannot generate rollbacks"
+    correct: 1
+    explanation: "Generating the migration and rollback together ensures the rollback is the exact inverse of the migration. Claude has full context of what the migration does and can produce a precise rollback. Generating the rollback later requires Claude to re-read and understand the migration, wasting tokens and risking inconsistency."
+  - id: "db-migration-3"
+    question: "What is the safest way to rename a database column in production?"
+    type: "multiple-choice"
+    options:
+      - "ALTER TABLE RENAME COLUMN"
+      - "Three-step migration: add new column, backfill data, then drop old column in a separate deployment"
+      - "Drop and recreate the table"
+      - "It cannot be done safely"
+    correct: 1
+    explanation: "Renaming a column directly breaks all code reading the old name. The safe approach: Step 1: add the new column and write to both. Step 2: backfill data from old to new. Step 3: update code to read from the new column. Step 4: drop the old column. Each step is a separate deployment, ensuring zero downtime."
+  - id: "db-migration-4"
+    question: "How should you use Claude Code to verify a migration before running it in production?"
+    type: "multiple-choice"
+    options:
+      - "Just run it"
+      - "Ask Claude to analyze the migration SQL for locking behavior, data loss risk, and estimated execution time on your table sizes"
+      - "Test it manually"
+      - "Migrations do not need verification"
+    correct: 1
+    explanation: "Claude can analyze migration SQL and identify dangerous operations: full table locks (ALTER TABLE on large tables), potential data loss (column drops, type changes that lose precision), and long-running operations (backfills on millions of rows). It can also estimate execution time based on table size and suggest batching strategies."
+---
+
+## The Scenario
+
+You have a production PostgreSQL database with 2 million users and 15 million orders. The application needs a schema change: splitting the monolithic `users` table into `users` + `user_profiles` + `user_preferences`, renaming several columns to follow new naming conventions, and adding full-text search indexes.
+
+This is the kind of migration that, done wrong, takes the database down for 30 minutes. Done right, users never notice.
+
+## Phase 1: Migration Planning
+
+### Analyze the Current Schema
+
+```
+"Read the Prisma schema in prisma/schema.prisma and create 
+a migration plan for splitting the users table.
+
+Current users table has:
+- Core fields: id, email, passwordHash, role, createdAt, updatedAt
+- Profile fields: firstName, lastName, bio, avatarUrl, timezone, locale
+- Preference fields: emailNotifications, theme, dashboardLayout
+
+Plan the migration to:
+1. Create a user_profiles table (profile fields + userId FK)
+2. Create a user_preferences table (preference fields + userId FK)
+3. Keep core fields in users table
+4. Rename firstName/lastName to first_name/last_name in the process
+
+For each step, list:
+- The migration SQL
+- Whether it locks the table
+- Estimated execution time for 2M rows
+- The rollback SQL
+
+Use the expand-contract pattern for zero downtime."
+```
+
+### What Claude Produces
+
+A phased migration plan:
+
+```
+Phase 1: EXPAND (no downtime)
+├── Create user_profiles table
+├── Create user_preferences table
+├── Add indexes on userId columns
+├── Estimated time: < 1 second (DDL only, no data)
+
+Phase 2: BACKFILL (no downtime, background job)
+├── Copy profile data from users to user_profiles
+├── Copy preference data from users to user_preferences
+├── Run in batches of 5,000 rows
+├── Estimated time: 4-6 minutes for 2M rows
+
+Phase 3: DUAL WRITE (code change)
+├── Update application to write to both old and new tables
+├── Read from new tables with fallback to old
+├── No schema changes needed
+
+Phase 4: CONTRACT (after validation)
+├── Drop profile columns from users table
+├── Drop preference columns from users table
+├── Estimated time: < 1 second (DDL only)
+```
+
+## Phase 2: Generate Migration Scripts
+
+### Expand Migration
+
+```
+"Generate the Prisma migration for Phase 1 (expand).
+
+Update the Prisma schema to add UserProfile and UserPreferences 
+models while keeping the existing fields on User.
+
+Then generate the migration:
+npx prisma migrate dev --name add_profile_and_preferences_tables
+
+Show me the generated SQL before we proceed."
+```
+
+Claude updates the schema, generates the migration, and shows the SQL:
+
+```sql
+-- CreateTable
+CREATE TABLE "user_profiles" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "firstName" TEXT,
+    "lastName" TEXT,
+    "bio" TEXT,
+    "avatarUrl" TEXT,
+    "timezone" TEXT NOT NULL DEFAULT 'UTC',
+    "locale" TEXT NOT NULL DEFAULT 'en',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_preferences" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "emailNotifications" BOOLEAN NOT NULL DEFAULT true,
+    "theme" TEXT NOT NULL DEFAULT 'dark',
+    "dashboardLayout" TEXT NOT NULL DEFAULT 'default',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_preferences_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_profiles_userId_key" ON "user_profiles"("userId");
+CREATE UNIQUE INDEX "user_preferences_userId_key" ON "user_preferences"("userId");
+
+-- AddForeignKey
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_userId_fkey" 
+    FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE;
+ALTER TABLE "user_preferences" ADD CONSTRAINT "user_preferences_userId_fkey" 
+    FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE;
+```
+
+### Pro tip
+
+Always ask Claude to show the SQL before running the migration. Review it for table locks, missing indexes, and data type mismatches.
+
+## Phase 3: Backfill Script
+
+```
+"Generate a backfill script at scripts/backfill-profiles.ts that:
+
+1. Reads users in batches of 5,000
+2. For each batch, creates user_profiles and user_preferences records
+3. Uses a transaction per batch
+4. Tracks progress (logs every 10,000 rows)
+5. Handles resumption — if the script crashes, it picks up where 
+   it left off by checking for existing records
+6. Includes a --dry-run flag that shows what would be done without 
+   writing
+7. Includes timing: total elapsed, rows/second
+
+Map the fields:
+- users.firstName → user_profiles.firstName
+- users.lastName → user_profiles.lastName
+- users.bio → user_profiles.bio
+- users.avatarUrl → user_profiles.avatarUrl
+- users.timezone → user_profiles.timezone
+- users.locale → user_profiles.locale
+- users.emailNotifications → user_preferences.emailNotifications
+- users.theme → user_preferences.theme
+- users.dashboardLayout → user_preferences.dashboardLayout
+
+Generate the rollback script too: scripts/rollback-profiles.ts
+that deletes all user_profiles and user_preferences records."
+```
+
+### The Backfill Output
+
+```
+$ npx tsx scripts/backfill-profiles.ts
+
+Starting backfill: users → user_profiles + user_preferences
+Total users to process: 2,000,000
+
+[10,000/2,000,000] 0.5% — 4,200 rows/sec — ETA: 7m 56s
+[20,000/2,000,000] 1.0% — 4,350 rows/sec — ETA: 7m 35s
+...
+[2,000,000/2,000,000] 100% — 4,500 rows/sec — Total: 7m 24s
+
+✔ Backfill complete
+  Profiles created: 2,000,000
+  Preferences created: 2,000,000
+  Errors: 0
+```
+
+## Phase 4: Dual Write Code
+
+```
+"Update the user service to implement dual writes:
+
+When creating a user:
+1. Create the user record
+2. Create the user_profile record  
+3. Create the user_preferences record
+All in one transaction.
+
+When updating profile fields:
+1. Update both users.firstName AND user_profiles.firstName
+2. Same for all profile/preference fields
+This ensures both tables stay in sync during the transition.
+
+When reading profile data:
+1. Read from user_profiles first
+2. Fall back to users table if user_profiles record doesn't exist
+   (handles any rows that were created between migration and backfill)
+
+Add a feature flag MIGRATION_PHASE that controls behavior:
+- 'dual_write': write to both, read from new
+- 'new_only': write to new only, read from new only
+- 'old_only': write to old only, read from old (rollback state)"
+```
+
+## Phase 5: Validation
+
+Before dropping the old columns, validate data consistency:
+
+```
+"Generate a validation script at scripts/validate-migration.ts that:
+
+1. Counts records: users vs user_profiles vs user_preferences
+   - All counts should match
+
+2. Spot-checks data: sample 1,000 random users
+   - Compare firstName in users vs user_profiles
+   - Compare all fields that were copied
+   - Report any mismatches
+
+3. Checks for orphans:
+   - user_profiles without a corresponding user
+   - user_preferences without a corresponding user
+   - Users without a corresponding user_profiles
+
+4. Outputs a pass/fail summary:
+   ✔ Record counts match (2,000,000)
+   ✔ Data consistency check passed (1,000 samples, 0 mismatches)
+   ✔ No orphan records found
+   
+   RESULT: Safe to proceed with contract phase"
+```
+
+## Phase 6: Contract Migration
+
+Only after validation passes:
+
+```
+"Generate the contract migration that removes the profile and 
+preference columns from the users table.
+
+Before generating, analyze the risk:
+- What columns are being dropped?
+- Is there any code still reading from these columns?
+  (Search the codebase for references)
+- What is the rollback plan if we need to restore these columns?
+
+Generate the migration only if there are no remaining references 
+to the old columns in the application code."
+```
+
+Claude searches the codebase, finds any remaining references to the old columns, and either fixes them or reports them before generating the final migration.
+
+## The Complete Migration Timeline
+
+```
+Day 1: Deploy Phase 1 (expand)
+  - Create new tables
+  - Zero downtime, < 1 second
+  
+Day 1: Run Phase 2 (backfill)
+  - Copy data in batches
+  - Zero downtime, ~8 minutes
+  - Background process
+
+Day 2: Deploy Phase 3 (dual write)
+  - Code writes to both tables
+  - Code reads from new tables
+  - Zero downtime, code deployment
+
+Day 3: Run Phase 5 (validation)
+  - Verify data consistency
+  - ~2 minutes to run
+
+Day 4: Deploy Phase 6 (contract)
+  - Drop old columns
+  - Zero downtime, < 1 second
+  - Point of no return (unless you have backups)
+```
+
+## Watch Out: Large Table Locks
+
+Some ALTER TABLE operations lock the entire table. On a 2M row table, this can mean minutes of downtime. Claude can identify locking operations:
+
+```
+"Analyze this migration SQL and tell me which statements 
+will acquire table-level locks and for how long, 
+given a table with 2 million rows."
+```
+
+Operations that lock:
+- Adding a column with a DEFAULT value (PostgreSQL 11+ does this instantly)
+- Adding a NOT NULL constraint with a CHECK (requires full table scan)
+- Creating an index without CONCURRENTLY
+
+Operations that do NOT lock:
+- Adding a nullable column without a default
+- CREATE INDEX CONCURRENTLY
+- Creating new tables
+
+## Key Takeaway
+
+Complex database migrations with Claude Code follow the expand-contract pattern: add new schema alongside old (expand), backfill data in batches, run dual writes during transition, validate consistency, then remove old schema (contract). Have Claude generate both the migration and its rollback in the same prompt — it has full context of both directions. Always ask Claude to analyze migration SQL for table locks and estimate execution time before running it. The backfill script needs batch processing, progress tracking, and resumption capability. Validate data consistency before the contract phase. A migration that would risk 30 minutes of downtime becomes a four-day zero-downtime process.

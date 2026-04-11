@@ -1,0 +1,12 @@
+{
+  "title": "Real-World Projects",
+  "slug": "real-world-projects",
+  "description": "Guided end-to-end projects using Claude Code. Each lesson is a complete project from setup to deployment.",
+  "arc": "practitioner",
+  "order": 14,
+  "icon": "Hammer",
+  "color": "#5e9ed6",
+  "estimatedHours": 6,
+  "prerequisites": ["mcp-fundamentals"],
+  "lessonCount": 6
+}

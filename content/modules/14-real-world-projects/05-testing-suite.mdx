@@ -1,0 +1,361 @@
+---
+title: "Generate a Complete Test Suite"
+slug: "testing-suite"
+order: 5
+difficulty: "intermediate"
+duration: 22
+tags: ["project", "testing", "vitest", "jest", "coverage"]
+objectives:
+  - "Generate a comprehensive test suite for an existing untested project"
+  - "Use Claude Code strategically to achieve 80%+ code coverage"
+  - "Apply test generation patterns that produce maintainable, reliable tests"
+quiz:
+  - id: "test-suite-1"
+    question: "What is the correct order for generating tests for an untested project?"
+    type: "multiple-choice"
+    options:
+      - "Start with the most complex module"
+      - "Start with utility functions (pure, no dependencies), then services (business logic), then routes/controllers (integration)"
+      - "Generate all tests at once"
+      - "Start with end-to-end tests"
+    correct: 1
+    explanation: "Utility functions are pure and have no external dependencies — they are the easiest to test and establish the testing patterns. Services have more complexity but can be tested with mocks. Routes need integration test setup (test server, test database). Building from simple to complex ensures each layer works before adding complexity."
+  - id: "test-suite-2"
+    question: "Why should you provide Claude with an existing test file as a pattern before generating new tests?"
+    type: "multiple-choice"
+    options:
+      - "Claude cannot write tests without an example"
+      - "The example establishes the project's testing conventions — test framework, assertion style, mock patterns, and file organization — so all generated tests are consistent"
+      - "It reduces token usage"
+      - "It is a Claude Code requirement"
+    correct: 1
+    explanation: "Different projects use different testing conventions: Jest vs Vitest, expect vs assert, jest.mock vs vi.mock, describe/it vs test, factory functions vs inline fixtures. Providing a pattern file ensures Claude generates tests that match the project's existing style, making them easy to maintain alongside hand-written tests."
+  - id: "test-suite-3"
+    question: "How should you handle test data (fixtures) when generating tests at scale?"
+    type: "multiple-choice"
+    options:
+      - "Hardcode values in each test"
+      - "Create a factories module first — factory functions that generate test data with sensible defaults and overrides"
+      - "Use random data generators"
+      - "Use production data"
+    correct: 1
+    explanation: "Factory functions (e.g., createTestUser({ email: 'custom@test.com' })) provide sensible defaults with the ability to override specific fields. This eliminates repetitive test data setup, makes tests readable (only override what matters for the test), and keeps test data consistent across the entire suite."
+  - id: "test-suite-4"
+    question: "What is the most efficient Claude Code prompt pattern for generating tests?"
+    type: "multiple-choice"
+    options:
+      - "Write tests for the entire project"
+      - "One file at a time: 'Read src/services/auth.ts, then write comprehensive tests at tests/services/auth.test.ts covering happy path, edge cases, and error handling'"
+      - "Describe every test case you want"
+      - "Let Claude decide what to test"
+    correct: 1
+    explanation: "Processing one source file at a time keeps Claude focused and produces thorough tests. The prompt reads the source file (understanding the actual behavior), then writes tests with explicit coverage requirements. Doing the entire project at once leads to shallow coverage and inconsistent quality."
+---
+
+## The Scenario
+
+You have inherited a Node.js project with 25 source files and zero tests. Your goal: get to 80%+ code coverage with a comprehensive test suite. Manually writing tests for 25 files would take 3-4 days. With Claude Code, you can do it in 3-4 hours.
+
+Here is the step-by-step workflow I used on a real Express + TypeScript project.
+
+## Phase 1: Test Infrastructure
+
+### Set Up the Test Framework
+
+```
+"Set up Vitest for this project:
+
+1. Install vitest, @vitest/coverage-v8, supertest, and @types/supertest
+2. Create vitest.config.ts with:
+   - TypeScript support
+   - Coverage reporting (v8 provider)
+   - Coverage thresholds: 80% lines, 80% functions, 75% branches
+   - Test file pattern: tests/**/*.test.ts
+3. Add scripts to package.json:
+   - test: vitest run
+   - test:watch: vitest
+   - test:coverage: vitest run --coverage
+4. Create tests/ directory mirroring src/ structure"
+```
+
+### Create Test Factories
+
+Before writing any tests, create the factories module:
+
+```
+"Read the Prisma schema (or TypeScript types) and create 
+a test factory module at tests/factories/index.ts.
+
+For each model/type, create a factory function:
+- createTestUser(overrides?) — returns a User with sensible defaults
+- createTestOrder(overrides?) — returns an Order with sensible defaults
+- createTestProduct(overrides?) — returns a Product with sensible defaults
+
+Requirements:
+- Each factory returns a complete object with all required fields
+- Defaults should be realistic (not 'test', 'foo', 'bar')
+- Use incrementing IDs to avoid collisions
+- The overrides parameter lets you override any field
+- Factory functions should be pure (no database calls)
+
+Also create:
+- createTestJWT(userId) — returns a valid JWT token for testing
+- createTestDB() — returns a Prisma client connected to the test database"
+```
+
+### Create Test Helpers
+
+```
+"Create a test helpers module at tests/helpers/index.ts with:
+
+1. setupTestServer() — creates an Express app instance for Supertest
+2. cleanDatabase() — truncates all tables between tests
+3. seedDatabase(data) — inserts test data
+4. expectError(response, statusCode, errorCode) — asserts error responses
+5. authenticatedRequest(app) — returns a Supertest agent with auth headers"
+```
+
+## Phase 2: Test Utility Functions First
+
+Utilities are pure functions with no dependencies — the easiest to test.
+
+```
+"Read src/lib/utils.ts and write comprehensive tests at 
+tests/lib/utils.test.ts.
+
+For each exported function, test:
+1. Happy path with typical inputs
+2. Edge cases: empty string, zero, null, undefined, empty array
+3. Boundary values: very large numbers, very long strings
+4. Type coercion: what happens with wrong types?
+5. Return type: verify the return type matches the TypeScript signature
+
+Use descriptive test names that explain the scenario:
+it('should return empty array when input array is empty')
+NOT
+it('test empty array')"
+```
+
+### Example Output
+
+For a `formatCurrency` function, Claude generates:
+
+```typescript
+describe('formatCurrency', () => {
+  describe('happy path', () => {
+    it('should format positive amounts with two decimal places', () => {
+      expect(formatCurrency(1234.5)).toBe('$1,234.50');
+    });
+
+    it('should format zero as $0.00', () => {
+      expect(formatCurrency(0)).toBe('$0.00');
+    });
+
+    it('should handle amounts with no cents', () => {
+      expect(formatCurrency(100)).toBe('$100.00');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should format negative amounts with minus sign', () => {
+      expect(formatCurrency(-50.99)).toBe('-$50.99');
+    });
+
+    it('should round to two decimal places', () => {
+      expect(formatCurrency(10.999)).toBe('$11.00');
+    });
+
+    it('should handle very large amounts', () => {
+      expect(formatCurrency(1000000000)).toBe('$1,000,000,000.00');
+    });
+
+    it('should handle very small amounts', () => {
+      expect(formatCurrency(0.01)).toBe('$0.01');
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw TypeError when input is not a number', () => {
+      expect(() => formatCurrency('abc' as any)).toThrow(TypeError);
+    });
+
+    it('should throw when input is NaN', () => {
+      expect(() => formatCurrency(NaN)).toThrow();
+    });
+  });
+});
+```
+
+### Run and Fix
+
+```
+"Run the tests for utils: npx vitest run tests/lib/utils.test.ts
+Fix any failures."
+```
+
+Claude runs the tests, sees which ones fail (often edge cases reveal actual bugs in the source code), and either fixes the tests or reports the bugs.
+
+## Phase 3: Test Services (Business Logic)
+
+Services have dependencies (database, external APIs) that need mocking.
+
+```
+"Read src/services/order-service.ts and write tests at 
+tests/services/order-service.test.ts.
+
+Mock the database: vi.mock('../lib/prisma') — mock the Prisma client
+Mock external APIs: vi.mock('../lib/payment-gateway')
+
+Test every exported function:
+1. createOrder:
+   - Success: valid input → creates order + payment charge
+   - Validation: missing required fields → throws ValidationError
+   - Insufficient stock → throws ConflictError
+   - Payment failure → rolls back order creation
+   
+2. getOrderById:
+   - Found → returns order with items
+   - Not found → throws NotFoundError
+   - Unauthorized (different user) → throws ForbiddenError
+
+3. updateOrderStatus:
+   - Valid transition (pending → confirmed) → updates status
+   - Invalid transition (completed → pending) → throws ValidationError
+   - Sends notification on status change
+
+4. cancelOrder:
+   - Cancellable status → cancels and refunds
+   - Already shipped → throws ConflictError
+   - Refund failure → order stays in original status
+
+Use the factory functions from tests/factories/ for test data.
+Use beforeEach to reset all mocks."
+```
+
+### Pro tip
+
+Ask Claude to test the **error paths** as thoroughly as the happy paths. The most common bugs are in error handling — missing try/catch, incorrect error types, partial rollbacks:
+
+```
+"For createOrder, specifically test what happens when:
+- The payment charge succeeds but the database write fails
+- The database write succeeds but the notification fails
+- Two orders for the same item are created simultaneously"
+```
+
+## Phase 4: Test Routes (Integration)
+
+Routes need a test server, auth tokens, and database state.
+
+```
+"Read src/routes/orders.ts and write integration tests at 
+tests/routes/orders.test.ts.
+
+Use the test helpers: setupTestServer(), authenticatedRequest(), 
+cleanDatabase().
+
+Test each endpoint:
+1. POST /api/v1/orders
+   - 201: valid order with authenticated user
+   - 400: missing required fields (test each field individually)
+   - 401: no auth token
+   - 409: insufficient stock
+   
+2. GET /api/v1/orders
+   - 200: returns paginated orders for authenticated user
+   - Verify pagination: first page, second page, last page
+   - Verify only user's own orders are returned
+   - 401: no auth token
+
+3. GET /api/v1/orders/:id
+   - 200: user's own order with full details
+   - 403: another user's order
+   - 404: non-existent order ID
+
+4. DELETE /api/v1/orders/:id
+   - 204: successfully cancelled
+   - 403: another user's order
+   - 409: order already shipped
+
+For each test, verify:
+- Status code
+- Response body structure
+- Database state after the operation"
+```
+
+## Phase 5: Coverage Analysis
+
+After all tests are written:
+
+```
+"Run the full test suite with coverage:
+npx vitest run --coverage
+
+Show me:
+1. Overall coverage numbers
+2. Files below 80% coverage
+3. For each low-coverage file, what is untested?"
+```
+
+Claude runs coverage, identifies gaps, and generates targeted tests:
+
+```
+"The following functions in src/services/user-service.ts 
+are untested (0% coverage):
+- resetPassword (lines 89-112)
+- verifyEmail (lines 115-134)
+- deactivateAccount (lines 137-165)
+
+Write tests for these three functions following the same 
+pattern as the existing tests in tests/services/user-service.test.ts."
+```
+
+## Real Numbers
+
+When I ran this process on a 25-file Express project:
+
+| Metric | Result |
+|---|---|
+| Source files | 25 |
+| Test files generated | 18 |
+| Total test cases | 247 |
+| Coverage: lines | 84% |
+| Coverage: functions | 88% |
+| Coverage: branches | 76% |
+| Time spent | 3.5 hours |
+| Tokens used | ~520,000 |
+| Sessions | 5 (new session every 5 files) |
+
+The remaining 16% uncovered code was mostly error handling edge cases and dead code paths. Two more sessions brought coverage to 91%.
+
+## Common Mistakes
+
+### Mistake 1: Generating All Tests in One Session
+
+A 25-file project generates too much context for one session. Split into batches: utilities (session 1), services (sessions 2-3), routes (sessions 4-5).
+
+### Mistake 2: Not Running Tests After Each File
+
+Generate tests for one file, run them, fix failures, then move on. If you generate tests for five files before running any, debugging failures becomes much harder because you do not know which file introduced the issue.
+
+### Mistake 3: Testing Implementation Instead of Behavior
+
+```
+// Bad: tests implementation detail
+it('should call prisma.user.create with the hashed password', () => {
+  expect(prisma.user.create).toHaveBeenCalledWith({ ... });
+});
+
+// Good: tests behavior
+it('should create a user and return it without the password hash', () => {
+  const user = await createUser(validInput);
+  expect(user.email).toBe(validInput.email);
+  expect(user).not.toHaveProperty('passwordHash');
+});
+```
+
+Tell Claude to test behavior, not implementation. Implementation tests break whenever you refactor.
+
+## Key Takeaway
+
+Generating a test suite for an untested project follows a bottom-up approach: set up the test framework and factories first, then test utility functions (pure, no mocks), then services (with mocked dependencies), then routes (integration with test server). Process one file at a time, run tests after each file, and fix failures immediately. Start a new session every 5-6 files to keep context fresh. A 25-file project reaches 80%+ coverage in about 3.5 hours and 520,000 tokens — roughly 10x faster than writing tests manually. The factory functions and test helpers you create in Phase 1 pay for themselves many times over as every subsequent test file reuses them.

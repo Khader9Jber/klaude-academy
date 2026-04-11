@@ -1,0 +1,398 @@
+---
+title: "Documentation Overhaul"
+slug: "documentation-overhaul"
+order: 6
+difficulty: "intermediate"
+duration: 20
+tags: ["project", "documentation", "markdown", "jsdoc", "api-docs"]
+objectives:
+  - "Systematically rewrite an entire project's documentation using Claude Code"
+  - "Generate API references, READMEs, and inline documentation from source code"
+  - "Build a documentation maintenance workflow that keeps docs in sync"
+quiz:
+  - id: "doc-overhaul-1"
+    question: "What is the first step when overhauling project documentation?"
+    type: "multiple-choice"
+    options:
+      - "Start writing new docs immediately"
+      - "Audit the existing documentation: what exists, what is missing, what is outdated, and what is wrong"
+      - "Delete all existing docs"
+      - "Ask the team what they want"
+    correct: 1
+    explanation: "An audit tells you the scope of work. Ask Claude to compare the codebase against existing docs: which endpoints are undocumented? Which documented features no longer exist? Which docs reference old API versions? This audit becomes your task list and prevents both redundant work and missed gaps."
+  - id: "doc-overhaul-2"
+    question: "How should you organize a documentation overhaul with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "One session for all documentation"
+      - "Separate sessions by document type: one for API reference, one for guides, one for inline docs — each with its own golden example"
+      - "Let Claude decide the structure"
+      - "Write everything in one large file"
+    correct: 1
+    explanation: "Different document types need different prompting strategies and golden examples. API reference docs follow a strict template. Guides need narrative flow. Inline docs need code context. Separating by type keeps each session focused and produces consistent output within each category."
+  - id: "doc-overhaul-3"
+    question: "What is a 'golden example' in documentation generation?"
+    type: "multiple-choice"
+    options:
+      - "The best documentation ever written"
+      - "A single, perfectly formatted document that serves as the template — Claude replicates its structure, style, and level of detail for all subsequent documents"
+      - "A placeholder document"
+      - "Documentation written by the team lead"
+    correct: 1
+    explanation: "A golden example is one document written exactly the way you want all documents to look. It sets the section structure, heading levels, table formats, code example style, and verbosity level. When you tell Claude 'follow this format exactly,' every subsequent document matches it. Without a golden example, Claude makes different formatting decisions each time."
+  - id: "doc-overhaul-4"
+    question: "How do you verify generated documentation is accurate?"
+    type: "multiple-choice"
+    options:
+      - "Trust Claude's output"
+      - "Cross-reference generated docs against the actual source code: run the curl examples, check that parameter names match, verify response schemas"
+      - "Ask another AI to review it"
+      - "Documentation accuracy does not matter"
+    correct: 1
+    explanation: "Generated documentation can contain hallucinated parameters, incorrect response schemas, or curl examples that do not actually work. Verification means running the curl commands, checking that the documented parameters match the actual validation schemas, and verifying the response structures against the actual endpoint responses."
+---
+
+## The Scenario
+
+You have a production project with 40 source files, 15 API endpoints, and documentation that consists of a half-written README and some outdated Notion pages. Your task: create comprehensive, accurate documentation that a new developer can use to get productive in their first week.
+
+Here is how to systematically overhaul documentation using Claude Code.
+
+## Phase 1: Documentation Audit
+
+### Take Inventory
+
+```
+"Audit the documentation state of this project.
+
+Check:
+1. README.md — does it exist? Is it complete? Is it accurate?
+2. docs/ directory — what docs exist?
+3. API endpoints (src/routes/) — which are documented? Which are not?
+4. Inline docs (JSDoc/TSDoc) — what percentage of exports have docs?
+5. Environment variables — are they documented anywhere?
+6. Database schema — is there an ERD or schema description?
+
+Create a documentation gap analysis:
+
+| Document | Status | Notes |
+|----------|--------|-------|
+| README | Partial | Missing setup instructions |
+| API Reference | Missing | 15 endpoints, 0 documented |
+| ... | ... | ... |"
+```
+
+### Claude's Audit Output
+
+```
+Documentation Gap Analysis:
+
+| Document           | Status    | Notes                              |
+|--------------------|-----------|------------------------------------|
+| README.md          | Outdated  | References Express 3 (project uses 4) |
+| API Reference      | Missing   | 15 endpoints, 0 documented         |
+| Architecture docs  | Missing   | No system overview                  |
+| Setup guide        | Missing   | README has partial instructions     |
+| JSDoc coverage     | 12%       | Only src/lib/utils.ts has docs     |
+| Env var docs       | Missing   | .env.example has no descriptions    |
+| Database docs      | Missing   | Prisma schema exists but no ERD    |
+| Changelog          | Missing   | No changelog file                   |
+| Contributing guide | Missing   | No contributing guidelines          |
+
+Priority order:
+1. README.md (every developer reads this first)
+2. Setup guide (blocks new developers immediately)
+3. API Reference (most requested by frontend team)
+4. JSDoc (helps IDE experience for all developers)
+5. Architecture docs (needed for onboarding)
+```
+
+## Phase 2: README Overhaul
+
+### Write the Golden README
+
+```
+"Rewrite README.md for this project.
+
+Read these files first:
+- package.json (project info, scripts, dependencies)
+- src/index.ts (entry point, middleware stack)
+- prisma/schema.prisma (database models)
+- .env.example (environment variables)
+
+Structure:
+1. Project name + one-line description
+2. Tech stack badges (Node, TypeScript, Express, PostgreSQL)
+3. Prerequisites (Node 18+, PostgreSQL 15+, pnpm)
+4. Quick Start:
+   - Clone
+   - Install: pnpm install
+   - Configure: cp .env.example .env.local (list required vars)
+   - Database: npx prisma migrate dev
+   - Run: pnpm dev
+   - Verify: curl http://localhost:3000/health
+5. Environment Variables table:
+   | Variable | Required | Default | Description |
+6. Project Structure (tree with one-line descriptions)
+7. Available Scripts (from package.json, with descriptions)
+8. API Overview (brief, link to full API docs)
+9. Testing (how to run, coverage target)
+10. Deployment (overview, link to deployment docs)
+11. Contributing (branch naming, commit format, PR process)
+
+Use values from the actual codebase. No placeholder text.
+Maximum 150 lines."
+```
+
+### Verify the README
+
+```
+"Read the generated README.md and verify:
+1. Every npm script listed actually exists in package.json
+2. Every environment variable listed exists in .env.example
+3. The Quick Start instructions would actually work if followed step by step
+4. The project structure matches the actual directory tree
+
+Fix any inaccuracies."
+```
+
+This self-verification step catches hallucinated scripts and variables.
+
+## Phase 3: API Reference
+
+### Create the Golden Endpoint Doc
+
+Write one endpoint documentation perfectly by hand (or with heavy Claude guidance):
+
+```
+"Document the POST /api/v1/auth/login endpoint.
+
+Read src/routes/auth.ts to understand:
+- What parameters it accepts (read the Zod schema)
+- What it returns on success
+- What errors it can return
+- What middleware it uses
+
+Format:
+## POST /api/v1/auth/login
+
+Authenticate a user and receive an access token.
+
+### Authentication
+None (public endpoint)
+
+### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+### Success Response (200)
+\`\`\`json
+{ actual response shape from the code }
+\`\`\`
+
+### Error Responses
+| Status | Code | Description |
+|--------|------|-------------|
+
+### Example
+\`\`\`bash
+curl command that actually works
+\`\`\`
+
+### Rate Limiting
+Details from middleware
+```
+
+### Batch Generate All Endpoints
+
+```
+"Using the exact same format as the login endpoint documentation 
+I just created, document all endpoints in src/routes/users.ts.
+
+Read the file. For each endpoint:
+1. Read the Zod validation schema for the exact field names and types
+2. Read the route handler for the response structure
+3. Read the middleware chain for auth requirements
+4. Generate the documentation
+
+Create the output in docs/api/users.md"
+```
+
+Repeat for each route file:
+
+```
+"Document all endpoints in src/routes/orders.ts using the same 
+format. Output to docs/api/orders.md"
+```
+
+```
+"Document all endpoints in src/routes/products.ts using the same 
+format. Output to docs/api/products.md"
+```
+
+### Pro tip
+
+Start a new session every 3-4 route files. API documentation generation is token-heavy because Claude reads the route file, validation schemas, and service layer for each endpoint.
+
+## Phase 4: Inline Documentation (JSDoc)
+
+### Batch JSDoc Generation
+
+```
+"Add JSDoc comments to every exported function, class, and type 
+in src/services/user-service.ts.
+
+Rules:
+- Read the implementation to understand what each function does
+- @description — one sentence, present tense ('Creates a new user')
+- @param — include type and description for each parameter
+- @returns — describe what is returned and when
+- @throws — list specific error types and when they are thrown
+- @example — one realistic example per function
+- Do NOT change any code — only add comments
+
+After this file, do the same for:
+- src/services/order-service.ts
+- src/services/product-service.ts"
+```
+
+### Verify JSDoc
+
+```
+"Run the TypeScript compiler: npx tsc --noEmit
+Make sure the added JSDoc comments don't introduce any type errors."
+```
+
+## Phase 5: Architecture Documentation
+
+```
+"Create docs/architecture.md — a system architecture overview.
+
+Read the codebase to understand:
+- src/ directory structure and purpose of each directory
+- How a request flows: route → middleware → service → repository → database
+- Authentication flow (JWT)
+- Error handling chain
+- Database relationships (from Prisma schema)
+
+Include:
+1. System overview (one paragraph)
+2. Request flow diagram (ASCII art)
+3. Directory layout with responsibilities
+4. Database schema diagram (ASCII art from Prisma models)
+5. Authentication architecture
+6. Error handling strategy
+7. Key design decisions and their rationale
+
+Target audience: new developer joining the team.
+Maximum 200 lines."
+```
+
+### Request Flow Diagram
+
+Claude generates ASCII diagrams from the actual middleware stack:
+
+```
+Client Request
+     │
+     ▼
+┌─────────────┐
+│   Express    │  CORS, JSON parsing, request logging
+│  Middleware  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    Auth      │  JWT verification (skip for public routes)
+│  Middleware  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Validation  │  Zod schema validation
+│  Middleware  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│    Route     │────▶│   Service   │────▶│  Repository  │
+│   Handler    │     │   (Logic)   │     │  (Prisma)    │
+└──────┬──────┘     └─────────────┘     └──────┬──────┘
+       │                                        │
+       ▼                                        ▼
+┌─────────────┐                          ┌─────────────┐
+│   Error     │                          │ PostgreSQL  │
+│  Handler    │                          │  Database   │
+└─────────────┘                          └─────────────┘
+```
+
+## Phase 6: Documentation Index
+
+```
+"Create docs/README.md as the documentation index.
+
+List every documentation file with a one-line description:
+- Getting Started: README.md
+- API Reference: docs/api/*.md (list each file)
+- Architecture: docs/architecture.md
+- Deployment: docs/deployment.md
+- Contributing: docs/contributing.md
+
+Add a 'Documentation for...' quick reference:
+| I want to... | Read this |
+|--------------|-----------|
+| Set up the project | README.md |
+| Understand the API | docs/api/ |
+| Debug a production issue | docs/architecture.md |
+```
+
+## The Documentation Maintenance Problem
+
+Documentation rots. Here is how to keep it fresh:
+
+### Hook: Remind on API Changes
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write(src/routes/**)",
+        "command": "echo 'REMINDER: Route file changed. Update docs/api/ if endpoints were added or modified.'"
+      }
+    ]
+  }
+}
+```
+
+### CI: Check Doc Freshness
+
+```yaml
+# .github/workflows/docs-check.yml
+- name: Check API docs freshness
+  run: |
+    for route in src/routes/*.ts; do
+      doc="docs/api/$(basename $route .ts).md"
+      if [ ! -f "$doc" ]; then
+        echo "Missing docs: $doc"
+        exit 1
+      fi
+    done
+```
+
+## Real Numbers
+
+| Document Type | Files | Time | Tokens |
+|---|---|---|---|
+| README | 1 | 15 min | 25,000 |
+| API Reference | 5 | 45 min | 180,000 |
+| JSDoc (inline) | 12 | 40 min | 150,000 |
+| Architecture | 1 | 15 min | 30,000 |
+| Contributing + misc | 3 | 20 min | 40,000 |
+| **Total** | **22** | **~2.5 hours** | **~425,000** |
+
+Manually writing this documentation would take 2-3 weeks for a single developer.
+
+## Key Takeaway
+
+A documentation overhaul with Claude Code follows five phases: audit (what is missing and wrong), README (first thing everyone reads), API reference (most requested docs), inline JSDoc (improves IDE experience), and architecture overview (onboarding essential). The golden example technique ensures consistency — write one perfect document, then have Claude replicate the format for everything else. Verification is critical: run the curl examples, check parameter names against validation schemas, and confirm scripts exist in package.json. Budget 2.5 hours and 425,000 tokens for a 40-file project. Set up hooks and CI checks to keep docs fresh after the initial overhaul.

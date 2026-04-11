@@ -1,0 +1,369 @@
+---
+title: "Build a CLI Tool"
+slug: "cli-tool"
+order: 3
+difficulty: "intermediate"
+duration: 22
+tags: ["project", "cli", "node", "typescript", "commander"]
+objectives:
+  - "Build a complete CLI tool from scratch using Claude Code"
+  - "Implement commands, flags, interactive prompts, and output formatting"
+  - "Package and distribute a CLI tool with proper error handling"
+quiz:
+  - id: "cli-tool-1"
+    question: "What is the best prompt strategy for building a CLI tool with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Describe the entire CLI in one prompt"
+      - "Start with the CLI framework and one command, verify it works, then add commands one at a time"
+      - "Write all commands as separate scripts"
+      - "Use a CLI template generator"
+    correct: 1
+    explanation: "Starting with the framework (Commander.js setup, base config, help text) and one working command establishes the patterns: how commands are defined, how options are parsed, how output is formatted, and how errors are handled. Every subsequent command copies this pattern."
+  - id: "cli-tool-2"
+    question: "How should you handle CLI output formatting with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Use console.log for everything"
+      - "Build a reusable output module with consistent colors, spinners, tables, and error formatting early in the project"
+      - "Use JSON output only"
+      - "Output formatting is not important for CLIs"
+    correct: 1
+    explanation: "A reusable output module (using chalk for colors, ora for spinners, cli-table3 for tables) ensures consistent formatting across all commands. Define it early and reference it in CLAUDE.md. Without this, each command formats output differently — some with colors, some without, some with tables, some with raw text."
+  - id: "cli-tool-3"
+    question: "What is essential to include when testing a CLI tool built with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Only unit tests"
+      - "Integration tests that execute the actual CLI commands and verify stdout output, exit codes, and file system changes"
+      - "No tests — just try it manually"
+      - "Only end-to-end tests"
+    correct: 1
+    explanation: "CLI tools need integration tests that run the actual binary, pass arguments, and verify stdout output and exit codes. Unit tests for utility functions are valuable too, but integration tests catch issues like argument parsing bugs, missing command registrations, and incorrect help text that unit tests miss."
+  - id: "cli-tool-4"
+    question: "How should a CLI tool handle errors?"
+    type: "multiple-choice"
+    options:
+      - "Let them crash with stack traces"
+      - "Catch errors at the command level, display a user-friendly message with chalk.red, suggest the fix, and exit with a non-zero code"
+      - "Suppress all errors"
+      - "Log errors to a file only"
+    correct: 1
+    explanation: "Good CLI error handling catches errors, prints a clean message (not a stack trace), suggests what the user should do ('Did you mean...?', 'Run with --verbose for details'), and exits with a non-zero code so scripts can detect failures. Stack traces are hidden by default but available with a --verbose flag."
+---
+
+## What We Are Building
+
+A project scaffolding CLI called `quickstart` that initializes new projects from templates. It demonstrates every CLI pattern: commands with subcommands, interactive prompts, progress indicators, file system operations, configuration files, and error handling.
+
+```bash
+# What the finished CLI looks like
+quickstart init my-app --template express-ts
+quickstart templates list
+quickstart templates add my-template ./path/to/template
+quickstart config set defaultTemplate express-ts
+quickstart config get defaultTemplate
+```
+
+## Phase 1: CLI Skeleton
+
+### The Setup Prompt
+
+```
+"Create a CLI tool called 'quickstart' using:
+- TypeScript
+- Commander.js for command parsing
+- Chalk for colored output
+- Ora for spinners
+- Inquirer for interactive prompts
+- fs-extra for file operations
+
+Directory structure:
+src/
+├── index.ts          — Entry point, register all commands
+├── commands/         — One file per command
+├── lib/
+│   ├── output.ts     — Colored output helpers (success, error, warn, info)
+│   ├── config.ts     — Read/write ~/.quickstart/config.json
+│   └── templates.ts  — Template registry and operations
+└── types/            — TypeScript interfaces
+
+Setup:
+1. package.json with bin field pointing to dist/index.js
+2. tsconfig.json targeting ES2022
+3. Shebang (#!/usr/bin/env node) in the entry point
+4. Create the output helpers module with these functions:
+   - success(message) — green checkmark + message
+   - error(message) — red X + message
+   - warn(message) — yellow warning + message
+   - info(message) — blue info + message
+   - spinner(message) — returns an ora spinner instance
+   - table(headers, rows) — formatted table output
+
+Do NOT create any commands yet. Just the skeleton and output module."
+```
+
+### Verify It Works
+
+```
+"Build the project (npx tsc) and run: node dist/index.js --help
+Show me the output."
+```
+
+Expected:
+
+```
+Usage: quickstart [options] [command]
+
+Project scaffolding CLI
+
+Options:
+  -V, --version  output the version number
+  -h, --help     display help for command
+```
+
+## Phase 2: First Command — init
+
+```
+"Create the 'init' command in src/commands/init.ts.
+
+Usage: quickstart init <project-name> [options]
+Options:
+  --template <name>   Template to use (default: 'basic')
+  --skip-install      Skip npm install
+  --verbose           Show detailed output
+
+Behavior:
+1. Check if directory already exists → error if it does
+2. If no --template flag, use Inquirer to prompt:
+   - Select template from available templates
+   - Enter project description
+   - Select package manager (npm, pnpm, yarn)
+3. Create project directory
+4. Copy template files (from a templates/ directory in the CLI package)
+5. Replace placeholders in template files:
+   - {{PROJECT_NAME}} → project name
+   - {{DESCRIPTION}} → description
+   - {{YEAR}} → current year
+6. Run package manager install (unless --skip-install)
+7. Show success message with next steps
+
+Use the output helpers for all messages.
+Use a spinner during file copying and npm install.
+
+For now, create one built-in template called 'basic' with:
+- package.json (with placeholders)
+- tsconfig.json
+- src/index.ts
+- .gitignore
+- README.md (with placeholders)
+
+Register the command in src/index.ts."
+```
+
+### Test It
+
+```
+"Build and test: 
+node dist/index.js init test-project --template basic --skip-install
+Show me the output and the created files."
+```
+
+Expected output:
+
+```
+✔ Created directory: test-project
+⠋ Copying template files...
+✔ Template files copied (5 files)
+✔ Replaced placeholders in 3 files
+
+✨ Project 'test-project' created successfully!
+
+  Next steps:
+    cd test-project
+    npm install
+    npm run dev
+```
+
+## Phase 3: Template Management
+
+```
+"Create the 'templates' command group with subcommands:
+
+quickstart templates list
+  - Show table of available templates (name, description, files count)
+  - Include built-in and custom templates
+
+quickstart templates add <name> <path>
+  - Copy files from path into ~/.quickstart/templates/<name>/
+  - Create template metadata (name, description, files list)
+
+quickstart templates remove <name>
+  - Cannot remove built-in templates
+  - Confirm before removing custom templates (Inquirer confirm)
+
+quickstart templates info <name>
+  - Show template details: name, description, file tree, 
+    placeholders used, created date
+
+Store custom templates in ~/.quickstart/templates/.
+Store the template registry in ~/.quickstart/config.json."
+```
+
+## Phase 4: Configuration
+
+```
+"Create the 'config' command group:
+
+quickstart config set <key> <value>
+  - Set a config value in ~/.quickstart/config.json
+  - Valid keys: defaultTemplate, packageManager, author, license
+  - Validate values (e.g., packageManager must be npm/pnpm/yarn)
+
+quickstart config get <key>
+  - Print the current value
+  - If not set, show the default value
+
+quickstart config list
+  - Show all config values as a table
+
+quickstart config reset
+  - Reset all config to defaults (confirm first)"
+```
+
+## Phase 5: Error Handling
+
+```
+"Add comprehensive error handling to all commands:
+
+1. Create an error handler wrapper in src/lib/errors.ts:
+   - CLIError class with message, suggestion, and exitCode
+   - Wrap every command action in a try/catch
+   - On CLIError: show message + suggestion in formatted output
+   - On unknown error: show 'An unexpected error occurred' 
+     + 'Run with --verbose for details'
+   - On --verbose: show the full stack trace
+
+2. Add these specific error handlers:
+   - Directory already exists: suggest a different name or --force
+   - Template not found: list available templates
+   - Permission denied: suggest running with sudo or changing permissions
+   - Network error (npm install): suggest --skip-install
+   - Invalid config key: list valid keys
+
+3. Exit codes:
+   - 0: success
+   - 1: general error
+   - 2: usage error (invalid arguments)
+   - 3: permission error"
+```
+
+### Example Error Output
+
+```bash
+$ quickstart init my-app --template nonexistent
+
+✖ Template 'nonexistent' not found
+
+  Available templates:
+    basic        — Minimal TypeScript project
+    express-ts   — Express + TypeScript API
+    react-ts     — React + TypeScript app
+
+  Usage: quickstart init <name> --template <template-name>
+```
+
+## Phase 6: Tests
+
+```
+"Write integration tests for the CLI in tests/:
+
+1. tests/commands/init.test.ts:
+   - Creates a project successfully with --skip-install
+   - Fails if directory exists
+   - Fails if template not found (with helpful error)
+   - Replaces placeholders correctly
+   - Respects --template flag
+
+2. tests/commands/config.test.ts:
+   - Set and get config values
+   - Reject invalid config keys
+   - List all config values
+   - Reset to defaults
+
+3. tests/commands/templates.test.ts:
+   - List includes built-in templates
+   - Add a custom template
+   - Remove a custom template (not built-in)
+
+Run the actual CLI binary using child_process.execSync.
+Use a temp directory for test output.
+Clean up after each test."
+```
+
+## Phase 7: Polish
+
+```
+"Add these finishing touches:
+
+1. Version command from package.json
+2. Auto-update check (compare package.json version with npm registry)
+3. Shell completion script (quickstart completion bash/zsh/fish)
+4. Man page generation or --help improvements:
+   - Each command shows examples in help text
+   - Global --no-color flag to disable chalk
+
+5. package.json scripts:
+   - build: tsc
+   - dev: ts-node src/index.ts
+   - test: vitest run
+   - prepublishOnly: npm run build
+
+6. .npmignore (exclude tests, src, tsconfig from published package)"
+```
+
+## The Final CLI Structure
+
+```
+quickstart/
+├── package.json (with bin field)
+├── tsconfig.json
+├── src/
+│   ├── index.ts
+│   ├── commands/
+│   │   ├── init.ts
+│   │   ├── templates.ts
+│   │   └── config.ts
+│   ├── lib/
+│   │   ├── output.ts
+│   │   ├── config.ts
+│   │   ├── templates.ts
+│   │   └── errors.ts
+│   └── types/
+│       └── index.ts
+├── templates/
+│   ├── basic/
+│   └── express-ts/
+└── tests/
+    └── commands/
+        ├── init.test.ts
+        ├── config.test.ts
+        └── templates.test.ts
+```
+
+## Time Budget
+
+| Phase | Time | Messages |
+|---|---|---|
+| Skeleton + output module | 10 min | 3 |
+| Init command | 15 min | 5 |
+| Template management | 10 min | 4 |
+| Configuration | 8 min | 3 |
+| Error handling | 10 min | 4 |
+| Tests | 15 min | 6 |
+| Polish | 10 min | 4 |
+| **Total** | **~78 min** | **~29** |
+
+## Key Takeaway
+
+Building a CLI with Claude Code follows the same pattern-first approach as API development. Start with the framework skeleton and output formatting module — these establish the conventions for every command. Build one complete command (init) with all patterns: argument parsing, interactive prompts, file operations, spinners, and error handling. Then replicate the pattern for additional commands. The output module is the CLI equivalent of a design system — it ensures every command looks and feels consistent. Error handling deserves its own phase because good CLIs are defined by how they fail, not just how they succeed.
