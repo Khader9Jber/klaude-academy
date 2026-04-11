@@ -1,0 +1,352 @@
+---
+title: "CI/CD Test Integration"
+slug: "ci-cd-testing"
+order: 5
+difficulty: "expert"
+duration: 20
+tags: ["qa", "ci-cd", "pipeline", "automation", "github-actions"]
+objectives:
+  - "Build GitHub Actions test workflows with Claude"
+  - "Implement parallel test execution for faster pipelines"
+  - "Detect and manage flaky tests"
+  - "Create quality gate pipelines that block bad deployments"
+quiz:
+  - id: "ci-cd-testing-1"
+    question: "What is a quality gate in CI/CD?"
+    type: "multiple-choice"
+    options:
+      - "A login page for CI"
+      - "A set of automated checks that must ALL pass before code can be merged or deployed — tests, coverage, lint, security scans"
+      - "A code review requirement"
+      - "A deployment approval step"
+    correct: 1
+    explanation: "A quality gate is a set of automated checks that block merges or deployments when they fail. Typical gates include: all tests passing, coverage above a threshold (e.g., 80%), no lint errors, no security vulnerabilities, and successful build. The pipeline automatically enforces quality standards without relying on human reviewers to catch everything."
+  - id: "ci-cd-testing-2"
+    question: "Why should you run tests in parallel in CI?"
+    type: "multiple-choice"
+    options:
+      - "Parallel tests are more accurate"
+      - "Running tests in parallel reduces total pipeline time — a 30-minute test suite split across 4 workers finishes in ~8 minutes"
+      - "It's required by GitHub Actions"
+      - "Serial execution causes flaky tests"
+    correct: 1
+    explanation: "A large test suite run sequentially takes the sum of all test times. Splitting tests across parallel workers divides the total time roughly by the number of workers. A 30-minute suite across 4 workers finishes in about 8 minutes. This faster feedback loop means developers get test results sooner, reducing context switching and waiting time."
+  - id: "ci-cd-testing-3"
+    question: "How do you detect flaky tests in CI?"
+    type: "multiple-choice"
+    options:
+      - "Flaky tests are impossible to detect"
+      - "Track tests that pass and fail inconsistently across runs without code changes — retry failed tests and flag those that pass on retry as potentially flaky"
+      - "Run tests once and check results"
+      - "Only run tests locally"
+    correct: 1
+    explanation: "A flaky test is one that sometimes passes and sometimes fails without any code changes. Detection strategies: retry failed tests (if they pass on retry, they're flaky), track pass/fail rates over time, compare test results across identical code commits. Once identified, flaky tests should be quarantined (run separately) until fixed."
+  - id: "ci-cd-testing-4"
+    question: "What is test sharding?"
+    type: "multiple-choice"
+    options:
+      - "Deleting old tests"
+      - "Splitting a test suite into independent chunks that run on separate CI workers simultaneously"
+      - "Running tests on different browsers"
+      - "Compressing test files"
+    correct: 1
+    explanation: "Test sharding divides your test suite into N independent chunks (shards), each running on a separate CI worker. Shard 1 might run tests A-M while shard 2 runs N-Z. Both run simultaneously, cutting total execution time roughly in half. Playwright and Vitest both support sharding natively."
+---
+
+## The Pipeline That Catches Everything
+
+A fast test suite that nobody runs in CI is worthless. A CI pipeline that takes 45 minutes to run gets ignored. The goal is a pipeline that is fast enough that developers actually wait for it and thorough enough that it catches real bugs.
+
+## Building the Test Pipeline with Claude
+
+```bash
+claude -p "Create a comprehensive GitHub Actions CI/CD pipeline 
+for a Next.js + Supabase project.
+
+Create .github/workflows/ci.yml with these jobs:
+
+1. lint-and-typecheck (2 min):
+   - ESLint
+   - TypeScript type checking
+   - Prettier check
+
+2. unit-tests (3 min):
+   - Run Vitest with coverage
+   - Fail if coverage below 80%
+   - Upload coverage report as artifact
+
+3. integration-tests (5 min):
+   - Start test database (Supabase local)
+   - Run integration tests
+   - Tear down database
+
+4. e2e-tests (8 min):
+   - Build the Next.js app
+   - Start the server
+   - Run Playwright tests (sharded across 3 workers)
+   - Upload failed test screenshots as artifacts
+
+5. security-scan (2 min):
+   - npm audit (warn on moderate, fail on high/critical)
+   - Check for secrets in code (using truffleHog or similar)
+
+Job dependencies:
+- lint-and-typecheck runs first
+- unit-tests and integration-tests run in parallel after lint
+- e2e-tests runs after unit and integration pass
+- security-scan runs in parallel with everything
+
+Triggers:
+- Push to main: full pipeline
+- Pull request: full pipeline
+- Schedule: nightly at 2 AM (run with retries for flaky detection)
+
+Cache:
+- node_modules (keyed on package-lock.json hash)
+- Next.js build cache
+- Playwright browsers
+
+Reference: @package.json for scripts and dependencies"
+```
+
+## The Generated Pipeline
+
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npx prettier --check "src/**/*.{ts,tsx}"
+
+  unit-tests:
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:coverage
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage $COVERAGE% is below 80% threshold"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+
+  integration-tests:
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Run migrations
+        run: npx tsx scripts/migrate.ts
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/testdb
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/testdb
+
+  e2e-tests:
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build app
+        run: npm run build
+      - name: Run E2E tests (shard ${{ matrix.shard }}/3)
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results-shard-${{ matrix.shard }}
+          path: test-results/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+```
+
+## Parallel Test Execution
+
+Sharding is the key to fast E2E tests:
+
+```bash
+claude -p "Configure Playwright for sharded parallel execution.
+
+Update playwright.config.ts:
+- Support the --shard CLI flag
+- Run tests across 3 shards in CI
+- Run all tests in a single worker locally
+- Use 'github' reporter in CI, 'html' reporter locally
+- Retry failed tests once in CI (for flaky detection)
+
+Also create a test-results merge step in CI that:
+1. Waits for all 3 shard jobs to complete
+2. Downloads all test result artifacts
+3. Merges them into a single report
+4. Uploads the merged report"
+```
+
+## Flaky Test Detection and Quarantine
+
+```bash
+claude -p "Add a flaky test detection system to our CI pipeline.
+
+Create:
+1. scripts/detect-flaky.ts:
+   - Parse test results JSON from Playwright/Vitest
+   - Identify tests that failed then passed on retry
+   - Write flaky test list to flaky-tests.json
+
+2. .github/workflows/flaky-detection.yml:
+   - Runs nightly
+   - Executes the full test suite 3 times
+   - Compares results across runs
+   - Any test that doesn't produce the same result all 3 times is flaky
+   - Creates a GitHub issue listing newly detected flaky tests
+
+3. src/test/quarantine.ts:
+   - Reads flaky-tests.json
+   - Exports a list of quarantined test names
+   - In CI: quarantined tests run but don't fail the build
+   - Locally: quarantined tests are skipped with a warning
+
+4. Add to CLAUDE.md:
+   'When generating tests, avoid common flakiness sources:
+    - Don't depend on timing (use waitFor instead of sleep)
+    - Don't depend on execution order
+    - Don't share state between tests
+    - Always clean up test data in afterEach'"
+```
+
+## Quality Gate Configuration
+
+```bash
+claude -p "Create a quality gate configuration that blocks merges.
+
+Create: .github/workflows/quality-gate.yml
+
+Required checks (ALL must pass to merge):
+1. All tests pass (unit, integration, E2E)
+2. Code coverage >= 80% (lines and branches)
+3. No ESLint errors (warnings OK)
+4. TypeScript compiles without errors
+5. No high/critical security vulnerabilities
+6. Build succeeds
+7. Bundle size doesn't increase by more than 5%
+
+Create a summary job that:
+- Collects results from all check jobs
+- Posts a status comment on the PR with a table:
+  | Check | Status | Details |
+  | Tests | Pass | 142/142 |
+  | Coverage | Pass | 84.2% (threshold: 80%) |
+  | Lint | Pass | 0 errors |
+  | Security | Warn | 2 moderate vulnerabilities |
+  | Bundle | Pass | 245KB (+2.1%) |
+
+Also configure branch protection rules reminder:
+- Require all checks to pass
+- Require at least 1 approval
+- Dismiss stale approvals on new commits"
+```
+
+## Monitoring Pipeline Health
+
+```bash
+claude -p "Create a CI pipeline health dashboard script.
+
+Create: scripts/ci-health.ts
+
+Analyze the last 30 days of CI runs and produce:
+1. Average pipeline duration (trend over time)
+2. Pipeline success rate
+3. Most common failure reasons
+4. Slowest jobs
+5. Flaky test frequency
+6. Coverage trend
+
+Use the GitHub API to fetch workflow run data.
+Output as a markdown report that can be posted as a GitHub issue.
+
+Schedule: weekly on Monday morning."
+```
+
+## Key Takeaway
+
+A good CI/CD test pipeline is fast enough that developers wait for it and thorough enough that it catches real bugs before they reach production. Use sharding for parallel test execution to keep E2E tests under 10 minutes. Implement quality gates that enforce coverage thresholds, zero lint errors, and clean security scans. Detect and quarantine flaky tests instead of ignoring them. Claude can generate the entire pipeline infrastructure — GitHub Actions workflows, quality gates, flaky detection, and health monitoring — from a single detailed prompt. The investment in CI/CD test infrastructure pays off with every deployment that does not break production.

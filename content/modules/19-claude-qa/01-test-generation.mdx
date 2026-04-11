@@ -1,0 +1,456 @@
+---
+title: "Automated Test Generation with Claude"
+slug: "test-generation"
+order: 1
+difficulty: "expert"
+duration: 22
+tags: ["qa", "testing", "generation", "unit-tests"]
+objectives:
+  - "Generate comprehensive unit, integration, and E2E tests using Claude"
+  - "Craft prompts that produce tests beyond happy path coverage"
+  - "Generate edge case, error path, and race condition tests"
+  - "Apply test generation at scale across entire modules"
+quiz:
+  - id: "test-gen-1"
+    question: "What makes a test generation prompt produce high-quality tests?"
+    type: "multiple-choice"
+    options:
+      - "Just saying 'write tests for this file'"
+      - "Specifying the testing framework, what to test (happy path, errors, edges), what to mock, and the assertion style"
+      - "Asking for as many tests as possible"
+      - "Copying tests from documentation"
+    correct: 1
+    explanation: "High-quality test generation requires a specific prompt: name the testing framework (Jest, Vitest, Playwright), specify coverage goals (happy path, error cases, boundary conditions), tell Claude what to mock (external APIs, databases, timers), and define assertion style (BDD, TDD). Without this context, Claude defaults to shallow happy-path tests."
+  - id: "test-gen-2"
+    question: "Why should you explicitly ask for edge case and error path tests?"
+    type: "multiple-choice"
+    options:
+      - "To have more tests"
+      - "Claude's default behavior is to test the happy path — explicitly requesting error and edge cases produces tests that catch real-world bugs"
+      - "Edge cases are more important than happy paths"
+      - "It makes the test suite run faster"
+    correct: 1
+    explanation: "Claude naturally gravitates toward happy-path tests because they're the most obvious test cases. But production bugs almost always come from edge cases (empty arrays, null values, max integers), error paths (network failures, timeouts, invalid input), and race conditions. You must explicitly ask for these to get comprehensive coverage."
+  - id: "test-gen-3"
+    question: "What is the best approach for generating tests for a large module?"
+    type: "multiple-choice"
+    options:
+      - "Generate all tests in one prompt"
+      - "Generate tests function-by-function, reviewing each batch before moving to the next"
+      - "Copy tests from a similar module"
+      - "Only test public APIs"
+    correct: 1
+    explanation: "Large modules should be tested incrementally. Generate tests for one function or one group of related functions at a time. Review the generated tests for accuracy, run them to verify they pass, then move to the next group. This catches issues early and prevents accumulating incorrect tests that are painful to debug later."
+  - id: "test-gen-4"
+    question: "How do you handle tests for functions that depend on external services?"
+    type: "multiple-choice"
+    options:
+      - "Test against the real service"
+      - "Skip testing those functions"
+      - "Tell Claude to mock the external dependency and test the function's behavior for various mock responses (success, failure, timeout)"
+      - "Write manual tests only"
+    correct: 2
+    explanation: "For functions that call external services (APIs, databases, payment processors), instruct Claude to mock those dependencies and generate tests for each possible response: successful response, error response, timeout, malformed data, rate limiting. This tests your code's behavior without needing the actual external service."
+---
+
+## The Test Generation Gap
+
+Most developers ask Claude: "Write tests for this file." Claude produces 5-10 basic tests that cover the happy path. The developer says "good enough" and moves on. Then a bug ships in production because nobody tested what happens when the input is null.
+
+This lesson shows you how to get Claude to generate the tests that actually catch bugs — not just the tests that pad your coverage numbers.
+
+## The Test Generation Prompt Formula
+
+Here is the prompt structure that consistently produces thorough tests:
+
+```bash
+"Generate tests for @src/lib/payments.ts
+
+Framework: Vitest
+Assertion style: expect() with descriptive test names
+
+Cover:
+1. Happy path — each function works with valid input
+2. Error cases — invalid input, missing fields, wrong types
+3. Boundary conditions — empty arrays, zero values, max integers
+4. Async behavior — resolved promises, rejected promises, timeouts
+5. Edge cases specific to this domain: negative amounts, 
+   currency rounding, duplicate transaction IDs
+
+Mock: 
+- Stripe API calls (use vi.mock)
+- Database queries (mock the db object from @src/lib/db.ts)
+- Date.now() for timestamp-dependent logic
+
+Do NOT test:
+- Internal helper functions (only public exports)
+- Type checking (TypeScript handles that)
+
+Output: One describe block per exported function. 
+Group tests as: 'valid input', 'invalid input', 'edge cases'."
+```
+
+## Example: Payment Processing Module
+
+Here is a real module and the tests Claude generates with a good prompt.
+
+The module under test:
+
+```typescript
+// src/lib/payments.ts
+export async function processPayment(
+  userId: string,
+  amount: number,
+  currency: string
+): Promise<PaymentResult> {
+  if (!userId) throw new PaymentError("User ID required");
+  if (amount <= 0) throw new PaymentError("Amount must be positive");
+  if (amount > 999999.99) throw new PaymentError("Amount exceeds maximum");
+  
+  const user = await db.users.findById(userId);
+  if (!user) throw new PaymentError("User not found");
+  
+  const charge = await stripe.charges.create({
+    amount: Math.round(amount * 100),
+    currency: currency.toLowerCase(),
+    customer: user.stripeCustomerId,
+  });
+  
+  await db.transactions.create({
+    userId,
+    amount,
+    currency,
+    stripeChargeId: charge.id,
+    status: charge.status,
+  });
+  
+  return {
+    success: charge.status === "succeeded",
+    transactionId: charge.id,
+    amount,
+    currency,
+  };
+}
+```
+
+The prompt:
+
+```bash
+"Generate comprehensive Vitest tests for @src/lib/payments.ts.
+
+Mock stripe with vi.mock and the db module.
+Cover: valid payments, invalid inputs, Stripe failures, 
+database failures, boundary amounts, currency handling.
+I want at least 20 test cases."
+```
+
+Claude generates:
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { processPayment } from './payments';
+import { db } from './db';
+import { stripe } from './stripe';
+
+vi.mock('./db');
+vi.mock('./stripe');
+
+describe('processPayment', () => {
+  const mockUser = {
+    id: 'user-123',
+    stripeCustomerId: 'cus_abc123',
+  };
+
+  const mockCharge = {
+    id: 'ch_test123',
+    status: 'succeeded',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(db.users.findById).mockResolvedValue(mockUser);
+    vi.mocked(stripe.charges.create).mockResolvedValue(mockCharge);
+  });
+
+  describe('valid input', () => {
+    it('processes a valid payment successfully', async () => {
+      const result = await processPayment('user-123', 49.99, 'USD');
+      
+      expect(result.success).toBe(true);
+      expect(result.transactionId).toBe('ch_test123');
+      expect(result.amount).toBe(49.99);
+      expect(result.currency).toBe('USD');
+    });
+
+    it('converts amount to cents for Stripe', async () => {
+      await processPayment('user-123', 49.99, 'USD');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 4999 })
+      );
+    });
+
+    it('lowercases currency code for Stripe', async () => {
+      await processPayment('user-123', 10, 'EUR');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'eur' })
+      );
+    });
+
+    it('creates a database transaction record', async () => {
+      await processPayment('user-123', 25.00, 'USD');
+      
+      expect(db.transactions.create).toHaveBeenCalledWith({
+        userId: 'user-123',
+        amount: 25.00,
+        currency: 'USD',
+        stripeChargeId: 'ch_test123',
+        status: 'succeeded',
+      });
+    });
+
+    it('uses the user stripeCustomerId for charges', async () => {
+      await processPayment('user-123', 10, 'USD');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: 'cus_abc123' })
+      );
+    });
+  });
+
+  describe('invalid input', () => {
+    it('throws when userId is empty string', async () => {
+      await expect(processPayment('', 10, 'USD'))
+        .rejects.toThrow('User ID required');
+    });
+
+    it('throws when amount is zero', async () => {
+      await expect(processPayment('user-123', 0, 'USD'))
+        .rejects.toThrow('Amount must be positive');
+    });
+
+    it('throws when amount is negative', async () => {
+      await expect(processPayment('user-123', -10, 'USD'))
+        .rejects.toThrow('Amount must be positive');
+    });
+
+    it('throws when amount exceeds maximum', async () => {
+      await expect(processPayment('user-123', 1000000, 'USD'))
+        .rejects.toThrow('Amount exceeds maximum');
+    });
+
+    it('throws when user not found in database', async () => {
+      vi.mocked(db.users.findById).mockResolvedValue(null);
+      
+      await expect(processPayment('nonexistent', 10, 'USD'))
+        .rejects.toThrow('User not found');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles amount at exact maximum boundary (999999.99)', async () => {
+      const result = await processPayment('user-123', 999999.99, 'USD');
+      expect(result.success).toBe(true);
+    });
+
+    it('handles minimum positive amount (0.01)', async () => {
+      await processPayment('user-123', 0.01, 'USD');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 1 })
+      );
+    });
+
+    it('handles floating point precision (19.99)', async () => {
+      await processPayment('user-123', 19.99, 'USD');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 1999 })
+      );
+    });
+
+    it('handles whole dollar amounts', async () => {
+      await processPayment('user-123', 100, 'USD');
+      
+      expect(stripe.charges.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 10000 })
+      );
+    });
+
+    it('returns success false when charge status is not succeeded', async () => {
+      vi.mocked(stripe.charges.create).mockResolvedValue({
+        id: 'ch_pending',
+        status: 'pending',
+      });
+      
+      const result = await processPayment('user-123', 10, 'USD');
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('external service failures', () => {
+    it('propagates Stripe API errors', async () => {
+      vi.mocked(stripe.charges.create).mockRejectedValue(
+        new Error('Card declined')
+      );
+      
+      await expect(processPayment('user-123', 10, 'USD'))
+        .rejects.toThrow('Card declined');
+    });
+
+    it('propagates database errors on user lookup', async () => {
+      vi.mocked(db.users.findById).mockRejectedValue(
+        new Error('Connection timeout')
+      );
+      
+      await expect(processPayment('user-123', 10, 'USD'))
+        .rejects.toThrow('Connection timeout');
+    });
+
+    it('propagates database errors on transaction creation', async () => {
+      vi.mocked(db.transactions.create).mockRejectedValue(
+        new Error('Duplicate key')
+      );
+      
+      await expect(processPayment('user-123', 10, 'USD'))
+        .rejects.toThrow('Duplicate key');
+    });
+
+    it('does not create transaction record if Stripe fails', async () => {
+      vi.mocked(stripe.charges.create).mockRejectedValue(
+        new Error('Network error')
+      );
+      
+      await expect(processPayment('user-123', 10, 'USD')).rejects.toThrow();
+      expect(db.transactions.create).not.toHaveBeenCalled();
+    });
+  });
+});
+```
+
+That is 20 tests covering valid input, invalid input, edge cases, and external failures. All from one well-structured prompt.
+
+## Generating Integration Tests
+
+Integration tests need different prompts — they test how modules work together:
+
+```bash
+"Generate integration tests for the user registration flow.
+
+The flow: 
+1. POST /api/auth/register with { email, password, name }
+2. Creates user in database
+3. Sends verification email
+4. Returns { user, token }
+
+Test files:
+- @src/app/api/auth/register/route.ts
+- @src/lib/auth.ts
+- @src/lib/email.ts
+
+Framework: Vitest
+Mock ONLY: the email service (vi.mock src/lib/email.ts)
+Use REAL: database (use test database from @src/lib/test-utils.ts)
+
+Test:
+1. Successful registration with valid data
+2. Duplicate email rejection
+3. Invalid email format
+4. Password too short (< 8 chars)
+5. Missing required fields
+6. Database failure during user creation
+7. Email service failure (user created but email fails)
+8. Verify the returned token is valid JWT"
+```
+
+## Generating E2E Tests
+
+For E2E tests, be explicit about the user journey:
+
+```bash
+"Generate Playwright E2E tests for the checkout flow.
+
+User journey:
+1. User is logged in (use the auth fixture from @e2e/fixtures.ts)
+2. Navigate to /products
+3. Add 'Premium Plan' to cart
+4. Go to /cart
+5. Click 'Proceed to Checkout'
+6. Fill in payment form (use test card 4242...)
+7. Submit payment
+8. Verify redirect to /order-confirmation
+9. Verify order details are correct
+
+Also test:
+- Empty cart checkout (should redirect to /products)
+- Expired session during checkout
+- Network error during payment (mock with route.abort)
+- Going back from checkout (cart should still have items)
+
+Use Page Object Model:
+- ProductsPage, CartPage, CheckoutPage, ConfirmationPage
+Reference existing POM: @e2e/pages/"
+```
+
+## Scaling: Testing an Entire Module
+
+For large modules, use a systematic approach:
+
+```bash
+# Step 1: Get a map of what needs testing
+claude -p "List all exported functions in @src/lib/payments/ 
+with their signatures and return types. 
+Group by file. Show which ones already have tests 
+(check @src/lib/payments/__tests__/)."
+
+# Step 2: Generate tests file by file
+claude -p "Generate Vitest tests for processRefund in 
+@src/lib/payments/refunds.ts. 
+Follow the same patterns as @src/lib/payments/__tests__/charges.test.ts"
+
+# Step 3: Verify
+claude -p "Run the payment tests and report results:
+npx vitest run src/lib/payments/"
+```
+
+## The "50 Tests in 5 Minutes" Approach
+
+For a real payment module with 8 exported functions:
+
+```bash
+claude -p "Generate comprehensive Vitest tests for ALL exported 
+functions in @src/lib/payments/index.ts.
+
+For EACH function, generate:
+- 2-3 happy path tests
+- 2-3 error/invalid input tests  
+- 1-2 edge case tests
+- 1 integration test with mocked dependencies
+
+Mock: Stripe, database, email service
+Use the patterns from @src/lib/payments/__tests__/charges.test.ts
+
+Target: at least 50 test cases total.
+Each test should have a descriptive name that explains the scenario."
+```
+
+## Reviewing Generated Tests
+
+Never blindly commit generated tests. Review for:
+
+```bash
+# After Claude generates tests, review them:
+claude -p "Review these generated tests in 
+@src/lib/payments/__tests__/refunds.test.ts for:
+
+1. Are any tests actually testing the mock instead of the code?
+2. Are assertions specific enough (not just 'toBeDefined')?
+3. Are there any tests that will always pass regardless of the code?
+4. Do the mocks accurately represent real API responses?
+5. Are there missing test cases that would catch real bugs?"
+```
+
+## Key Takeaway
+
+Test generation with Claude is powerful but requires specific prompts. Always specify: the framework, what to mock, which categories of tests to write (happy path, errors, edges, async, integration), and the output format. Never accept the default "5 happy path tests" — explicitly request error paths, boundary conditions, and failure modes. Generate tests incrementally, review before committing, and run them to verify they actually test what they claim to test. The prompt formula is the difference between decorative tests and tests that catch production bugs.

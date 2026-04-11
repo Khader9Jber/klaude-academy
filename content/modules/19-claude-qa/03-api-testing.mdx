@@ -1,0 +1,345 @@
+---
+title: "API Testing with Claude"
+slug: "api-testing"
+order: 3
+difficulty: "expert"
+duration: 20
+tags: ["qa", "api", "testing", "postman", "rest"]
+objectives:
+  - "Generate comprehensive API test suites from OpenAPI/Swagger specs"
+  - "Test contracts, schemas, and response times with Claude"
+  - "Build automated API test pipelines"
+  - "Cover authentication, pagination, error responses, and edge cases"
+quiz:
+  - id: "api-testing-1"
+    question: "What is the fastest way to generate API tests with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Write them manually"
+      - "Give Claude your OpenAPI/Swagger spec and tell it to generate tests for every endpoint, status code, and edge case"
+      - "Use a record-and-playback tool"
+      - "Copy tests from documentation"
+    correct: 1
+    explanation: "An OpenAPI spec is a machine-readable contract of your entire API — every endpoint, parameter, request body, and response shape. Claude can read this spec and generate tests for every documented scenario, including edge cases the spec implies but doesn't explicitly state (like what happens with invalid types or missing required fields)."
+  - id: "api-testing-2"
+    question: "What is contract testing?"
+    type: "multiple-choice"
+    options:
+      - "Testing legal contracts"
+      - "Verifying that an API response matches its documented schema — structure, types, required fields, and format constraints"
+      - "Testing network contracts"
+      - "Testing payment processing"
+    correct: 1
+    explanation: "Contract testing verifies that API responses conform to their documented schema. This means checking that every field is present with the correct type, required fields are never null, enum values are valid, and nested objects have the right shape. If someone changes the API without updating consumers, contract tests catch it immediately."
+  - id: "api-testing-3"
+    question: "Why should you test API error responses, not just success responses?"
+    type: "multiple-choice"
+    options:
+      - "To have more tests"
+      - "Error responses are the API contract too — clients depend on specific error formats, status codes, and messages to handle failures correctly"
+      - "Error responses are easier to test"
+      - "It's not important"
+    correct: 1
+    explanation: "Frontend applications, mobile apps, and other API consumers write error handling code that depends on specific error formats: status codes (400 vs 422 vs 500), error message structure ({ error: { code, message } }), and validation error details. If error responses change or are inconsistent, every consumer's error handling breaks."
+  - id: "api-testing-4"
+    question: "What should you include in an API test for a paginated endpoint?"
+    type: "multiple-choice"
+    options:
+      - "Just test the first page"
+      - "Test first page, last page, empty results, invalid page numbers, page size limits, and that total count is accurate"
+      - "Test with one item"
+      - "Only test the default page size"
+    correct: 1
+    explanation: "Pagination has many edge cases that break in production: page 0 vs page 1, requesting past the last page, empty result sets, page size larger than total items, negative page numbers, and total count accuracy. Testing all these scenarios catches bugs that only appear when users navigate through real data."
+---
+
+## From Spec to 200 Tests in 5 Minutes
+
+API testing is one of the highest-leverage uses of Claude for QA. Give Claude your OpenAPI spec and it produces a comprehensive test suite that would take days to write manually.
+
+## The OpenAPI-to-Tests Pipeline
+
+```bash
+# Step 1: Give Claude your spec
+claude -p "Generate a comprehensive API test suite from this OpenAPI spec.
+
+@openapi.yaml
+
+Framework: Vitest + supertest (for HTTP requests)
+Base URL: http://localhost:3000/api
+
+For EACH endpoint, generate tests for:
+1. Success response — valid request, verify response shape and status code
+2. Validation errors — missing required fields, wrong types, invalid values
+3. Authentication — request without token, expired token, wrong role
+4. Not found — request for nonexistent resource
+5. Edge cases — empty strings, very long strings, special characters
+
+Group tests by resource (users, projects, tasks).
+Use descriptive test names: 'POST /api/users — should return 422 when email is invalid'
+
+Create a test helper at src/test/api-helpers.ts with:
+- getAuthToken(role) — returns JWT for test user with role
+- createTestUser(overrides) — creates a user and returns it
+- cleanup() — deletes all test data"
+```
+
+## Example: Full Endpoint Test Suite
+
+For a single `POST /api/users` endpoint, here is what Claude generates:
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import { getAuthToken, cleanup } from '../test/api-helpers';
+
+const BASE_URL = 'http://localhost:3000';
+
+describe('POST /api/users', () => {
+  let adminToken: string;
+  let userToken: string;
+
+  beforeAll(async () => {
+    adminToken = await getAuthToken('admin');
+    userToken = await getAuthToken('user');
+  });
+
+  afterAll(async () => {
+    await cleanup();
+  });
+
+  describe('success cases', () => {
+    it('should create a user with valid data (201)', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'newuser@test.com',
+          name: 'Test User',
+          role: 'user',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        id: expect.any(String),
+        email: 'newuser@test.com',
+        name: 'Test User',
+        role: 'user',
+        createdAt: expect.any(String),
+      });
+    });
+
+    it('should return the created user without password hash', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'nopass@test.com',
+          name: 'No Password Visible',
+          role: 'user',
+        });
+
+      expect(response.body).not.toHaveProperty('password');
+      expect(response.body).not.toHaveProperty('passwordHash');
+    });
+  });
+
+  describe('validation errors', () => {
+    it('should return 422 when email is missing', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'No Email', role: 'user' });
+
+      expect(response.status).toBe(422);
+      expect(response.body.error).toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([
+          expect.objectContaining({ field: 'email' }),
+        ]),
+      });
+    });
+
+    it('should return 422 when email format is invalid', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'not-an-email', name: 'Bad Email', role: 'user' });
+
+      expect(response.status).toBe(422);
+    });
+
+    it('should return 409 when email already exists', async () => {
+      // Create first user
+      await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'dupe@test.com', name: 'First', role: 'user' });
+
+      // Try to create duplicate
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'dupe@test.com', name: 'Second', role: 'user' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('DUPLICATE_EMAIL');
+    });
+
+    it('should return 422 when role is invalid enum value', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'a@b.com', name: 'Bad Role', role: 'superadmin' });
+
+      expect(response.status).toBe(422);
+    });
+
+    it('should return 422 when name exceeds 100 characters', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'long@test.com', name: 'A'.repeat(101), role: 'user' });
+
+      expect(response.status).toBe(422);
+    });
+  });
+
+  describe('authentication', () => {
+    it('should return 401 when no token provided', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .send({ email: 'noauth@test.com', name: 'No Auth', role: 'user' });
+
+      expect(response.status).toBe(401);
+    });
+
+    it('should return 403 when non-admin tries to create user', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ email: 'forbid@test.com', name: 'Forbidden', role: 'user' });
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should trim whitespace from email', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: '  spaces@test.com  ', name: 'Spaces', role: 'user' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.email).toBe('spaces@test.com');
+    });
+
+    it('should handle unicode characters in name', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'unicode@test.com', name: 'Jose Garcia', role: 'user' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.name).toBe('Jose Garcia');
+    });
+
+    it('should reject request with empty body', async () => {
+      const response = await request(BASE_URL)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(422);
+    });
+  });
+});
+```
+
+That is 12 tests for a single endpoint. Across 15 endpoints, you get 180+ tests.
+
+## Schema Validation Tests
+
+Test that every response matches the documented contract:
+
+```bash
+"Generate contract tests that verify EVERY API response matches 
+the OpenAPI spec schemas.
+
+@openapi.yaml
+
+For each endpoint and status code:
+1. Make the request
+2. Validate the response body against the JSON Schema from the spec
+3. Check required fields are present
+4. Check field types match
+5. Check enum values are valid
+6. Check nested objects match their schemas
+
+Use ajv for JSON Schema validation.
+Create a helper: validateResponse(response, schemaName) 
+that throws with a clear message on schema mismatch."
+```
+
+## Response Time Assertions
+
+```bash
+"Add response time assertions to the API test suite.
+
+Create a performance test file at src/__tests__/api-performance.test.ts.
+
+For each endpoint:
+- GET requests: must respond within 200ms
+- POST/PUT requests: must respond within 500ms
+- Search/query endpoints: must respond within 1000ms
+
+Use supertest with response time measurement.
+Run each test 5 times and assert on the average.
+Flag any endpoint that exceeds its threshold as a warning 
+(not a hard failure — just log it)."
+```
+
+## Testing Pagination
+
+```bash
+"Generate pagination tests for all list endpoints.
+
+Endpoints: GET /api/users, GET /api/projects, GET /api/tasks
+
+Test:
+1. Default pagination (page 1, limit 20)
+2. Custom page size (limit=5)
+3. Second page (page=2)
+4. Last page (verify correct count)
+5. Page beyond last (should return empty array)
+6. Page 0 (should return error or default to page 1)
+7. Negative page number
+8. Very large page size (limit=10000 — should cap at max)
+9. Total count accuracy across pages
+10. Sort order is consistent across pages"
+```
+
+## Generating Tests from Postman Collections
+
+If you have existing Postman collections:
+
+```bash
+"Convert this Postman collection export to a Vitest API test suite.
+
+@postman-collection.json
+
+For each request in the collection:
+1. Extract the method, URL, headers, and body
+2. Generate a test that sends the same request
+3. Assert on the expected status code
+4. Assert on the response body shape
+5. Add the Postman test scripts as assertions
+
+Group by folder structure from the collection.
+Add proper setup/teardown for auth tokens."
+```
+
+## Key Takeaway
+
+API testing with Claude scales dramatically when you start from an OpenAPI spec. Claude can generate tests for every endpoint, status code, validation rule, and edge case documented in your spec — and then add the cases that are implied but not documented. Use contract testing to verify response shapes, pagination tests to catch boundary bugs, and response time assertions to catch performance regressions. The combination of a well-documented API spec and Claude's test generation produces a comprehensive test suite in minutes that would take days to write by hand.

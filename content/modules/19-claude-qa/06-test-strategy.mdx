@@ -1,0 +1,383 @@
+---
+title: "Building a Test Strategy with Claude"
+slug: "test-strategy"
+order: 6
+difficulty: "expert"
+duration: 22
+tags: ["qa", "strategy", "planning", "coverage", "management"]
+objectives:
+  - "Use Claude to analyze a codebase and recommend a test strategy"
+  - "Apply the test pyramid and risk-based testing principles"
+  - "Build a roadmap from low coverage to comprehensive testing"
+  - "Prioritize what to test first for maximum impact"
+quiz:
+  - id: "test-strategy-1"
+    question: "What is the test pyramid?"
+    type: "multiple-choice"
+    options:
+      - "A way to organize test files"
+      - "A model where you have many fast unit tests at the base, fewer integration tests in the middle, and a small number of slow E2E tests at the top"
+      - "A ranking of test importance"
+      - "A project management framework"
+    correct: 1
+    explanation: "The test pyramid guides the distribution of test types: many unit tests (fast, cheap, focused), fewer integration tests (test module interactions), and a small number of E2E tests (slow, expensive, but verify real user flows). This distribution gives you fast feedback from unit tests while E2E tests catch integration issues that unit tests miss."
+  - id: "test-strategy-2"
+    question: "What is risk-based testing?"
+    type: "multiple-choice"
+    options:
+      - "Testing risky code first"
+      - "Prioritizing test coverage based on business risk — testing payment processing and authentication more thoroughly than admin settings or about pages"
+      - "Avoiding testing risky features"
+      - "Testing in production"
+    correct: 1
+    explanation: "Risk-based testing allocates test effort based on the impact of failure. Payment processing bugs lose money. Authentication bugs expose data. A typo on the about page is embarrassing but not critical. By testing high-risk areas thoroughly (90%+ coverage) and lower-risk areas adequately (60-70%), you get the best return on your testing investment."
+  - id: "test-strategy-3"
+    question: "How should Claude help you prioritize what to test first in a codebase with 20% coverage?"
+    type: "multiple-choice"
+    options:
+      - "Test everything equally"
+      - "Have Claude analyze the codebase for critical paths (auth, payments, data mutations) and build a prioritized testing roadmap based on risk and complexity"
+      - "Start with the simplest files"
+      - "Only test new code"
+    correct: 1
+    explanation: "Claude can analyze your codebase structure, identify critical business paths (authentication, payment, data processing), assess complexity (functions with many branches/dependencies), and produce a prioritized roadmap: Phase 1 tests critical paths, Phase 2 tests complex logic, Phase 3 fills remaining coverage. This gets the highest-value tests written first."
+  - id: "test-strategy-4"
+    question: "What is the recommended approach to go from 20% to 85% test coverage?"
+    type: "multiple-choice"
+    options:
+      - "Write all tests in one sprint"
+      - "Phase it: test critical paths first (20%→50%), then core business logic (50%→70%), then edge cases and remaining modules (70%→85%), spread across sprints"
+      - "Only focus on new code"
+      - "Hire a QA team"
+    correct: 1
+    explanation: "Going from 20% to 85% coverage is a multi-sprint effort. Phasing it ensures you get the highest-value tests first: Phase 1 covers critical paths (auth, payments) to reach 50%, Phase 2 covers core business logic (CRUD operations, data processing) to reach 70%, Phase 3 fills remaining gaps with edge cases and utility tests to reach 85%. Each phase delivers measurable improvement."
+---
+
+## The Strategic Question
+
+You have a codebase with 20% test coverage. Your team lead says: "We need to get to 85% coverage in two weeks." Where do you even start?
+
+This is where Claude transforms from a code assistant into a strategic partner. Instead of writing random tests to hit a coverage number, Claude can analyze your entire codebase and build a testing roadmap that maximizes the value of every test you write.
+
+## Step 1: Codebase Analysis
+
+```bash
+claude "Analyze this codebase and produce a test strategy assessment.
+
+Read the project structure and key files. For each module, assess:
+1. Current test coverage (check for existing test files)
+2. Business criticality (how bad is it if this breaks?)
+3. Complexity (cyclomatic complexity, number of branches)
+4. Dependencies (what other modules depend on this?)
+5. Change frequency (how often is this code modified?)
+
+Modules to analyze:
+@src/lib/auth.ts
+@src/lib/payments.ts
+@src/lib/database.ts
+@src/lib/email.ts
+@src/lib/cache.ts
+@src/lib/validators.ts
+@src/app/api/
+
+Output a risk matrix:
+
+| Module | Coverage | Risk | Complexity | Priority |
+|--------|----------|------|------------|----------|
+
+Then list the top 10 functions that need tests most urgently."
+```
+
+Claude produces something like:
+
+```
+## Test Strategy Assessment
+
+| Module | Coverage | Risk | Complexity | Priority |
+|--------|----------|------|------------|----------|
+| auth.ts | 12% | CRITICAL | High (15 branches) | 1 |
+| payments.ts | 0% | CRITICAL | High (22 branches) | 2 |
+| database.ts | 8% | HIGH | Medium (8 branches) | 3 |
+| api/users | 15% | HIGH | Medium | 4 |
+| api/projects | 20% | MEDIUM | Medium | 5 |
+| validators.ts | 45% | MEDIUM | Low | 6 |
+| email.ts | 0% | LOW | Low | 7 |
+| cache.ts | 30% | LOW | Low | 8 |
+
+## Top 10 Functions Needing Tests
+
+1. auth.ts → verifyToken() — CRITICAL, 0 tests, 8 branches
+   Handles all authentication. A bug here = data breach.
+
+2. payments.ts → processPayment() — CRITICAL, 0 tests, 12 branches
+   Handles money. A bug here = financial loss.
+
+3. payments.ts → processRefund() — CRITICAL, 0 tests, 6 branches
+   Refund errors = customer complaints + accounting issues.
+
+4. auth.ts → refreshSession() — CRITICAL, 0 tests, 5 branches
+   Session refresh bugs = users randomly logged out.
+
+5. database.ts → runTransaction() — HIGH, 0 tests, 4 branches
+   Transaction failures = data corruption.
+...
+```
+
+## Step 2: The Test Pyramid for Your Project
+
+```bash
+claude "Based on the codebase analysis, design a test pyramid 
+specifically for this project.
+
+For each layer, specify:
+- What to test
+- How many tests (approximate)
+- Which framework to use
+- Expected execution time
+
+Layer 1: Unit Tests (base)
+Layer 2: Integration Tests (middle)
+Layer 3: E2E Tests (top)
+
+Include the ratio: for every 1 E2E test, how many integration 
+and unit tests should we have?
+
+Consider our specific tech stack: Next.js, Supabase, Stripe."
+```
+
+Claude designs a project-specific pyramid:
+
+```
+## Test Pyramid for This Project
+
+### Layer 1: Unit Tests (70% of test effort)
+Framework: Vitest
+Target: ~200 tests
+Execution time: < 30 seconds
+
+What to test:
+- All pure functions in src/lib/ (validators, formatters, helpers)
+- Business logic in payment and auth modules (with mocked deps)
+- React hooks (with renderHook)
+- State management logic (Zustand stores)
+- Type guards and data transformers
+
+### Layer 2: Integration Tests (20% of test effort)
+Framework: Vitest + Supertest
+Target: ~60 tests
+Execution time: < 3 minutes
+
+What to test:
+- API routes with real database (test DB)
+- Authentication flow end-to-end (login → session → protected route)
+- Payment flow with Stripe test mode
+- Database queries and transactions
+- Email sending (mock SMTP, verify content)
+
+### Layer 3: E2E Tests (10% of test effort)
+Framework: Playwright
+Target: ~25 tests
+Execution time: < 8 minutes
+
+What to test:
+- Critical user journeys:
+  1. Sign up → verify email → first login
+  2. Create project → add tasks → invite member
+  3. Checkout → payment → confirmation
+  4. Settings → change password → re-login
+- Cross-browser smoke tests (Chrome, Firefox)
+- Mobile responsive critical flows
+
+### Ratio
+For every 1 E2E test: 2-3 integration tests : 8-10 unit tests
+```
+
+## Step 3: The Two-Week Roadmap
+
+```bash
+claude "Create a sprint plan to go from 20% to 85% coverage 
+in 2 weeks (10 working days).
+
+Day-by-day plan with:
+- Which module/function to test
+- How many tests to write
+- Expected coverage increase
+- Who should review (if team)
+
+Constraints:
+- I can write ~30 tests per day with Claude's help
+- Critical modules first
+- Must maintain existing tests (don't break them)
+- Tests must be meaningful (no tests just for coverage)"
+```
+
+Claude produces:
+
+```
+## Sprint Plan: 20% → 85% Coverage
+
+### Week 1: Critical Paths (20% → 55%)
+
+Day 1: Auth Module (20% → 30%)
+- verifyToken: 8 tests (happy path, expired, malformed, missing)
+- refreshSession: 6 tests
+- hashPassword/verifyPassword: 4 tests  
+- login flow integration: 6 tests
+- Coverage gain: +10%
+
+Day 2: Auth Module Continued (30% → 38%)
+- Registration: 8 tests
+- Password reset: 6 tests
+- Role-based access: 8 tests
+- Auth middleware integration: 4 tests
+- Coverage gain: +8%
+
+Day 3: Payment Module (38% → 48%)
+- processPayment: 12 tests (success, failure, edge cases)
+- processRefund: 8 tests
+- calculateTotal: 6 tests
+- Stripe webhook handling: 6 tests
+- Coverage gain: +10%
+
+Day 4: Database Layer (48% → 55%)
+- CRUD operations: 10 tests per entity (users, projects, tasks)
+- Transaction handling: 6 tests
+- Query builder: 8 tests
+- Coverage gain: +7%
+
+Day 5: API Routes — Users & Auth (55% → 62%)
+- POST /api/users: 10 tests
+- GET /api/users: 8 tests  
+- POST /api/auth/login: 10 tests
+- POST /api/auth/register: 8 tests
+- Coverage gain: +7%
+
+### Week 2: Business Logic + E2E (55% → 85%)
+
+Day 6: API Routes — Projects & Tasks
+Day 7: Validators and Utility Functions
+Day 8: React Hooks and State Management
+Day 9: E2E Critical User Journeys
+Day 10: Edge Cases, Error Paths, and Coverage Gaps
+```
+
+## Step 4: Executing the Strategy
+
+Use Claude to execute each day's plan:
+
+```bash
+# Day 1: Auth module
+claude -p "Generate the Day 1 tests from our test strategy.
+
+Write Vitest tests for @src/lib/auth.ts:
+
+1. verifyToken (8 tests):
+   - Valid token returns user
+   - Expired token throws AuthError
+   - Malformed token throws AuthError
+   - Missing token throws AuthError
+   - Token with wrong secret throws AuthError
+   - Token for deleted user throws AuthError
+   - Token with invalid payload throws AuthError
+   - Token verification calls database once (no N+1)
+
+2. refreshSession (6 tests):
+   - Valid refresh token returns new session
+   - Expired refresh token is rejected
+   - Used refresh token is rejected (rotation)
+   - Refresh extends session by correct duration
+   - Old tokens are invalidated after refresh
+   - Concurrent refresh requests don't duplicate sessions
+
+Mock: database, jwt.verify, Date.now
+Follow test conventions from CLAUDE.md"
+```
+
+## Measuring Progress
+
+Track coverage daily:
+
+```bash
+claude -p "Create a script at scripts/coverage-report.ts that:
+1. Runs vitest with coverage
+2. Compares current coverage to yesterday's baseline
+3. Outputs a daily progress report:
+
+Coverage Progress — Day 3
+━━━━━━━━━━━━━━━━━━━━━━━
+Overall: 48.2% (+10.1% from yesterday)
+Target: 85% by Day 10
+
+By module:
+  auth.ts:       92% ██████████ (target: 90%) DONE
+  payments.ts:   88% █████████  (target: 90%) -2%
+  database.ts:   45% █████      (target: 80%) in progress
+  api/users:     15% ██         (target: 80%) not started
+  validators:    45% █████      (target: 70%) not started
+
+Pace: On track (need +6.1%/day, averaging +9.4%/day)
+
+4. Saves to coverage-history.json for trend tracking"
+```
+
+## Risk-Based Testing in Practice
+
+Not everything deserves 90% coverage. Use risk levels to allocate effort:
+
+```bash
+claude "Apply risk-based testing to our codebase.
+
+Categorize every module into risk tiers:
+
+Tier 1 — CRITICAL (target: 90%+ coverage):
+- Anything handling money, auth, or user data
+- Identify these from @src/lib/ and @src/app/api/
+
+Tier 2 — HIGH (target: 80%+ coverage):
+- Core business logic, data processing
+- Database queries with complex joins
+- State management for critical features
+
+Tier 3 — MEDIUM (target: 60%+ coverage):
+- UI components with business logic
+- Utility functions
+- Configuration and setup
+
+Tier 4 — LOW (target: 40%+ coverage):
+- Static pages, about/marketing
+- Admin-only features with low usage
+- Deprecated code pending removal
+
+List specific files in each tier with their current coverage 
+and the tests needed to reach the target."
+```
+
+## The Ongoing Strategy
+
+A test strategy is not a one-time exercise:
+
+```bash
+claude "Create a sustainable testing process for our team.
+
+Add to CLAUDE.md:
+
+## Testing Rules
+1. Every PR must include tests for new/changed code
+2. New features: unit tests + at least 1 integration test
+3. Bug fixes: must include a regression test
+4. Coverage must not decrease on any PR
+5. Critical module changes: require E2E test update
+
+## Test Review Checklist
+- [ ] Tests cover happy path
+- [ ] Tests cover error paths
+- [ ] Tests cover edge cases
+- [ ] No flaky patterns (no sleeps, no timing deps)
+- [ ] Test names describe the scenario
+- [ ] Mocks are realistic
+- [ ] No test data leaks between tests"
+```
+
+## Key Takeaway
+
+Going from 20% to 85% coverage is not about writing random tests until the number goes up. It is about strategy: analyze your codebase for risk and complexity, prioritize critical paths first, follow the test pyramid for the right distribution of test types, and execute in daily phases with measurable progress. Claude can analyze your codebase, design the strategy, produce the day-by-day roadmap, and then generate the actual tests for each day's plan. The combination of strategic planning and Claude's test generation speed is how you go from "we don't have enough tests" to "our test suite catches real bugs" in two weeks.

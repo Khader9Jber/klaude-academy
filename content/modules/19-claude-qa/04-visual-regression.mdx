@@ -1,0 +1,319 @@
+---
+title: "Visual Regression Testing"
+slug: "visual-regression"
+order: 4
+difficulty: "expert"
+duration: 18
+tags: ["qa", "visual", "regression", "screenshots", "ui"]
+objectives:
+  - "Set up Playwright visual comparison tests with Claude's help"
+  - "Manage screenshot baselines effectively"
+  - "Handle dynamic content in visual tests"
+  - "Integrate visual regression into CI pipelines"
+quiz:
+  - id: "visual-reg-1"
+    question: "What is visual regression testing?"
+    type: "multiple-choice"
+    options:
+      - "Testing that code compiles"
+      - "Comparing screenshots of your UI against known-good baselines to detect unintended visual changes"
+      - "Testing CSS performance"
+      - "Reviewing designs in Figma"
+    correct: 1
+    explanation: "Visual regression testing takes screenshots of your pages/components and compares them pixel-by-pixel against previously approved baseline images. If anything changes — layout shifts, color changes, missing elements, font changes — the test fails with a diff showing exactly what changed. This catches visual bugs that functional tests miss."
+  - id: "visual-reg-2"
+    question: "How do you handle dynamic content (dates, user data) in visual tests?"
+    type: "multiple-choice"
+    options:
+      - "Ignore it"
+      - "Mask dynamic elements, use fixed test data, freeze timestamps, and configure pixel-level tolerance thresholds"
+      - "Take screenshots faster"
+      - "Remove dynamic content from the page"
+    correct: 1
+    explanation: "Dynamic content causes false failures in visual tests. The solutions: mask areas with dynamic content (Playwright's mask option), use consistent test data fixtures, freeze Date.now() and animations, set locale/timezone explicitly, and use a small pixel tolerance threshold (e.g., 0.1%) to handle anti-aliasing differences across environments."
+  - id: "visual-reg-3"
+    question: "When should you update visual regression baselines?"
+    type: "multiple-choice"
+    options:
+      - "Every time a test fails"
+      - "Only when visual changes are intentional — review the diff, confirm the change is expected, then update the baseline"
+      - "Never"
+      - "Automatically in CI"
+    correct: 1
+    explanation: "Baselines should only be updated when visual changes are intentional: a redesign, new component, or deliberate style change. When a visual test fails, review the diff carefully. If the change is expected (you redesigned the button), update the baseline. If the change is unexpected (a CSS regression broke the layout), fix the code instead of updating the baseline."
+  - id: "visual-reg-4"
+    question: "Why should visual regression tests run in CI with a consistent environment?"
+    type: "multiple-choice"
+    options:
+      - "CI is faster"
+      - "Different OS/browser/font rendering between local and CI causes false positives — a consistent CI environment ensures reliable comparisons"
+      - "CI has better screenshots"
+      - "Local testing is not supported"
+    correct: 1
+    explanation: "Font rendering, anti-aliasing, and sub-pixel positioning differ between macOS, Linux, and Windows. A screenshot taken on macOS will look subtly different from one on Linux, causing false test failures. Running visual tests in a consistent CI environment (usually Linux Docker containers) eliminates these cross-platform rendering differences."
+---
+
+## Why Functional Tests Are Not Enough
+
+Your functional tests pass. Every button works, every form submits, every API returns the right data. But a CSS change just moved the checkout button off-screen on mobile. No functional test catches that. Visual regression testing does.
+
+## Setting Up Visual Tests with Playwright
+
+```bash
+claude -p "Set up Playwright visual regression testing for our Next.js app.
+
+Create:
+1. e2e/visual/ directory for visual tests
+2. e2e/visual/visual.config.ts — Playwright config for visual tests:
+   - Single browser (Chromium) for consistency
+   - Fixed viewport: 1280x720
+   - Disable animations (CSS and JS)
+   - Consistent locale/timezone
+   
+3. e2e/visual/helpers.ts — Visual test utilities:
+   - takeScreenshot(page, name) — consistent screenshot settings
+   - maskDynamicContent(page) — hide dates, avatars, random content
+   - waitForStableDOM(page) — wait for animations and loading to complete
+   - screenshotWithViewports(page, name, viewports[]) — responsive testing
+
+4. e2e/visual/pages.spec.ts — Visual tests for key pages:
+   - Homepage
+   - Login page
+   - Dashboard (with mock data)
+   - Settings page
+   - 404 page
+   Each at desktop (1280x720) and mobile (375x812) viewports
+
+5. Scripts in package.json:
+   - test:visual — run visual tests
+   - test:visual:update — update baselines
+
+Reference: @playwright.config.ts for existing config
+Reference: @e2e/fixtures.ts for auth fixtures"
+```
+
+## The Generated Visual Test Suite
+
+```typescript
+// e2e/visual/pages.spec.ts
+import { test, expect } from '@playwright/test';
+import { maskDynamicContent, waitForStableDOM } from './helpers';
+
+test.describe('Visual Regression — Desktop', () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  test('homepage', async ({ page }) => {
+    await page.goto('/');
+    await waitForStableDOM(page);
+    
+    await expect(page).toHaveScreenshot('homepage-desktop.png', {
+      maxDiffPixelRatio: 0.001,
+    });
+  });
+
+  test('login page', async ({ page }) => {
+    await page.goto('/login');
+    await waitForStableDOM(page);
+    
+    await expect(page).toHaveScreenshot('login-desktop.png', {
+      maxDiffPixelRatio: 0.001,
+    });
+  });
+
+  test('dashboard with data', async ({ page }) => {
+    // Login first
+    await page.goto('/login');
+    await page.fill('[data-testid="email"]', 'test@example.com');
+    await page.fill('[data-testid="password"]', 'testpass123');
+    await page.click('[data-testid="login-button"]');
+    await page.waitForURL('/dashboard');
+    
+    // Mask dynamic content
+    await maskDynamicContent(page);
+    await waitForStableDOM(page);
+    
+    await expect(page).toHaveScreenshot('dashboard-desktop.png', {
+      maxDiffPixelRatio: 0.001,
+      mask: [
+        page.locator('[data-testid="current-time"]'),
+        page.locator('[data-testid="user-avatar"]'),
+        page.locator('[data-testid="activity-feed"]'),
+      ],
+    });
+  });
+});
+
+test.describe('Visual Regression — Mobile', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('homepage mobile', async ({ page }) => {
+    await page.goto('/');
+    await waitForStableDOM(page);
+    
+    await expect(page).toHaveScreenshot('homepage-mobile.png', {
+      maxDiffPixelRatio: 0.001,
+    });
+  });
+
+  test('navigation menu open', async ({ page }) => {
+    await page.goto('/');
+    await page.click('[data-testid="menu-toggle"]');
+    await page.waitForSelector('[data-testid="mobile-nav"]');
+    await waitForStableDOM(page);
+    
+    await expect(page).toHaveScreenshot('nav-open-mobile.png', {
+      maxDiffPixelRatio: 0.001,
+    });
+  });
+});
+```
+
+## Handling Dynamic Content
+
+The biggest challenge in visual testing is content that changes every time:
+
+```typescript
+// e2e/visual/helpers.ts
+import { type Page } from '@playwright/test';
+
+export async function waitForStableDOM(page: Page) {
+  // Disable CSS animations
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+      }
+    `,
+  });
+
+  // Wait for network idle (all API calls resolved)
+  await page.waitForLoadState('networkidle');
+  
+  // Wait for fonts to load
+  await page.evaluate(() => document.fonts.ready);
+  
+  // Small buffer for any remaining rendering
+  await page.waitForTimeout(500);
+}
+
+export async function maskDynamicContent(page: Page) {
+  // Replace all timestamps with a fixed value
+  await page.evaluate(() => {
+    document.querySelectorAll('[data-testid*="date"], time').forEach((el) => {
+      el.textContent = '2025-01-01';
+    });
+  });
+  
+  // Replace relative times ("3 minutes ago")
+  await page.evaluate(() => {
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT
+    );
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.textContent?.match(/\d+ (minute|hour|day|week)s? ago/)) {
+        node.textContent = '1 day ago';
+      }
+    }
+  });
+}
+
+export async function screenshotWithViewports(
+  page: Page,
+  name: string,
+  viewports: Array<{ width: number; height: number; label: string }>
+) {
+  for (const viewport of viewports) {
+    await page.setViewportSize({ 
+      width: viewport.width, 
+      height: viewport.height 
+    });
+    await waitForStableDOM(page);
+    
+    // Playwright auto-manages baselines per viewport
+    await page.screenshot({ 
+      path: `screenshots/${name}-${viewport.label}.png`,
+      fullPage: true 
+    });
+  }
+}
+```
+
+## Component-Level Visual Tests
+
+Test individual components in isolation for more granular regression detection:
+
+```bash
+claude -p "Generate visual regression tests for our UI components.
+
+Components to test (each in multiple states):
+
+Button:
+- Default, hover, active, disabled, loading
+- Each size: sm, md, lg
+- Each variant: primary, secondary, outline, ghost
+
+Card:
+- Default, with image, without image, loading skeleton
+
+Modal:
+- Open state with short content
+- Open state with long content (scrollable)
+- With form fields
+
+Toast:
+- Success, error, warning, info
+
+Create: e2e/visual/components.spec.ts
+Use a test page at /test/components that renders each component 
+state (create it if it doesn't exist).
+
+Reference: @src/components/ui/ for component props"
+```
+
+## CI Pipeline Integration
+
+```bash
+claude -p "Create a GitHub Actions workflow for visual regression testing.
+
+Requirements:
+- Run on pull requests only (not on push to main)
+- Use a Docker container for consistent rendering
+- Steps:
+  1. Install dependencies
+  2. Build the app
+  3. Start the dev server
+  4. Run visual tests
+  5. If tests fail, upload diff images as artifacts
+  6. Comment on PR with visual diff summary
+
+- Baseline management:
+  - Baselines are committed to the repo in e2e/visual/screenshots/
+  - A 'update-baselines' label on the PR auto-updates them
+  
+Create: .github/workflows/visual-tests.yml"
+```
+
+## Reviewing Visual Diffs
+
+When visual tests fail in CI, use Claude to analyze the diffs:
+
+```bash
+# Download the diff artifacts from CI, then:
+claude "Look at these visual regression test failures:
+
+[paste screenshot of the diff]
+
+What changed? Is this an intentional design change or a regression?
+The PR is supposed to add a new notification badge to the header."
+```
+
+Claude can look at the visual diff and identify whether the change is related to the PR or an unintended side effect.
+
+## Key Takeaway
+
+Visual regression testing catches the bugs that functional tests cannot see — layout shifts, missing elements, color changes, and responsive breakages. Set up Playwright visual tests with consistent environments (fixed viewport, disabled animations, masked dynamic content), test at multiple viewports for responsive coverage, and run them in CI with Docker for consistent rendering. The key to maintaining visual tests is baseline discipline: only update baselines for intentional changes, and always review diffs before approving. Claude can help set up the entire infrastructure, generate component-level visual tests, and even analyze visual diff images when tests fail.

@@ -1,0 +1,368 @@
+---
+title: "Test Automation Framework Setup"
+slug: "test-automation-frameworks"
+order: 2
+difficulty: "expert"
+duration: 25
+tags: ["qa", "automation", "playwright", "cypress", "jest"]
+objectives:
+  - "Use Claude to set up complete testing frameworks from scratch"
+  - "Generate Page Object Models for Playwright E2E testing"
+  - "Configure CLAUDE.md rules for consistent test patterns"
+  - "Build reusable test infrastructure with Claude's help"
+quiz:
+  - id: "test-frameworks-1"
+    question: "What is the Page Object Model (POM) pattern in test automation?"
+    type: "multiple-choice"
+    options:
+      - "A database model for test data"
+      - "A design pattern where each page/component in your app has a corresponding class that encapsulates its locators and actions"
+      - "A way to model page load performance"
+      - "A template for generating pages"
+    correct: 1
+    explanation: "The Page Object Model encapsulates page elements and interactions into reusable classes. Instead of writing selectors directly in tests, you interact with methods like loginPage.fillEmail('user@test.com'). This makes tests more readable, reduces duplication, and means you only update locators in one place when the UI changes."
+  - id: "test-frameworks-2"
+    question: "Why should you add testing conventions to CLAUDE.md?"
+    type: "multiple-choice"
+    options:
+      - "To document your tests"
+      - "So Claude automatically follows your test patterns, naming conventions, and organizational rules every time it generates tests"
+      - "To track test results"
+      - "CLAUDE.md is required for testing"
+    correct: 1
+    explanation: "Adding test conventions to CLAUDE.md ensures every test Claude generates follows the same patterns: same naming convention (describe/it blocks), same mock setup approach, same assertion style, same file organization. Without this, each Claude session might generate tests in a different style, leading to an inconsistent test suite."
+  - id: "test-frameworks-3"
+    question: "When should you use Playwright over Jest/Vitest?"
+    type: "multiple-choice"
+    options:
+      - "Always"
+      - "For end-to-end tests that need to run in real browsers — testing user flows, visual rendering, and cross-browser behavior"
+      - "For unit tests"
+      - "When you need faster tests"
+    correct: 1
+    explanation: "Playwright runs tests in real browsers (Chromium, Firefox, WebKit), making it ideal for E2E tests that verify actual user flows, visual rendering, and cross-browser compatibility. Jest/Vitest run in Node.js without a browser, making them faster for unit and integration tests that don't need DOM rendering."
+  - id: "test-frameworks-4"
+    question: "What should you tell Claude when generating POM classes?"
+    type: "multiple-choice"
+    options:
+      - "Just say 'create page objects'"
+      - "Specify the page URL, key elements to interact with, common user actions, navigation methods, and assertion helpers"
+      - "Let Claude decide the structure"
+      - "Copy from an example"
+    correct: 1
+    explanation: "Effective POM generation requires telling Claude: which page (URL/route), what elements users interact with (forms, buttons, lists), what actions users perform (login, search, submit), how pages connect (navigation), and what assertions are common (verify logged in, verify error shown). This produces page objects that actually match your application's UI and user flows."
+---
+
+## Framework Setup from Zero
+
+Setting up a testing framework involves dozens of configuration decisions: test runner, assertion library, browser setup, file structure, environment variables, fixtures, and more. Claude can handle all of this in one session — but you need to tell it exactly what you want.
+
+## Playwright E2E Setup with Claude
+
+```bash
+claude -p "Set up Playwright for E2E testing in this Next.js project.
+
+Create:
+1. playwright.config.ts — use Chromium only for dev, all browsers in CI
+   Base URL: http://localhost:3000
+   Timeout: 30 seconds
+   Retries: 2 in CI, 0 locally
+   Reporter: HTML for local, GitHub Actions for CI
+
+2. e2e/fixtures.ts — custom fixtures:
+   - authenticatedPage: auto-login using test account
+   - adminPage: auto-login as admin
+   - testUser: creates a fresh user, cleans up after test
+
+3. e2e/pages/LoginPage.ts — Page Object Model:
+   - navigate()
+   - fillEmail(email)
+   - fillPassword(password) 
+   - clickSubmit()
+   - getErrorMessage()
+   - expectLoggedIn()
+
+4. e2e/pages/DashboardPage.ts — POM:
+   - navigate()
+   - getWelcomeMessage()
+   - clickNewProject()
+   - getProjectList()
+   - expectProjectVisible(name)
+
+5. e2e/auth.spec.ts — first test:
+   - Login with valid credentials
+   - Login with invalid credentials
+   - Login with empty fields
+
+6. package.json scripts:
+   - test:e2e — run all E2E tests
+   - test:e2e:ui — run with Playwright UI mode
+   - test:e2e:debug — run in debug mode
+
+7. .github/workflows/e2e.yml — GitHub Actions workflow
+   - Install deps, build app, run Playwright
+   - Upload test results as artifact on failure
+
+Reference: @package.json for existing scripts
+Reference: @src/app/ for route structure"
+```
+
+This single prompt produces a complete, working E2E testing infrastructure.
+
+## Vitest Unit Testing Setup
+
+```bash
+claude -p "Set up Vitest for unit testing in this Next.js project.
+
+Create:
+1. vitest.config.ts:
+   - Use @vitejs/plugin-react
+   - Path aliases matching tsconfig (@ -> src/)
+   - Setup file for global mocks
+   - Coverage with v8 provider, thresholds: 80% lines/branches
+   - Include: src/**/*.test.ts
+   - Exclude: e2e/, node_modules/
+
+2. src/test/setup.ts:
+   - Mock next/navigation (useRouter, usePathname)
+   - Mock next/headers (cookies, headers)
+   - Mock environment variables
+   - Reset all mocks between tests
+
+3. src/test/utils.tsx:
+   - Custom render function with providers (React Query, Theme, Auth)
+   - renderHook wrapper with providers
+   - Common mock factories: createMockUser(), createMockProject()
+
+4. src/test/mocks/handlers.ts:
+   - MSW handlers for common API routes
+   - /api/auth/session — returns mock session
+   - /api/users — returns mock users array
+   - /api/projects — returns mock projects array
+
+5. Example test: src/lib/utils.test.ts
+   - Test 3-4 utility functions with happy path and error cases
+
+6. package.json scripts:
+   - test — run Vitest
+   - test:watch — run in watch mode
+   - test:coverage — run with coverage report
+
+Reference: @tsconfig.json for path aliases
+Reference: @src/lib/ for utility functions to test"
+```
+
+## Page Object Model Generation
+
+The POM pattern is where Claude truly shines for QA. Give Claude a page and it generates the entire interaction model.
+
+```bash
+"Generate a Page Object Model for the project settings page.
+
+Page URL: /projects/:id/settings
+Reference: @src/app/projects/[id]/settings/page.tsx
+
+The page has:
+- Project name input (editable)
+- Description textarea (editable)
+- Visibility toggle (public/private)
+- Danger zone with 'Delete Project' button
+- Delete confirmation modal with text input ('type project name to confirm')
+- 'Save Changes' button (disabled until changes made)
+- 'Cancel' link (goes back to project)
+
+Generate:
+1. e2e/pages/ProjectSettingsPage.ts with:
+   - All element locators (use data-testid where possible)
+   - All user actions as methods
+   - Assertion helpers (expectSaved, expectDeleteModalOpen, etc.)
+   - Navigation methods (navigate, goBack)
+
+2. e2e/project-settings.spec.ts with tests:
+   - Update project name
+   - Update description
+   - Toggle visibility
+   - Cancel changes (verify no save)
+   - Delete project flow (full modal interaction)
+   - Save button disabled when no changes
+   - Delete with wrong confirmation text (should show error)
+
+Follow the POM pattern from @e2e/pages/LoginPage.ts"
+```
+
+Generated POM:
+
+```typescript
+// e2e/pages/ProjectSettingsPage.ts
+import { type Page, type Locator, expect } from '@playwright/test';
+
+export class ProjectSettingsPage {
+  readonly page: Page;
+  readonly nameInput: Locator;
+  readonly descriptionInput: Locator;
+  readonly visibilityToggle: Locator;
+  readonly saveButton: Locator;
+  readonly cancelLink: Locator;
+  readonly deleteButton: Locator;
+  readonly deleteModal: Locator;
+  readonly deleteConfirmInput: Locator;
+  readonly deleteConfirmButton: Locator;
+  readonly successToast: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.nameInput = page.getByTestId('project-name-input');
+    this.descriptionInput = page.getByTestId('project-description');
+    this.visibilityToggle = page.getByTestId('visibility-toggle');
+    this.saveButton = page.getByRole('button', { name: 'Save Changes' });
+    this.cancelLink = page.getByRole('link', { name: 'Cancel' });
+    this.deleteButton = page.getByRole('button', { name: 'Delete Project' });
+    this.deleteModal = page.getByTestId('delete-modal');
+    this.deleteConfirmInput = page.getByPlaceholder('Type project name');
+    this.deleteConfirmButton = page.getByTestId('confirm-delete');
+    this.successToast = page.getByRole('alert');
+  }
+
+  async navigate(projectId: string) {
+    await this.page.goto(`/projects/${projectId}/settings`);
+  }
+
+  async updateName(name: string) {
+    await this.nameInput.clear();
+    await this.nameInput.fill(name);
+  }
+
+  async updateDescription(description: string) {
+    await this.descriptionInput.clear();
+    await this.descriptionInput.fill(description);
+  }
+
+  async toggleVisibility() {
+    await this.visibilityToggle.click();
+  }
+
+  async save() {
+    await this.saveButton.click();
+  }
+
+  async cancel() {
+    await this.cancelLink.click();
+  }
+
+  async deleteProject(projectName: string) {
+    await this.deleteButton.click();
+    await this.deleteConfirmInput.fill(projectName);
+    await this.deleteConfirmButton.click();
+  }
+
+  async expectSaveDisabled() {
+    await expect(this.saveButton).toBeDisabled();
+  }
+
+  async expectSaveEnabled() {
+    await expect(this.saveButton).toBeEnabled();
+  }
+
+  async expectSaved() {
+    await expect(this.successToast).toBeVisible();
+    await expect(this.successToast).toContainText('saved');
+  }
+
+  async expectDeleteModalOpen() {
+    await expect(this.deleteModal).toBeVisible();
+  }
+}
+```
+
+## CLAUDE.md Testing Rules
+
+Add these to your project's CLAUDE.md so every test Claude generates follows your conventions:
+
+```markdown
+# CLAUDE.md — Testing Conventions
+
+## Test File Organization
+- Unit tests: co-locate as `*.test.ts` next to source files
+- Integration tests: `src/__tests__/integration/`
+- E2E tests: `e2e/` with Page Object Models in `e2e/pages/`
+
+## Test Naming Convention
+- describe: module or function name
+- it: "should [expected behavior] when [condition]"
+- Example: it('should return null when user not found')
+
+## Mocking Rules
+- Mock external services (Stripe, email, S3) — ALWAYS
+- Mock database — only in unit tests, use test DB for integration
+- Mock timers — when testing time-dependent logic
+- Never mock the module under test
+
+## Assertion Style
+- Use specific matchers: toBe, toEqual, toContain (not toBeTruthy)
+- Test exact error messages, not just that errors are thrown
+- Assert on mock call arguments, not just call counts
+
+## Test Data
+- Use factory functions: createMockUser(), createMockProject()
+- Never hardcode IDs — generate with crypto.randomUUID()
+- Clean up test data in afterEach/afterAll
+
+## Coverage Requirements
+- Minimum 80% line coverage for new code
+- All public API functions must have tests
+- Error paths must be tested, not just happy paths
+```
+
+## Cypress Component Testing Setup
+
+```bash
+claude -p "Set up Cypress component testing for our React components.
+
+Create:
+1. cypress.config.ts — component testing configuration
+   - Framework: React, bundler: Vite
+   - Viewport: 1280x720
+   - Custom commands for common interactions
+
+2. cypress/support/component.ts:
+   - Mount helper with all providers
+   - Custom commands: cy.getByTestId(), cy.login()
+
+3. cypress/support/commands.ts:
+   - cy.getByTestId(id) — shorthand for data-testid
+   - cy.shouldBeVisible() — visibility assertion
+
+4. Example component test: cypress/component/Button.cy.tsx
+   - Renders with correct text
+   - Handles click events
+   - Shows loading state
+   - Disabled state prevents clicks
+
+Reference: @src/components/ui/Button.tsx"
+```
+
+## Building a Test Infrastructure Playbook
+
+Create a reusable testing setup that Claude can follow for any new project:
+
+```bash
+claude -p "Create a test infrastructure playbook at docs/testing-playbook.md.
+
+Include:
+1. How to add a new unit test
+2. How to add a new E2E test (with POM)
+3. How to add a new mock
+4. How to add a new fixture
+5. How to run tests locally and in CI
+6. Common debugging techniques for flaky tests
+
+Reference existing test files:
+@vitest.config.ts
+@playwright.config.ts
+@src/test/setup.ts
+@e2e/fixtures.ts"
+```
+
+## Key Takeaway
+
+Claude can set up complete testing frameworks in minutes — Playwright for E2E, Vitest for unit tests, Cypress for component tests. The key is giving Claude a detailed specification: what to configure, what patterns to follow, and what infrastructure to create. Page Object Models are where Claude shines brightest — it can analyze your page components and generate comprehensive interaction models. Put your testing conventions in CLAUDE.md and every test Claude generates will be consistent with your existing suite. The initial setup investment pays off every time you generate tests for new features.
