@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npx tsx scripts/fetch-updates.ts",
     "build": "next build",
+    "fetch-updates": "npx tsx scripts/fetch-updates.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

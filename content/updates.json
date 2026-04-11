@@ -1,0 +1,171 @@
+{
+  "lastUpdated": "2026-04-11T21:08:41.390Z",
+  "count": 12,
+  "updates": [
+    {
+      "id": "claude-4-6-release",
+      "title": "Claude 4.6 (Opus & Sonnet) Released",
+      "date": "2025-05-14",
+      "summary": "Claude 4.6 brings improved reasoning, faster output, and 1M context for Opus. Sonnet 4.6 replaces Sonnet 4.5 as the default model with better coding performance.",
+      "url": "https://www.anthropic.com/news",
+      "category": "model",
+      "tags": [
+        "claude-4.6",
+        "opus",
+        "sonnet",
+        "release"
+      ]
+    },
+    {
+      "id": "claude-code-ga",
+      "title": "Claude Code Generally Available",
+      "date": "2025-04-15",
+      "summary": "Claude Code exits beta and is now generally available as a CLI tool, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).",
+      "url": "https://docs.anthropic.com/en/docs/claude-code",
+      "category": "release",
+      "tags": [
+        "claude-code",
+        "release",
+        "cli",
+        "ide"
+      ]
+    },
+    {
+      "id": "claude-code-hooks",
+      "title": "Claude Code Hooks — Automation Triggers",
+      "date": "2025-04-01",
+      "summary": "Hooks let you run shell commands before/after Claude Code actions. Auto-format on save, notify on completion, enforce linting — all configurable in settings.json.",
+      "url": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+      "category": "feature",
+      "tags": [
+        "claude-code",
+        "hooks",
+        "automation"
+      ]
+    },
+    {
+      "id": "claude-code-subagents",
+      "title": "Claude Code Sub-Agents and Skills",
+      "date": "2025-04-01",
+      "summary": "Sub-agents run parallel tasks in isolated worktrees. Skills are reusable prompt packages that extend Claude Code's capabilities for specific workflows.",
+      "url": "https://docs.anthropic.com/en/docs/claude-code/sub-agents",
+      "category": "feature",
+      "tags": [
+        "claude-code",
+        "agents",
+        "skills",
+        "parallel"
+      ]
+    },
+    {
+      "id": "files-api",
+      "title": "Files API for Document Processing",
+      "date": "2025-04-01",
+      "summary": "Upload PDFs, images, and documents directly to the API. Claude processes them natively without base64 encoding, supporting up to 100 pages per request.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/files",
+      "category": "feature",
+      "tags": [
+        "api",
+        "files",
+        "pdf",
+        "documents"
+      ]
+    },
+    {
+      "id": "agent-sdk-release",
+      "title": "Claude Agent SDK Released",
+      "date": "2025-03-15",
+      "summary": "The Agent SDK provides a Python framework for building autonomous Claude-powered agents with tool use, guardrails, and multi-agent orchestration.",
+      "url": "https://docs.anthropic.com/en/docs/agents",
+      "category": "release",
+      "tags": [
+        "sdk",
+        "agents",
+        "python",
+        "automation"
+      ]
+    },
+    {
+      "id": "citations-api",
+      "title": "Citations API for Source Attribution",
+      "date": "2025-03-01",
+      "summary": "The Citations API lets Claude attribute specific claims to source documents, providing verifiable references in responses.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/citations",
+      "category": "feature",
+      "tags": [
+        "api",
+        "citations",
+        "attribution",
+        "trust"
+      ]
+    },
+    {
+      "id": "extended-thinking",
+      "title": "Extended Thinking for Complex Reasoning",
+      "date": "2025-02-24",
+      "summary": "Extended thinking gives Claude a scratchpad for complex reasoning before responding. Improves performance on math, logic, and multi-step problems.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking",
+      "category": "feature",
+      "tags": [
+        "reasoning",
+        "thinking",
+        "performance"
+      ]
+    },
+    {
+      "id": "mcp-protocol",
+      "title": "Model Context Protocol (MCP) Open Standard",
+      "date": "2024-11-25",
+      "summary": "Anthropic open-sources the Model Context Protocol, enabling AI models to connect with external tools, databases, and APIs through a standardized interface.",
+      "url": "https://modelcontextprotocol.io",
+      "category": "feature",
+      "tags": [
+        "mcp",
+        "protocol",
+        "open-source",
+        "tools"
+      ]
+    },
+    {
+      "id": "prompt-caching",
+      "title": "Prompt Caching for API Users",
+      "date": "2024-10-01",
+      "summary": "Prompt caching reduces API costs by up to 90% for repeated prefixes. Cache hits are charged at 10% of input token price with a 5-minute TTL.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "category": "feature",
+      "tags": [
+        "api",
+        "caching",
+        "cost",
+        "optimization"
+      ]
+    },
+    {
+      "id": "message-batches",
+      "title": "Message Batches API — 50% Discount",
+      "date": "2024-09-24",
+      "summary": "The Batches API lets you send up to 100,000 requests at once with 50% off input and output tokens. Results are delivered within 24 hours.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/message-batches",
+      "category": "feature",
+      "tags": [
+        "api",
+        "batches",
+        "cost",
+        "scale"
+      ]
+    },
+    {
+      "id": "tool-use-ga",
+      "title": "Tool Use (Function Calling) GA",
+      "date": "2024-05-30",
+      "summary": "Tool use is generally available across all Claude models. Define tools with JSON schema, Claude decides when to call them, and you execute the functions.",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "category": "feature",
+      "tags": [
+        "api",
+        "tools",
+        "function-calling"
+      ]
+    }
+  ]
+}
