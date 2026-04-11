@@ -1,0 +1,456 @@
+---
+title: "React Native Development with Claude"
+slug: "react-native"
+order: 1
+difficulty: "intermediate"
+duration: 22
+tags: ["mobile", "react-native", "cross-platform", "expo"]
+objectives:
+  - "Scaffold Expo and React Native projects with Claude"
+  - "Generate screens, navigation flows, and state management code"
+  - "Handle platform-specific code for iOS and Android"
+  - "Debug common React Native errors with Claude's help"
+quiz:
+  - id: "react-native-1"
+    question: "What's the best way to start a new React Native project with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to generate every file from scratch"
+      - "Use 'npx create-expo-app' first, then use Claude to generate screens, navigation, and business logic within the existing project structure"
+      - "Copy a template from GitHub"
+      - "Use Claude to build a web app and convert it"
+    correct: 1
+    explanation: "Start with the official Expo CLI to get the boilerplate right (metro config, babel, native modules). Then use Claude to build on that foundation — generating screens, setting up navigation, adding state management. Claude works best when it has an existing project structure to work within."
+  - id: "react-native-2"
+    question: "How should you handle platform-specific code when using Claude?"
+    type: "multiple-choice"
+    options:
+      - "Write separate apps for iOS and Android"
+      - "Tell Claude which platforms you need to support and ask for Platform.select() or .ios.tsx/.android.tsx files where behavior differs"
+      - "Only target one platform"
+      - "Ignore platform differences"
+    correct: 1
+    explanation: "Claude understands React Native's platform abstraction layers: Platform.OS checks, Platform.select() for inline differences, and .ios.tsx/.android.tsx file extensions for larger platform-specific components. Tell Claude your target platforms and it generates code that handles both correctly."
+  - id: "react-native-3"
+    question: "What context should you give Claude when generating a new screen?"
+    type: "multiple-choice"
+    options:
+      - "Just the screen name"
+      - "The screen's purpose, its navigation params, data it displays, user interactions, and your existing component/styling conventions"
+      - "A screenshot of a similar app"
+      - "The full app code"
+    correct: 1
+    explanation: "Claude generates better screens when it knows: what the screen does, what navigation parameters it receives, what data it renders, what user actions it supports, and your existing patterns (styling approach, component library, state management choice). This avoids generating code that looks foreign to your codebase."
+  - id: "react-native-4"
+    question: "What's the most common React Native error Claude helps debug?"
+    type: "multiple-choice"
+    options:
+      - "Syntax errors"
+      - "Metro bundler failures, native module linking issues, and 'Unable to resolve module' errors"
+      - "Typos"
+      - "Logic errors"
+    correct: 1
+    explanation: "React Native's build toolchain (Metro bundler, native module linking, auto-linking failures) produces cryptic errors that are hard to Google. Claude recognizes these patterns instantly — 'Unable to resolve module' usually means missing dependencies or incorrect imports, and Claude can diagnose the specific cause from the error message."
+---
+
+## Mobile Dev Without the Pain
+
+React Native development has a specific kind of friction: the toolchain is complex, the error messages are cryptic, and you're constantly juggling two platforms. Claude eliminates most of that friction — not by hiding the complexity, but by generating code that handles it correctly the first time.
+
+## Scaffolding a Project
+
+Start with Expo (the smart default for most projects), then bring Claude in:
+
+```bash
+# Create the project with Expo CLI
+npx create-expo-app@latest my-app --template blank-typescript
+cd my-app
+
+# Now bring in Claude
+claude "I just created a new Expo project (blank TypeScript template).
+Set up the following:
+
+1. File-based routing with expo-router
+2. A tab navigator with 3 tabs: Home, Search, Profile
+3. A consistent theme system (colors, spacing, typography)
+4. Basic screen stubs for each tab
+
+Install any needed dependencies. Use the Expo SDK — no bare workflow."
+```
+
+Claude generates the full structure:
+
+```bash
+npx expo install expo-router expo-linking expo-constants expo-status-bar
+```
+
+```typescript
+// app/_layout.tsx
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../hooks/useTheme';
+
+export default function RootLayout() {
+  const { colors } = useTheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: {
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
+        },
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: 'Search',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="search-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
+```
+
+```typescript
+// hooks/useTheme.ts
+const lightTheme = {
+  colors: {
+    primary: '#2563EB',
+    background: '#FFFFFF',
+    card: '#F8FAFC',
+    text: '#0F172A',
+    textSecondary: '#64748B',
+    border: '#E2E8F0',
+    error: '#DC2626',
+    success: '#16A34A',
+  },
+  spacing: {
+    xs: 4, sm: 8, md: 16, lg: 24, xl: 32,
+  },
+  fontSize: {
+    sm: 14, md: 16, lg: 18, xl: 24, xxl: 32,
+  },
+};
+
+export function useTheme() {
+  // For now, return light theme.
+  // Extend with useColorScheme() for dark mode support.
+  return lightTheme;
+}
+```
+
+You've got a working tabbed app with consistent theming in under a minute.
+
+## Generating Screens
+
+This is where Claude saves the most time. A screen that takes 30-45 minutes to build manually takes one prompt:
+
+```bash
+claude "Generate a Product Details screen for my e-commerce app.
+
+It receives these navigation params:
+- productId: string
+
+It should:
+- Fetch product data from our API (use a custom hook)
+- Show product image (full-width, 300px height)
+- Product name, price, rating (stars), review count
+- Description text (expandable if > 3 lines)
+- Size selector (S, M, L, XL) — horizontal scroll
+- 'Add to Cart' button (fixed at bottom, primary color)
+- Loading skeleton while data fetches
+- Error state with retry button
+
+Use our existing theme system from useTheme.
+Style with StyleSheet.create — we don't use styled-components."
+```
+
+Claude generates a complete, well-structured screen component with all the states handled (loading, error, success), proper TypeScript types, and code that follows your project's conventions because you told it your styling approach.
+
+## Navigation Setup
+
+Navigation is one of those things that's easy conceptually but tedious to code:
+
+```bash
+claude "Set up the navigation structure for my app:
+
+Tab Navigator (bottom):
+  - Home (stack)
+    - HomeScreen
+    - ProductDetail (receives productId)
+    - CategoryScreen (receives categoryId)
+  - Search (stack)
+    - SearchScreen
+    - SearchResults (receives query)
+  - Cart (stack)
+    - CartScreen
+    - CheckoutScreen
+    - OrderConfirmation (receives orderId)
+  - Profile (stack)
+    - ProfileScreen
+    - EditProfile
+    - OrderHistory
+    - OrderDetail (receives orderId)
+
+Use expo-router file-based routing.
+Add TypeScript types for all route params.
+Include deep linking config for product URLs."
+```
+
+Claude generates the entire file structure and type definitions. No more looking up the `expo-router` docs for the fifteenth time.
+
+## State Management
+
+```bash
+claude "Set up Zustand state management for my e-commerce app:
+
+Stores needed:
+1. cartStore — items, add/remove/update quantity, total calculation
+2. authStore — user, token, login/logout, isAuthenticated
+3. productStore — cached products, fetchProduct, searchProducts
+
+Include TypeScript types.
+Persist cart and auth to AsyncStorage.
+Add a useHydration hook so the app doesn't flash before
+persisted state loads."
+```
+
+```typescript
+// stores/cartStore.ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  size: string;
+  image: string;
+}
+
+interface CartStore {
+  items: CartItem[];
+  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  removeItem: (productId: string, size: string) => void;
+  updateQuantity: (productId: string, size: string,
+                    quantity: number) => void;
+  clearCart: () => void;
+  total: () => number;
+  itemCount: () => number;
+}
+
+export const useCartStore = create<CartStore>()(
+  persist(
+    (set, get) => ({
+      items: [],
+
+      addItem: (item) => set((state) => {
+        const existing = state.items.find(
+          i => i.productId === item.productId && i.size === item.size
+        );
+        if (existing) {
+          return {
+            items: state.items.map(i =>
+              i.productId === item.productId && i.size === item.size
+                ? { ...i, quantity: i.quantity + 1 }
+                : i
+            ),
+          };
+        }
+        return { items: [...state.items, { ...item, quantity: 1 }] };
+      }),
+
+      removeItem: (productId, size) => set((state) => ({
+        items: state.items.filter(
+          i => !(i.productId === productId && i.size === size)
+        ),
+      })),
+
+      updateQuantity: (productId, size, quantity) => set((state) => ({
+        items: quantity === 0
+          ? state.items.filter(
+              i => !(i.productId === productId && i.size === size))
+          : state.items.map(i =>
+              i.productId === productId && i.size === size
+                ? { ...i, quantity }
+                : i
+            ),
+      })),
+
+      clearCart: () => set({ items: [] }),
+      total: () => get().items.reduce(
+        (sum, item) => sum + item.price * item.quantity, 0),
+      itemCount: () => get().items.reduce(
+        (sum, item) => sum + item.quantity, 0),
+    }),
+    {
+      name: 'cart-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
+```
+
+## Platform-Specific Code
+
+The iOS vs Android dance. Claude handles it naturally:
+
+```bash
+claude "I need a share button that:
+- On iOS: uses the native share sheet (Share API)
+- On Android: uses the native share intent
+- Shares a product URL and description
+
+Also, the button should use haptic feedback on iOS
+(expo-haptics) but vibration on Android.
+
+Make it work on both with one component."
+```
+
+```typescript
+import { Platform, Share, Vibration } from 'react-native';
+import * as Haptics from 'expo-haptics';
+
+async function handleShare(product: Product) {
+  // Platform-specific haptic feedback
+  if (Platform.OS === 'ios') {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  } else {
+    Vibration.vibrate(50);
+  }
+
+  const url = `https://myapp.com/product/${product.id}`;
+
+  await Share.share(
+    Platform.select({
+      ios: {
+        message: product.name,
+        url: url,  // iOS supports separate URL
+      },
+      android: {
+        message: `${product.name}\n${url}`,  // Android: URL in message
+      },
+    }) as { message: string; url?: string }
+  );
+}
+```
+
+## Debugging React Native Errors
+
+RN errors are notoriously unhelpful. Claude decodes them:
+
+```bash
+claude "I'm getting this error:
+
+Error: Unable to resolve module @react-native-community/netinfo
+from /Users/me/app/node_modules/some-library/src/utils.js
+
+I didn't install this package — it's a dependency of some-library.
+
+What's happening and how do I fix it?"
+```
+
+Claude explains the exact issue (transitive dependency not auto-linked, or peer dependency mismatch) and gives you the fix — usually `npx expo install @react-native-community/netinfo` or adding a resolution to `package.json`.
+
+```bash
+# Another common one:
+claude "Metro bundler error:
+'Error: While resolving module react-native-reanimated,
+the Haste package was found, but the module was not.'
+
+I've tried clearing cache. Still broken."
+```
+
+Claude knows this is usually a Metro cache issue combined with a version mismatch and gives you the exact sequence:
+
+```bash
+npx expo start --clear
+# or the nuclear option:
+rm -rf node_modules && npm install && npx expo start --clear
+```
+
+## Performance Patterns
+
+```bash
+claude "My FlatList with 500 items is laggy on Android.
+Here's my renderItem:
+[paste code]
+
+Optimize it for performance."
+```
+
+Claude applies RN-specific optimizations:
+
+```typescript
+// Before: re-renders on every scroll
+const renderItem = ({ item }) => (
+  <View style={styles.card}>
+    <Image source={{ uri: item.image }} style={styles.image} />
+    <Text>{item.name}</Text>
+    <Text>${item.price}</Text>
+  </View>
+);
+
+// After: memoized, optimized, fast
+const ProductCard = React.memo(({ item }: { item: Product }) => (
+  <View style={styles.card}>
+    <Image
+      source={{ uri: item.image }}
+      style={styles.image}
+      resizeMode="cover"
+    />
+    <Text style={styles.name}>{item.name}</Text>
+    <Text style={styles.price}>${item.price}</Text>
+  </View>
+));
+
+<FlatList
+  data={products}
+  renderItem={({ item }) => <ProductCard item={item} />}
+  keyExtractor={(item) => item.id}
+  getItemLayout={(_, index) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  })}
+  maxToRenderPerBatch={10}
+  windowSize={5}
+  removeClippedSubviews={true}
+  initialNumToRender={10}
+/>
+```
+
+Claude adds `React.memo`, `getItemLayout` for scroll position calculation, and tunes the virtualization parameters. These are the things you'd spend 20 minutes looking up in the performance docs.
+
+## Key Takeaway
+
+Claude accelerates React Native development by generating screens, navigation, state management, and platform-specific code from plain English descriptions. Start with `create-expo-app` for the foundation, then use Claude for everything on top. The biggest time savings come from screen generation (describe the UI, get a complete component), navigation setup (describe the flow, get typed routes), and debugging (paste the cryptic error, get the fix). Always tell Claude your existing conventions (styling approach, state management library, component library) so the generated code fits your project naturally.

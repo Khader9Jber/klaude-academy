@@ -1,0 +1,404 @@
+---
+title: "Native iOS and Android with Claude"
+slug: "native-ios-android"
+order: 3
+difficulty: "intermediate"
+duration: 20
+tags: ["mobile", "ios", "android", "swift", "kotlin"]
+objectives:
+  - "Generate SwiftUI views and UIKit layouts with Claude"
+  - "Create Kotlin Compose UI components through conversational prompts"
+  - "Integrate platform APIs: camera, location, notifications"
+  - "Generate App Store and Play Store metadata with Claude"
+quiz:
+  - id: "native-ios-android-1"
+    question: "When should you use native development over cross-platform?"
+    type: "multiple-choice"
+    options:
+      - "Always — native is better"
+      - "When you need deep platform integration (HealthKit, ARKit, Widgets), maximum performance, or platform-specific UX patterns that cross-platform frameworks can't replicate well"
+      - "When the app is simple"
+      - "When you have a large team"
+    correct: 1
+    explanation: "Native development makes sense for deep platform integration (HealthKit, Watch complications, home screen widgets), performance-critical apps (games, video), or when you need pixel-perfect platform-specific UX. For most business apps, cross-platform works fine."
+  - id: "native-ios-android-2"
+    question: "What's the biggest advantage of using Claude for SwiftUI development?"
+    type: "multiple-choice"
+    options:
+      - "Claude writes faster Swift code"
+      - "Claude generates complete view hierarchies with modifiers, previews, and state management — eliminating the need to memorize dozens of modifier names and their correct ordering"
+      - "Claude can test on devices"
+      - "Claude replaces Xcode"
+    correct: 1
+    explanation: "SwiftUI has hundreds of view modifiers that must be applied in a specific order. Claude knows these modifiers and their ordering, generates preview providers, and handles @State/@Binding/@ObservedObject correctly. You describe the UI, Claude handles the SwiftUI API surface."
+  - id: "native-ios-android-3"
+    question: "How does Claude help with platform API integration?"
+    type: "multiple-choice"
+    options:
+      - "Claude has access to the APIs"
+      - "Claude generates the permission setup (Info.plist/AndroidManifest), API wrapper code, error handling, and user-facing permission request flows as a complete package"
+      - "Claude only generates the API call"
+      - "Claude can't help with native APIs"
+    correct: 1
+    explanation: "Platform APIs require multiple pieces: manifest/plist permissions, runtime permission requests, the actual API calls, error handling, and graceful degradation. Claude generates all of these together, not just the API call. This prevents the common mistake of implementing the API but forgetting the permission setup."
+  - id: "native-ios-android-4"
+    question: "What should you include when asking Claude to generate App Store metadata?"
+    type: "multiple-choice"
+    options:
+      - "Just the app name"
+      - "App purpose, target audience, key features, competitive differentiators, and any Apple/Google keyword research or category preferences"
+      - "Screenshots"
+      - "Revenue projections"
+    correct: 1
+    explanation: "App Store metadata (title, subtitle, description, keywords) is a content marketing exercise. Claude needs to understand what your app does, who it's for, what makes it different, and what terms your audience searches for. With this context, it generates ASO-optimized metadata that actually ranks."
+---
+
+## Going Native When It Matters
+
+Sometimes cross-platform isn't enough. You need HealthKit. You need ARKit. You need home screen widgets that update in real-time. You need the platform to feel native because your users will notice if it doesn't.
+
+Claude speaks both Swift and Kotlin fluently.
+
+## SwiftUI View Generation
+
+SwiftUI is declarative and beautiful — but the modifier API surface is enormous. Claude knows it all.
+
+### Basic Views
+
+```bash
+claude "Create a SwiftUI ProfileView:
+- Navigation title 'Profile'
+- Circular profile image (120pt, from URL, placeholder with initials)
+- Name (title font, bold)
+- Bio (body font, gray, max 3 lines)
+- Stats row: Posts | Followers | Following (each with number + label)
+- Edit Profile button (bordered, full width)
+- List of recent posts (use a ForEach with dummy data struct)
+
+Use @State for the profile data. Include a #Preview."
+```
+
+```swift
+struct ProfileView: View {
+    @State private var profile = UserProfile.sample
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Avatar
+                AsyncImage(url: URL(string: profile.avatarURL)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            Text(profile.initials)
+                                .font(.title)
+                                .foregroundStyle(.blue)
+                        )
+                }
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+
+                // Name and Bio
+                VStack(spacing: 8) {
+                    Text(profile.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Text(profile.bio)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.center)
+                }
+
+                // Stats
+                HStack(spacing: 32) {
+                    StatItem(count: profile.postCount, label: "Posts")
+                    StatItem(count: profile.followerCount, label: "Followers")
+                    StatItem(count: profile.followingCount, label: "Following")
+                }
+
+                // Edit button
+                Button("Edit Profile") {
+                    // Navigate to edit
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                // Recent posts
+                LazyVStack(spacing: 16) {
+                    ForEach(profile.recentPosts) { post in
+                        PostCard(post: post)
+                    }
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Profile")
+    }
+}
+
+struct StatItem: View {
+    let count: Int
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("\(count)")
+                .font(.headline)
+                .fontWeight(.bold)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        ProfileView()
+    }
+}
+```
+
+Claude added the `#Preview` macro, used `AsyncImage` with a proper placeholder, applied correct modifier ordering, and extracted the `StatItem` into a reusable component.
+
+### UIKit When You Need It
+
+Sometimes you need UIKit for older projects or specific functionality:
+
+```bash
+claude "Create a UIKit view controller with a collection view
+that shows a Pinterest-style masonry layout.
+
+Each cell has: image, title, subtitle, like count.
+Use UICollectionViewCompositionalLayout with estimated sizes.
+Include prefetching for smooth scrolling."
+```
+
+Claude generates a complete `UICollectionViewController` subclass with the compositional layout, cell registration, diffable data source, and prefetching delegate. That's code you'd normally spend an hour setting up from Apple's documentation.
+
+## Kotlin Compose UI
+
+Jetpack Compose is Android's SwiftUI equivalent. Claude handles it just as well.
+
+```bash
+claude "Create a Kotlin Compose product listing screen:
+
+TopAppBar with search icon and filter icon.
+LazyVerticalGrid with 2 columns of product cards.
+Each card: product image (aspect ratio 4:3), name, price,
+  rating stars, 'Add to Cart' button.
+Pull-to-refresh support.
+Loading state with shimmer placeholders.
+
+Use Material 3 theming. Include a ViewModel with StateFlow."
+```
+
+```kotlin
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProductListScreen(
+    viewModel: ProductListViewModel = hiltViewModel(),
+    onProductClick: (String) -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullToRefreshState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Products") },
+                actions = {
+                    IconButton(onClick = { /* search */ }) {
+                        Icon(Icons.Default.Search, "Search")
+                    }
+                    IconButton(onClick = { /* filter */ }) {
+                        Icon(Icons.Default.FilterList, "Filter")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refresh() },
+            state = pullRefreshState,
+            modifier = Modifier.padding(padding)
+        ) {
+            when {
+                uiState.isLoading -> ShimmerGrid()
+                uiState.error != null -> ErrorState(
+                    message = uiState.error!!,
+                    onRetry = { viewModel.refresh() }
+                )
+                else -> ProductGrid(
+                    products = uiState.products,
+                    onProductClick = onProductClick,
+                    onAddToCart = { viewModel.addToCart(it) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductGrid(
+    products: List<Product>,
+    onProductClick: (String) -> Unit,
+    onAddToCart: (String) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(products, key = { it.id }) { product ->
+            ProductCard(
+                product = product,
+                onClick = { onProductClick(product.id) },
+                onAddToCart = { onAddToCart(product.id) }
+            )
+        }
+    }
+}
+
+@Composable
+fun ProductCard(
+    product: Product,
+    onClick: () -> Unit,
+    onAddToCart: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            AsyncImage(
+                model = product.imageUrl,
+                contentDescription = product.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(4f / 3f),
+                contentScale = ContentScale.Crop
+            )
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = product.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$${product.price}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = onAddToCart,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.ShoppingCart, null,
+                         modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add to Cart")
+                }
+            }
+        }
+    }
+}
+```
+
+## Platform API Integration
+
+This is where native really shines — and where Claude saves the most setup time.
+
+### Camera Access
+
+```bash
+claude "Implement camera access for my iOS app (SwiftUI):
+1. Check camera permission
+2. Request if not determined
+3. Show camera picker for photo capture
+4. Handle the captured image (save to photos, display preview)
+5. Graceful fallback if permission denied (show settings link)
+
+Include the Info.plist key I need."
+```
+
+Claude generates the complete flow — permission check, request, camera controller, image handling, and the Settings deep link for denied permissions. Plus the `NSCameraUsageDescription` for Info.plist that you'd forget otherwise.
+
+### Push Notifications (Both Platforms)
+
+```bash
+claude "Set up push notifications for both platforms:
+
+iOS (Swift):
+- Register for remote notifications
+- Handle token registration
+- Process notifications in foreground and background
+- Create notification categories with actions
+
+Android (Kotlin):
+- Firebase Cloud Messaging setup
+- Handle token refresh
+- Create notification channels (API 26+)
+- Custom notification layout
+
+Include the manifest/plist changes needed."
+```
+
+Claude generates parallel implementations, each using the platform's native notification APIs correctly. The Android version includes notification channels (required since API 26) and the iOS version handles the UNUserNotificationCenter delegate properly.
+
+## App Store Metadata Generation
+
+The part nobody enjoys but everyone needs:
+
+```bash
+claude "Generate App Store and Play Store metadata for my app:
+
+App: FitTrack — a workout tracking app
+Target audience: gym-goers aged 18-35
+Key features: workout logging, progress photos, exercise library,
+  AI form analysis, social sharing
+Competitive edge: AI-powered form correction using phone camera
+
+Generate:
+- App Store: title (30 char), subtitle (30 char),
+  keywords (100 char), description (4000 char),
+  promotional text (170 char)
+- Play Store: title (30 char), short description (80 char),
+  full description (4000 char)
+
+Optimize for ASO. Include relevant keywords naturally."
+```
+
+Claude generates metadata that reads like a professional ASO agency wrote it — keyword-rich but natural, benefit-focused, with clear feature hierarchy.
+
+## Bridging Native and Cross-Platform
+
+When you're adding native modules to a cross-platform app:
+
+```bash
+claude "I need a native module for React Native that wraps
+iOS HealthKit to read step count and heart rate data.
+
+Generate:
+1. The Swift native module with @objc methods
+2. The bridge header
+3. The TypeScript interface on the RN side
+4. A React hook (useHealthKit) that wraps the native calls
+
+Include permission setup for HealthKit."
+```
+
+Claude handles the entire bridge — Swift `RCT_EXPORT_METHOD` macros, the bridging header, and the TypeScript types that keep both sides in sync.
+
+## Key Takeaway
+
+Native iOS and Android development with Claude eliminates the API surface area problem. SwiftUI has hundreds of modifiers, Kotlin Compose has dozens of composables, and platform APIs each have their own permission and lifecycle requirements. Claude knows all of these and generates complete implementations — not just the happy path, but permission handling, error states, and platform-specific setup (Info.plist, AndroidManifest). The biggest time savings come from platform API integration (camera, notifications, HealthKit) where forgetting one setup step means hours of debugging, and from App Store metadata where Claude generates ASO-optimized copy in seconds.

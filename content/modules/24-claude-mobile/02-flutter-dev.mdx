@@ -1,0 +1,447 @@
+---
+title: "Flutter Development with Claude"
+slug: "flutter-dev"
+order: 2
+difficulty: "intermediate"
+duration: 22
+tags: ["mobile", "flutter", "dart", "cross-platform"]
+objectives:
+  - "Generate Flutter widgets from plain English descriptions"
+  - "Implement state management patterns (Provider, Riverpod, BLoC) with Claude"
+  - "Create custom painters and animations through conversational prompts"
+  - "Convert design mockups into Flutter widget trees"
+quiz:
+  - id: "flutter-dev-1"
+    question: "What's the most effective way to describe a widget to Claude?"
+    type: "multiple-choice"
+    options:
+      - "\"Make a card widget\""
+      - "\"Create a card widget showing a user profile: circular avatar (48px), name (bold, 16pt), subtitle (gray, 14pt), trailing arrow icon. Card has 12px padding, 8px border radius, subtle shadow. Tapping navigates to profile detail.\""
+      - "\"Copy this design\""
+      - "\"A nice looking widget\""
+    correct: 1
+    explanation: "Flutter widgets are built from precise specifications. Giving Claude exact sizes, colors, typography, padding, border radius, and interaction behavior produces a widget that matches your design on the first try. Vague descriptions require multiple revision rounds."
+  - id: "flutter-dev-2"
+    question: "When should you use Riverpod over Provider in a Flutter project?"
+    type: "multiple-choice"
+    options:
+      - "Always — Riverpod is newer"
+      - "When you need compile-time safety, multiple providers of the same type, or providers that don't depend on BuildContext"
+      - "When the app is small"
+      - "When using Flutter Web"
+    correct: 1
+    explanation: "Riverpod solves Provider's real pain points: it's compile-time safe (no runtime ProviderNotFoundException), supports multiple providers of the same type, and doesn't require BuildContext for access. Claude can generate either — tell it which you use and it adapts."
+  - id: "flutter-dev-3"
+    question: "How does Claude help with custom painters?"
+    type: "multiple-choice"
+    options:
+      - "Claude can't generate custom painters"
+      - "Describe the shape or visualization you want, and Claude generates CustomPainter code with the correct canvas operations (drawPath, drawArc, etc.)"
+      - "Claude copies shapes from a library"
+      - "Claude generates SVG instead"
+    correct: 1
+    explanation: "CustomPainter is intimidating because you need to know canvas operations. Claude translates descriptions like 'a semicircular progress indicator with gradient fill' into correct Paint, Path, and Canvas code. It handles the math for arcs, bezier curves, and coordinate transforms."
+  - id: "flutter-dev-4"
+    question: "What's the best approach for converting a Figma design to Flutter?"
+    type: "multiple-choice"
+    options:
+      - "Use an automated conversion tool"
+      - "Describe the design's structure to Claude: layout hierarchy, spacing, colors, typography, and interaction behavior — then iterate on the generated widget tree"
+      - "Recreate it from scratch without reference"
+      - "Export it as an image and display that"
+    correct: 1
+    explanation: "Describe the visual hierarchy to Claude: 'Column with a header image, then a row of stats (3 columns), then a scrollable list of cards.' Include exact design tokens (colors, spacing, fonts). Claude generates the widget tree, and you iterate on the details. This produces maintainable code, unlike automated converters that generate unreadable widget trees."
+---
+
+## Flutter's Widget Tree, Built by Conversation
+
+Flutter's widget composition model is elegant but verbose. A simple card with an image, text, and a button is 30+ lines of nested widgets. Claude collapses that verbosity into a single prompt.
+
+## Widget Generation
+
+The core skill: describe what you see, Claude writes the widget tree.
+
+### Simple Widgets
+
+```bash
+claude "Create a Flutter UserCard widget:
+- Horizontal layout (Row)
+- Left: CircleAvatar with network image, 48px radius
+- Middle (expanded): Column with name (bold, 16sp) and
+  email (gray, 14sp)
+- Right: Icon button (chevron_right) that calls onTap
+- Card with 16px padding, 8px border radius, elevation 2
+- Takes UserCardProps: name, email, avatarUrl, onTap"
+```
+
+```dart
+class UserCard extends StatelessWidget {
+  final String name;
+  final String email;
+  final String avatarUrl;
+  final VoidCallback onTap;
+
+  const UserCard({
+    super.key,
+    required this.name,
+    required this.email,
+    required this.avatarUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundImage: NetworkImage(avatarUrl),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey[400],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+Notice Claude added `InkWell` for the tap ripple effect and `Expanded` on the text column so the layout flexes properly. These are Flutter idioms that beginners miss.
+
+### Complex Screens
+
+```bash
+claude "Generate a ProductDetailScreen for an e-commerce app:
+
+Layout (scrollable):
+1. Product image carousel (PageView, 300px height, page indicator dots)
+2. Below image: Row with price (bold, 24sp, green) and
+   'favorite' heart icon (toggleable)
+3. Product name (20sp, bold)
+4. Rating row: 5 stars (filled/unfilled), '4.3' text, '(127 reviews)'
+5. Description (expandable, max 3 lines with 'Read more')
+6. Size selector: horizontal chip group (S, M, L, XL), one selected
+7. Color selector: horizontal row of colored circles, selected has border
+
+Bottom: Fixed 'Add to Cart' button (full width, primary color, 56px height)
+
+Use StatefulWidget. Accept productId as constructor parameter."
+```
+
+Claude generates 120+ lines of properly structured Flutter code with all the interactive state (selected size, selected color, favorite toggle, description expanded) managed correctly.
+
+## State Management with Claude
+
+### Riverpod Setup
+
+```bash
+claude "Set up Riverpod state management for my Flutter e-commerce app.
+
+Create these providers:
+1. authProvider — AsyncNotifier, handles login/logout/token refresh
+2. cartProvider — Notifier, manages cart items with add/remove/clear
+3. productsProvider — FutureProvider family, fetches product by ID
+4. searchProvider — AsyncNotifier, handles search with debounce
+
+Use Riverpod 2.x code generation approach with @riverpod annotation.
+Include the necessary build_runner config."
+```
+
+```dart
+// providers/cart_provider.dart
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'cart_provider.g.dart';
+
+@immutable
+class CartItem {
+  final String productId;
+  final String name;
+  final double price;
+  final int quantity;
+  final String size;
+
+  const CartItem({
+    required this.productId,
+    required this.name,
+    required this.price,
+    required this.quantity,
+    required this.size,
+  });
+
+  CartItem copyWith({int? quantity}) {
+    return CartItem(
+      productId: productId,
+      name: name,
+      price: price,
+      quantity: quantity ?? this.quantity,
+      size: size,
+    );
+  }
+}
+
+@riverpod
+class Cart extends _$Cart {
+  @override
+  List<CartItem> build() => [];
+
+  void addItem(CartItem item) {
+    final index = state.indexWhere(
+      (i) => i.productId == item.productId && i.size == item.size,
+    );
+
+    if (index >= 0) {
+      state = [
+        ...state.sublist(0, index),
+        state[index].copyWith(quantity: state[index].quantity + 1),
+        ...state.sublist(index + 1),
+      ];
+    } else {
+      state = [...state, item];
+    }
+  }
+
+  void removeItem(String productId, String size) {
+    state = state.where(
+      (i) => !(i.productId == productId && i.size == size),
+    ).toList();
+  }
+
+  void clear() => state = [];
+
+  double get total =>
+      state.fold(0, (sum, item) => sum + item.price * item.quantity);
+}
+```
+
+### BLoC Pattern
+
+```bash
+claude "Create a BLoC for user authentication in Flutter:
+
+Events: LoginRequested, LogoutRequested, TokenRefreshed, CheckAuthStatus
+States: AuthInitial, AuthLoading, Authenticated(user), Unauthenticated, AuthError(message)
+
+The BLoC should:
+- Store JWT token securely (flutter_secure_storage)
+- Auto-check token on app start
+- Handle token refresh when expired
+- Emit AuthError on API failures
+
+Use flutter_bloc 8.x with sealed classes for events and states."
+```
+
+Claude generates the full BLoC with events, states, and the bloc class — including the secure storage integration and token refresh logic that would take you 30 minutes to wire up.
+
+## Custom Painters and Animations
+
+This is where Claude saves the most pain. `CustomPainter` requires knowing Canvas API operations that nobody has memorized.
+
+```bash
+claude "Create a CustomPainter that draws a circular progress
+indicator with:
+- Background circle in light gray (2px stroke)
+- Progress arc in a blue-to-purple gradient
+- Percentage text centered in the middle (bold, 24sp)
+- Rounded stroke caps
+- Animated from 0 to target value over 1 second (curved)"
+```
+
+```dart
+class CircularProgressPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0
+  final Color startColor;
+  final Color endColor;
+
+  CircularProgressPainter({
+    required this.progress,
+    this.startColor = const Color(0xFF2563EB),
+    this.endColor = const Color(0xFF7C3AED),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - 16) / 2;
+
+    // Background circle
+    final bgPaint = Paint()
+      ..color = Colors.grey[200]!
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    // Progress arc with gradient
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final gradient = SweepGradient(
+      startAngle: -pi / 2,
+      endAngle: 3 * pi / 2,
+      colors: [startColor, endColor],
+    );
+    final progressPaint = Paint()
+      ..shader = gradient.createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      rect,
+      -pi / 2,           // Start from top
+      2 * pi * progress,  // Sweep angle
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(CircularProgressPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+// Usage with animation:
+class AnimatedCircularProgress extends StatefulWidget {
+  final double targetProgress;
+  const AnimatedCircularProgress({
+    super.key,
+    required this.targetProgress,
+  });
+
+  @override
+  State<AnimatedCircularProgress> createState() =>
+      _AnimatedCircularProgressState();
+}
+
+class _AnimatedCircularProgressState
+    extends State<AnimatedCircularProgress>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final progress = _animation.value * widget.targetProgress;
+        return CustomPaint(
+          size: const Size(120, 120),
+          painter: CircularProgressPainter(progress: progress),
+          child: Center(
+            child: Text(
+              '${(progress * 100).toInt()}%',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+You described a progress circle. Claude wrote a `CustomPainter` with gradient shading, a `CurvedAnimation`, and proper dispose cleanup. That's 100 lines of code you didn't need to figure out from the Canvas documentation.
+
+## Design to Flutter
+
+When you have a Figma design or a screenshot in mind:
+
+```bash
+claude "Convert this design to Flutter:
+
+Screen: Settings page
+- AppBar with 'Settings' title, back arrow
+- Scrollable content:
+  - Section header: 'Account' (gray, uppercase, small)
+  - ListTile: 'Profile' with person icon, right arrow
+  - ListTile: 'Notifications' with bell icon, trailing Switch
+  - ListTile: 'Privacy' with lock icon, right arrow
+  - Divider
+  - Section header: 'Preferences'
+  - ListTile: 'Theme' with palette icon, trailing text 'Dark'
+  - ListTile: 'Language' with globe icon, trailing text 'English'
+  - Divider
+  - Section header: 'About'
+  - ListTile: 'Terms of Service' with doc icon
+  - ListTile: 'Version' with info icon, trailing text 'v1.2.3'
+  - 24px bottom padding
+
+Use Material 3 design. The switch should actually toggle."
+```
+
+Claude generates a complete screen that looks native and handles all interaction correctly. The widget tree matches the visual hierarchy you described.
+
+## Dart-Specific Patterns
+
+Claude knows Dart idioms that save you from writing Java-style code:
+
+```bash
+claude "Refactor this Dart code to be more idiomatic:
+[paste verbose code with if/else chains, manual null checks,
+mutable variables]"
+```
+
+Claude applies pattern matching, null-aware operators, collection-if, spread operators, and other Dart-specific patterns that make the code 40% shorter and more readable.
+
+## Key Takeaway
+
+Claude eliminates Flutter's verbosity tax by generating complete widget trees from descriptions. The key is being precise about layout structure (Row vs Column, exact spacing, typography specs) so the generated code matches your design on the first pass. For state management, tell Claude which pattern you use (Riverpod, BLoC, Provider) and it generates idiomatic code for that specific approach. Custom painters and animations — the most painful Flutter features to code from scratch — become one-prompt solutions. Describe the visual result, Claude handles the Canvas API math and animation lifecycle.

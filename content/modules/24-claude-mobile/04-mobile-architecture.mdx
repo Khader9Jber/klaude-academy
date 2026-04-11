@@ -1,0 +1,424 @@
+---
+title: "Mobile App Architecture"
+slug: "mobile-architecture"
+order: 4
+difficulty: "intermediate"
+duration: 20
+tags: ["mobile", "architecture", "patterns", "design"]
+objectives:
+  - "Use Claude to design mobile architecture: MVVM, Clean Architecture, MVI"
+  - "Implement offline-first patterns with Claude's guidance"
+  - "Generate API client layers with error handling and caching"
+  - "Design navigation architecture for complex apps"
+quiz:
+  - id: "mobile-architecture-1"
+    question: "What's the most important context to give Claude when designing mobile architecture?"
+    type: "multiple-choice"
+    options:
+      - "The programming language"
+      - "App complexity, offline requirements, team size, expected scale, and whether the app needs to share logic with web/backend"
+      - "The deployment target"
+      - "The design mockups"
+    correct: 1
+    explanation: "Architecture decisions depend heavily on context. A solo developer building a simple app needs different architecture than a 10-person team building an offline-first app with shared web logic. Claude can recommend MVVM for simple apps, Clean Architecture for complex ones, or KMP/shared modules for cross-platform logic — but only if it knows these constraints."
+  - id: "mobile-architecture-2"
+    question: "What does 'offline-first' mean in mobile architecture?"
+    type: "multiple-choice"
+    options:
+      - "The app works without the internet"
+      - "The app reads from local storage first, syncs with the server when connectivity is available, and handles conflicts between local and remote data"
+      - "The app caches API responses"
+      - "The app doesn't need a backend"
+    correct: 1
+    explanation: "Offline-first means local storage is the source of truth. The app writes to local DB first, then syncs to the server in the background. When conflicts arise (user edited on two devices offline), the app has a strategy (last-write-wins, merge, user-prompted). Claude generates the full sync architecture including conflict resolution."
+  - id: "mobile-architecture-3"
+    question: "Why should the API client layer have its own error types?"
+    type: "multiple-choice"
+    options:
+      - "It looks more professional"
+      - "Custom error types let the UI layer show specific messages (network offline, auth expired, rate limited, server error) without parsing HTTP status codes in view code"
+      - "The compiler requires it"
+      - "For logging purposes only"
+    correct: 1
+    explanation: "When your API layer throws NetworkError.unauthorized, the UI knows to redirect to login. When it throws NetworkError.offline, the UI shows a retry banner. Raw HTTP status codes in view code create tight coupling and make error handling a mess. Claude generates typed error hierarchies that make the UI logic clean."
+  - id: "mobile-architecture-4"
+    question: "When is Clean Architecture overkill for a mobile app?"
+    type: "multiple-choice"
+    options:
+      - "Never — always use Clean Architecture"
+      - "For small apps (< 10 screens) with simple data flows, a single developer, and no plans for shared business logic across platforms"
+      - "When using Flutter"
+      - "When the app has a backend"
+    correct: 1
+    explanation: "Clean Architecture adds layers (domain, data, presentation) that provide value at scale but create unnecessary boilerplate for simple apps. A 5-screen app with CRUD operations doesn't need use cases, repositories, and mappers. MVVM with a simple service layer is usually enough. Claude recommends the right level of architecture for your app's complexity."
+---
+
+## Architecture Is About Tomorrow's Problems
+
+A good mobile architecture doesn't just make today's feature easy to build — it makes next quarter's features possible without a rewrite. Claude helps you design for that future without over-engineering for it.
+
+## Choosing the Right Pattern
+
+Before writing any code, have this conversation with Claude:
+
+```bash
+claude "I'm building a mobile app with these characteristics:
+- Expense tracking app for small businesses
+- ~15 screens
+- Must work offline (field workers with spotty connectivity)
+- Sync data to a backend when online
+- Team of 2 developers
+- React Native with TypeScript
+- Will eventually add a web version
+
+Recommend an architecture pattern and explain why.
+Show me the folder structure."
+```
+
+Claude reasons through the constraints:
+
+```
+Recommendation: MVVM + Repository pattern with offline-first sync
+
+Why not Clean Architecture?
+- Team of 2 doesn't benefit from the extra abstraction layers
+- 15 screens is moderate — Clean Architecture shines at 30+
+- The overhead of use cases + mappers + domain entities
+  for each feature would slow a small team down
+
+Why MVVM + Repository?
+- Clear separation: View → ViewModel → Repository → DataSource
+- Repository pattern naturally handles offline-first
+  (local DB as primary, API as sync target)
+- Easy to test (mock repositories, test ViewModels)
+- When you add the web version, Repositories and data layer
+  can be shared via shared TypeScript modules
+
+Folder structure:
+src/
+├── screens/           # Screen components (Views)
+│   ├── expenses/
+│   │   ├── ExpenseListScreen.tsx
+│   │   ├── ExpenseDetailScreen.tsx
+│   │   └── AddExpenseScreen.tsx
+│   └── settings/
+├── viewmodels/        # Business logic + state
+│   ├── useExpenseList.ts
+│   ├── useExpenseDetail.ts
+│   └── useSync.ts
+├── repositories/      # Data access abstraction
+│   ├── ExpenseRepository.ts
+│   ├── CategoryRepository.ts
+│   └── SyncRepository.ts
+├── datasources/       # Concrete implementations
+│   ├── local/
+│   │   ├── database.ts       # WatermelonDB setup
+│   │   └── ExpenseLocalDS.ts
+│   └── remote/
+│       ├── api.ts            # Axios/fetch wrapper
+│       └── ExpenseRemoteDS.ts
+├── models/            # TypeScript interfaces
+├── navigation/        # Navigation config
+├── components/        # Shared UI components
+├── hooks/             # Shared hooks
+└── utils/             # Helpers, constants
+```
+
+That's a recommendation with reasoning — not just "use Clean Architecture" because it's popular.
+
+## Offline-First Architecture
+
+This is where most mobile apps fail. The online-first mindset works until your user is in a subway, on a plane, or in a warehouse with no signal.
+
+```bash
+claude "Design an offline-first data layer for my expense
+tracking app using WatermelonDB (React Native).
+
+Requirements:
+- Users create expenses while offline
+- When online, sync to backend API
+- Handle conflicts (same expense edited on phone + web)
+- Track sync status: synced / pending / failed
+- Show sync indicator in the UI
+
+Generate:
+1. WatermelonDB schema for expenses
+2. The sync engine
+3. Conflict resolution strategy
+4. The repository that abstracts local vs remote"
+```
+
+```typescript
+// datasources/local/schema.ts
+import { appSchema, tableSchema } from '@nozbe/watermelondb';
+
+export const schema = appSchema({
+  version: 1,
+  tables: [
+    tableSchema({
+      name: 'expenses',
+      columns: [
+        { name: 'remote_id', type: 'string', isOptional: true },
+        { name: 'amount', type: 'number' },
+        { name: 'category', type: 'string' },
+        { name: 'description', type: 'string' },
+        { name: 'date', type: 'number' },
+        { name: 'receipt_path', type: 'string', isOptional: true },
+        { name: 'sync_status', type: 'string' }, // synced|pending|failed
+        { name: 'updated_at', type: 'number' },
+        { name: 'created_at', type: 'number' },
+      ],
+    }),
+  ],
+});
+
+// repositories/ExpenseRepository.ts
+import { Database } from '@nozbe/watermelondb';
+import NetInfo from '@react-native-community/netinfo';
+
+export class ExpenseRepository {
+  constructor(
+    private db: Database,
+    private api: ExpenseAPI,
+  ) {}
+
+  async createExpense(data: ExpenseInput): Promise<Expense> {
+    // Always write locally first
+    const local = await this.db.write(async () => {
+      return this.db.get('expenses').create((expense) => {
+        expense.amount = data.amount;
+        expense.category = data.category;
+        expense.description = data.description;
+        expense.date = data.date;
+        expense.syncStatus = 'pending';
+        expense.createdAt = Date.now();
+        expense.updatedAt = Date.now();
+      });
+    });
+
+    // Try to sync immediately if online
+    this.trySyncExpense(local.id);
+
+    return this.toExpense(local);
+  }
+
+  private async trySyncExpense(localId: string): Promise<void> {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) return;
+
+    try {
+      const local = await this.db.get('expenses').find(localId);
+      const remote = await this.api.createExpense({
+        amount: local.amount,
+        category: local.category,
+        description: local.description,
+        date: local.date,
+      });
+
+      await this.db.write(async () => {
+        await local.update((exp) => {
+          exp.remoteId = remote.id;
+          exp.syncStatus = 'synced';
+        });
+      });
+    } catch (error) {
+      await this.db.write(async () => {
+        const local = await this.db.get('expenses').find(localId);
+        await local.update((exp) => {
+          exp.syncStatus = 'failed';
+        });
+      });
+    }
+  }
+
+  async syncAll(): Promise<SyncResult> {
+    const pending = await this.db
+      .get('expenses')
+      .query(Q.where('sync_status', Q.notEq('synced')))
+      .fetch();
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const expense of pending) {
+      try {
+        await this.trySyncExpense(expense.id);
+        synced++;
+      } catch {
+        failed++;
+      }
+    }
+
+    return { synced, failed, total: pending.length };
+  }
+}
+```
+
+The repository writes locally first, then syncs. The UI always reads from the local database. Sync happens in the background. This pattern works even if the user is offline for days.
+
+## API Client Architecture
+
+Every mobile app talks to a backend. The API layer should be bulletproof:
+
+```bash
+claude "Generate a typed API client for React Native with:
+
+1. Base client with interceptors (auth token, refresh token)
+2. Custom error types: NetworkError, AuthError, ValidationError,
+   ServerError, RateLimitError
+3. Automatic retry with exponential backoff for network errors
+4. Request/response caching (configurable per endpoint)
+5. Request deduplication (same GET request in-flight = share response)
+6. TypeScript types for all endpoints
+
+Backend base URL from environment config.
+Use axios. Make it testable (injectable dependencies)."
+```
+
+```typescript
+// datasources/remote/apiClient.ts
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios';
+import { getToken, refreshToken } from '../../utils/auth';
+
+export class NetworkError extends Error {
+  constructor(message: string, public isOffline: boolean = false) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export class AuthError extends Error {
+  constructor(public statusCode: number = 401) {
+    super('Authentication required');
+    this.name = 'AuthError';
+  }
+}
+
+export class ValidationError extends Error {
+  constructor(public fields: Record<string, string[]>) {
+    super('Validation failed');
+    this.name = 'ValidationError';
+  }
+}
+
+export class ApiClient {
+  private client: AxiosInstance;
+  private inFlightRequests = new Map<string, Promise<any>>();
+
+  constructor(baseURL: string) {
+    this.client = axios.create({ baseURL, timeout: 15000 });
+
+    // Auth interceptor
+    this.client.interceptors.request.use(async (config) => {
+      const token = await getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // Error interceptor
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        if (!error.response) {
+          throw new NetworkError(
+            'No network connection',
+            true
+          );
+        }
+
+        switch (error.response.status) {
+          case 401:
+            // Try token refresh once
+            const newToken = await refreshToken();
+            if (newToken && error.config) {
+              error.config.headers.Authorization =
+                `Bearer ${newToken}`;
+              return this.client.request(error.config);
+            }
+            throw new AuthError(401);
+          case 422:
+            throw new ValidationError(
+              error.response.data as Record<string, string[]>
+            );
+          case 429:
+            throw new Error('Rate limited. Try again later.');
+          default:
+            throw new Error(
+              `Server error: ${error.response.status}`
+            );
+        }
+      }
+    );
+  }
+
+  async get<T>(url: string,
+               config?: AxiosRequestConfig): Promise<T> {
+    // Request deduplication
+    const key = `GET:${url}:${JSON.stringify(config?.params)}`;
+    if (this.inFlightRequests.has(key)) {
+      return this.inFlightRequests.get(key);
+    }
+
+    const promise = this.client
+      .get<T>(url, config)
+      .then(r => r.data)
+      .finally(() => this.inFlightRequests.delete(key));
+
+    this.inFlightRequests.set(key, promise);
+    return promise;
+  }
+}
+```
+
+That's a production API client with auth refresh, typed errors, request deduplication, and proper error mapping. The UI can now do `catch (e) { if (e instanceof AuthError) navigate('login') }` instead of parsing HTTP status codes.
+
+## Navigation Architecture
+
+For complex apps, navigation is its own architectural challenge:
+
+```bash
+claude "Design a navigation architecture for an app with:
+- Auth flow (login, register, forgot password)
+- Main tab bar (home, search, create, notifications, profile)
+- Deep linking for: products, user profiles, notifications
+- Modal presentation for: create post, image viewer, settings
+- Nested stacks within each tab
+
+Use expo-router. Show the file structure and deep linking config.
+Handle the auth guard (redirect to login if not authenticated)."
+```
+
+Claude generates the complete file structure, the root layout with auth guards, and the deep linking configuration that maps URLs to screens. Navigation architecture is one of those things that's incredibly tedious to set up from scratch but trivial to generate.
+
+## When to Level Up
+
+Here's the progression Claude recommends based on app complexity:
+
+```
+5 screens, 1 developer:
+  → Simple state hooks + fetch wrapper
+  → No architecture pattern needed
+
+10-20 screens, 1-3 developers:
+  → MVVM + Repository pattern
+  → Local storage for offline basics
+
+20-50 screens, 3-8 developers:
+  → Clean Architecture (or feature-based modules)
+  → Full offline-first with sync engine
+  → Shared business logic across platforms
+
+50+ screens, 8+ developers:
+  → Modular architecture (feature modules)
+  → Micro-frontends for mobile
+  → Shared SDK for business logic
+  → Dedicated sync infrastructure
+```
+
+Don't jump to Clean Architecture for a 5-screen app. Don't stay on simple hooks for a 50-screen app. Claude helps you right-size the architecture for where you actually are.
+
+## Key Takeaway
+
+Mobile architecture with Claude is about matching complexity to your actual constraints — not cargo-culting patterns from big tech blogs. Give Claude your app's specifics (screen count, team size, offline needs, platform targets) and it recommends the right level of architecture. The highest-value patterns Claude generates are offline-first data layers (write-local-sync-remote), typed API clients (with proper error hierarchies and auth refresh), and navigation architectures (deep linking, auth guards, nested stacks). Start with the simplest architecture that works and let Claude help you evolve it as the app grows.

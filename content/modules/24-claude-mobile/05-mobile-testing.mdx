@@ -1,0 +1,524 @@
+---
+title: "Mobile Testing with Claude"
+slug: "mobile-testing"
+order: 5
+difficulty: "intermediate"
+duration: 18
+tags: ["mobile", "testing", "detox", "appium"]
+objectives:
+  - "Generate E2E tests for React Native (Detox) and Flutter (integration_test)"
+  - "Create unit tests for mobile business logic"
+  - "Implement screenshot testing for UI consistency"
+  - "Generate CI/CD configurations for mobile with Fastlane"
+quiz:
+  - id: "mobile-testing-1"
+    question: "What's the most effective way to generate E2E tests with Claude?"
+    type: "multiple-choice"
+    options:
+      - "\"Write tests for my app\""
+      - "\"Here's my LoginScreen component [paste code]. Generate Detox E2E tests covering: successful login, wrong password, empty fields, network error, and biometric login. Use testID props that match my component.\""
+      - "\"Test the login\""
+      - "\"Generate a test file\""
+    correct: 1
+    explanation: "Claude generates accurate E2E tests when it can see the actual component code — including testID props it can target, the exact error messages it should assert, and the navigation flows it should verify. Sharing the component code is essential for tests that actually pass."
+  - id: "mobile-testing-2"
+    question: "Why is screenshot testing valuable for mobile apps?"
+    type: "multiple-choice"
+    options:
+      - "It replaces unit tests"
+      - "It catches visual regressions (broken layouts, wrong colors, missing elements) that functional tests miss because they only check behavior, not appearance"
+      - "It's faster than other tests"
+      - "It tests performance"
+    correct: 1
+    explanation: "A functional test verifies that 'the button exists and is tappable.' A screenshot test catches that 'the button is now overlapping the header because someone changed a margin.' Visual regressions are some of the most common bugs in mobile apps, and screenshot tests are the only automated way to catch them."
+  - id: "mobile-testing-3"
+    question: "What should mobile unit tests focus on?"
+    type: "multiple-choice"
+    options:
+      - "UI rendering"
+      - "Business logic: data transformations, validation rules, state machine transitions, calculations, and formatting functions"
+      - "API calls"
+      - "Navigation"
+    correct: 1
+    explanation: "Unit tests should target pure business logic that doesn't depend on the UI framework or platform APIs. Data transformations, validation (is this email valid?), calculations (cart total with discounts and tax), and state transitions (order status flow) are perfect for unit tests — fast to run and high value."
+  - id: "mobile-testing-4"
+    question: "What does Fastlane automate in a mobile CI/CD pipeline?"
+    type: "multiple-choice"
+    options:
+      - "Just building the app"
+      - "Building, signing, testing, screenshotting, and deploying to App Store / Play Store — the entire release pipeline"
+      - "Just testing"
+      - "Just deployment"
+    correct: 1
+    explanation: "Fastlane automates the entire mobile release pipeline: build the app, sign it with the right certificates, run tests, capture screenshots in multiple languages, upload to TestFlight/Play Console, and submit for review. Claude generates the Fastfile configuration for all of these steps."
+---
+
+## Testing Mobile Is Different
+
+Mobile testing has unique challenges: two platforms, device fragmentation, gesture interactions, offline states, push notifications, deep links. You can't just write a few Jest tests and call it done. Claude understands these mobile-specific testing needs.
+
+## E2E Testing with Detox (React Native)
+
+Detox is the standard for React Native E2E testing. Claude generates tests that handle the real complexities.
+
+```bash
+claude "Here's my LoginScreen component:
+[paste LoginScreen.tsx]
+
+Generate Detox E2E tests for:
+1. Happy path: enter email, enter password, tap login, verify home screen
+2. Invalid credentials: wrong password shows error toast
+3. Empty fields: both fields empty, tap login, shows validation
+4. Network offline: toggle airplane mode, try login, shows offline message
+5. Biometric prompt: verify biometric button appears and handles cancel
+
+Use the testIDs from my component. Include setup/teardown."
+```
+
+```typescript
+// e2e/login.test.ts
+describe('Login Screen', () => {
+  beforeAll(async () => {
+    await device.launchApp({ newInstance: true });
+  });
+
+  beforeEach(async () => {
+    await device.reloadReactNative();
+  });
+
+  it('should login successfully with valid credentials', async () => {
+    await element(by.id('email-input')).typeText('user@test.com');
+    await element(by.id('password-input')).typeText('ValidPass123!');
+    await element(by.id('login-button')).tap();
+
+    // Wait for navigation to complete
+    await waitFor(element(by.id('home-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    await expect(element(by.id('welcome-text')))
+      .toHaveText('Welcome back');
+  });
+
+  it('should show error for invalid credentials', async () => {
+    await element(by.id('email-input')).typeText('user@test.com');
+    await element(by.id('password-input')).typeText('WrongPass');
+    await element(by.id('login-button')).tap();
+
+    await waitFor(element(by.id('error-toast')))
+      .toBeVisible()
+      .withTimeout(3000);
+
+    await expect(element(by.id('error-toast')))
+      .toHaveText('Invalid email or password');
+
+    // Should stay on login screen
+    await expect(element(by.id('login-screen'))).toBeVisible();
+  });
+
+  it('should validate empty fields', async () => {
+    await element(by.id('login-button')).tap();
+
+    await expect(element(by.id('email-error')))
+      .toHaveText('Email is required');
+    await expect(element(by.id('password-error')))
+      .toHaveText('Password is required');
+  });
+
+  it('should handle network errors gracefully', async () => {
+    // Simulate offline
+    await device.setURLBlacklist(['.*']);
+
+    await element(by.id('email-input')).typeText('user@test.com');
+    await element(by.id('password-input')).typeText('ValidPass123!');
+    await element(by.id('login-button')).tap();
+
+    await waitFor(element(by.id('offline-banner')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    // Restore network
+    await device.setURLBlacklist([]);
+  });
+
+  it('should show biometric option when available', async () => {
+    // Enroll biometric on simulator
+    await device.setBiometricEnrollment(true);
+
+    await expect(element(by.id('biometric-button'))).toBeVisible();
+
+    // Test cancel flow
+    await element(by.id('biometric-button')).tap();
+    await device.matchFace(); // or device.unmatchFace() for failure
+    await waitFor(element(by.id('home-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+  });
+});
+```
+
+Notice Claude generates the biometric enrollment setup, URL blacklisting for offline simulation, and proper `waitFor` patterns. These are Detox-specific features that save you hours of documentation reading.
+
+## Flutter Integration Tests
+
+```bash
+claude "Generate Flutter integration tests for my
+checkout flow:
+
+Screens: Cart → Shipping Address → Payment → Confirmation
+
+Test scenarios:
+1. Complete checkout happy path
+2. Empty cart redirect
+3. Invalid shipping address validation
+4. Payment failure with retry
+5. Back navigation preserves form data
+
+Use the integration_test package. Include test fixtures."
+```
+
+```dart
+// integration_test/checkout_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:my_app/main.dart' as app;
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Checkout Flow', () {
+    testWidgets('completes full checkout', (tester) async {
+      app.main();
+      await tester.pumpAndSettle();
+
+      // Navigate to cart (assume items already added)
+      await tester.tap(find.byKey(const Key('cart-tab')));
+      await tester.pumpAndSettle();
+
+      // Verify cart has items
+      expect(find.byKey(const Key('cart-item')),
+             findsAtLeast(1));
+
+      // Tap checkout
+      await tester.tap(find.byKey(const Key('checkout-button')));
+      await tester.pumpAndSettle();
+
+      // Fill shipping address
+      await tester.enterText(
+        find.byKey(const Key('address-street')),
+        '123 Test Street',
+      );
+      await tester.enterText(
+        find.byKey(const Key('address-city')),
+        'San Francisco',
+      );
+      await tester.enterText(
+        find.byKey(const Key('address-zip')),
+        '94102',
+      );
+      await tester.tap(find.byKey(const Key('continue-button')));
+      await tester.pumpAndSettle();
+
+      // Payment screen
+      expect(find.text('Payment'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('card-number')),
+        '4242424242424242',
+      );
+      await tester.tap(find.byKey(const Key('pay-button')));
+      await tester.pumpAndSettle(
+        const Duration(seconds: 5),
+      );
+
+      // Confirmation
+      expect(find.text('Order Confirmed'), findsOneWidget);
+      expect(find.byKey(const Key('order-number')),
+             findsOneWidget);
+    });
+
+    testWidgets('redirects empty cart to shop', (tester) async {
+      app.main();
+      await tester.pumpAndSettle();
+
+      // Navigate to empty cart
+      await tester.tap(find.byKey(const Key('cart-tab')));
+      await tester.pumpAndSettle();
+
+      // Should show empty state with shop button
+      expect(find.text('Your cart is empty'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('shop-button')));
+      await tester.pumpAndSettle();
+
+      // Should be on shop screen
+      expect(find.text('Products'), findsOneWidget);
+    });
+  });
+}
+```
+
+## Unit Tests for Business Logic
+
+The highest ROI tests are unit tests on pure business logic. They're fast, reliable, and Claude generates them perfectly:
+
+```bash
+claude "Generate unit tests for this cart calculation module:
+
+[paste cartUtils.ts with functions for:
+  calculateSubtotal, applyDiscount, calculateTax,
+  calculateShipping, calculateTotal]
+
+Cover:
+- Normal cases
+- Edge cases: empty cart, zero-price items, negative quantities
+- Discount edge cases: percentage > 100%, expired coupons
+- Tax rounding (2 decimal places)
+- Free shipping threshold"
+```
+
+```typescript
+// __tests__/cartUtils.test.ts
+import {
+  calculateSubtotal,
+  applyDiscount,
+  calculateTax,
+  calculateShipping,
+  calculateTotal,
+} from '../utils/cartUtils';
+
+describe('Cart Calculations', () => {
+  const sampleItems = [
+    { id: '1', name: 'Shirt', price: 29.99, quantity: 2 },
+    { id: '2', name: 'Pants', price: 49.99, quantity: 1 },
+  ];
+
+  describe('calculateSubtotal', () => {
+    it('calculates subtotal correctly', () => {
+      expect(calculateSubtotal(sampleItems)).toBe(109.97);
+    });
+
+    it('returns 0 for empty cart', () => {
+      expect(calculateSubtotal([])).toBe(0);
+    });
+
+    it('handles single item', () => {
+      expect(calculateSubtotal([sampleItems[0]])).toBe(59.98);
+    });
+
+    it('handles zero-price items', () => {
+      const items = [{ id: '3', name: 'Free', price: 0, quantity: 1 }];
+      expect(calculateSubtotal(items)).toBe(0);
+    });
+  });
+
+  describe('applyDiscount', () => {
+    it('applies percentage discount', () => {
+      expect(applyDiscount(100, { type: 'percent', value: 10 }))
+        .toBe(90);
+    });
+
+    it('applies fixed discount', () => {
+      expect(applyDiscount(100, { type: 'fixed', value: 15 }))
+        .toBe(85);
+    });
+
+    it('never goes below zero', () => {
+      expect(applyDiscount(10, { type: 'fixed', value: 50 }))
+        .toBe(0);
+    });
+
+    it('caps percentage at 100%', () => {
+      expect(applyDiscount(100, { type: 'percent', value: 150 }))
+        .toBe(0);
+    });
+
+    it('returns original amount for expired coupon', () => {
+      const expired = {
+        type: 'percent' as const,
+        value: 20,
+        expiresAt: new Date('2020-01-01'),
+      };
+      expect(applyDiscount(100, expired)).toBe(100);
+    });
+  });
+
+  describe('calculateTax', () => {
+    it('rounds to 2 decimal places', () => {
+      // 33.33 * 0.0875 = 2.916375 → should be 2.92
+      expect(calculateTax(33.33, 0.0875)).toBe(2.92);
+    });
+
+    it('returns 0 for zero subtotal', () => {
+      expect(calculateTax(0, 0.08)).toBe(0);
+    });
+  });
+
+  describe('calculateShipping', () => {
+    it('charges standard rate below threshold', () => {
+      expect(calculateShipping(49.99)).toBe(5.99);
+    });
+
+    it('gives free shipping at threshold', () => {
+      expect(calculateShipping(75)).toBe(0);
+    });
+
+    it('gives free shipping above threshold', () => {
+      expect(calculateShipping(200)).toBe(0);
+    });
+  });
+});
+```
+
+Fast tests, high coverage, meaningful edge cases. Run in milliseconds.
+
+## Screenshot Testing
+
+Visual regressions are the silent killers of mobile apps. Someone changes a margin, and suddenly the checkout button is behind the keyboard on small screens.
+
+```bash
+claude "Set up screenshot testing for my React Native app
+using react-native-owl or Detox snapshots.
+
+I want to capture screenshots of:
+- Home screen (light mode + dark mode)
+- Product card component (with/without discount badge)
+- Empty states (empty cart, no search results)
+- Error states (network error, server error)
+
+Include configuration for iPhone 15 Pro and Pixel 7
+dimensions. Show how to update baselines."
+```
+
+Claude generates the test configuration, the screenshot capture code, and the comparison setup. When someone changes CSS that breaks a layout, the CI pipeline catches it with a pixel-diff comparison.
+
+## CI/CD with Fastlane
+
+Mobile CI/CD is its own beast. Fastlane tames it:
+
+```bash
+claude "Generate a Fastfile for my React Native app:
+
+iOS lane:
+- Run unit tests (Jest)
+- Run E2E tests (Detox, iPhone 15 simulator)
+- Build release IPA
+- Upload to TestFlight
+- Send Slack notification
+
+Android lane:
+- Run unit tests
+- Build release AAB
+- Upload to Play Store internal track
+- Send Slack notification
+
+Shared:
+- Version bumping (patch by default)
+- Code signing with match (iOS)
+- Environment-specific configs (staging vs production)
+
+Include the Appfile and Matchfile setup."
+```
+
+```ruby
+# fastlane/Fastfile
+default_platform(:ios)
+
+before_all do
+  ensure_git_status_clean
+end
+
+platform :ios do
+  desc "Run tests and deploy to TestFlight"
+  lane :beta do |options|
+    env = options[:env] || "staging"
+
+    # Match signing
+    match(type: "appstore", readonly: true)
+
+    # Version bump
+    increment_build_number(
+      build_number: latest_testflight_build_number + 1
+    )
+
+    # Build
+    gym(
+      scheme: "MyApp-#{env.capitalize}",
+      export_method: "app-store",
+      output_directory: "./build",
+      clean: true
+    )
+
+    # Upload to TestFlight
+    pilot(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+
+    # Notify
+    slack(
+      message: "iOS #{env} build uploaded to TestFlight",
+      slack_url: ENV["SLACK_WEBHOOK_URL"],
+      default_payloads: [:git_branch, :git_author]
+    )
+  end
+
+  desc "Run Detox E2E tests"
+  lane :test_e2e do
+    sh("cd .. && npx detox build --configuration ios.sim.release")
+    sh("cd .. && npx detox test --configuration ios.sim.release " \
+       "--cleanup --headless")
+  end
+end
+
+platform :android do
+  desc "Build and deploy to Play Store internal track"
+  lane :beta do |options|
+    env = options[:env] || "staging"
+
+    # Build AAB
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      project_dir: "android/",
+      properties: {
+        "ENVFILE" => ".env.#{env}"
+      }
+    )
+
+    # Upload to Play Store
+    upload_to_play_store(
+      track: "internal",
+      aab: "android/app/build/outputs/bundle/release/app-release.aab",
+      skip_upload_metadata: true,
+      skip_upload_images: true
+    )
+
+    slack(
+      message: "Android #{env} build uploaded to Play Store",
+      slack_url: ENV["SLACK_WEBHOOK_URL"]
+    )
+  end
+end
+```
+
+That's a complete mobile CI/CD pipeline. Build, sign, test, deploy, notify. All generated from one prompt.
+
+## The Testing Pyramid for Mobile
+
+```
+         /  E2E  \          ← Few: critical user journeys
+        / Screenshot \      ← Medium: visual regression
+       /   Integration  \   ← Medium: component interactions
+      /    Unit Tests     \  ← Many: business logic, utils
+```
+
+Claude generates the right tests at each level:
+- **Unit**: Pure functions, calculations, validation, formatting
+- **Integration**: Component rendering with mocked dependencies
+- **Screenshot**: Visual regression on key screens and states
+- **E2E**: The 5-10 most critical user flows
+
+Don't let Claude generate 50 E2E tests. They're slow, flaky, and expensive. Let it generate 50 unit tests and 5 E2E tests.
+
+## Key Takeaway
+
+Mobile testing with Claude covers the full pyramid: unit tests for business logic (fast, reliable, high-value), E2E tests for critical user flows (Detox for React Native, integration_test for Flutter), screenshot tests for visual regressions, and CI/CD pipelines with Fastlane for automated builds and deployment. The key is sharing your actual component code when requesting E2E tests so Claude can target the right testIDs and assert the right messages. For CI/CD, Claude generates complete Fastfiles that handle the entire mobile release pipeline — code signing, building, testing, uploading to stores, and team notifications. Focus your E2E tests on the 5-10 critical paths and let unit tests handle the rest.
