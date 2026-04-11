@@ -1,8 +1,8 @@
-# Claude Academy
+# Klaude Academy
 
 **Master Claude from Zero to Hero** — an interactive learning website with 74 lessons, quizzes, exercises, and a complete prompt engineering lab.
 
-**Live:** [klaude-academy.netlify.app](https://klaude-academy.netlify.app) | [GitHub Pages](https://khader9jber.github.io/claude-academy/)
+**Live:** [klaude-academy.netlify.app](https://klaude-academy.netlify.app) | [GitHub Pages](https://khader9jber.github.io/klaude-academy/)
 
 ---
 
@@ -18,8 +18,8 @@
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/Khader9Jber/claude-academy.git
-cd claude-academy
+git clone https://github.com/Khader9Jber/klaude-academy.git
+cd klaude-academy
 ```
 
 ### 2. Install dependencies
@@ -80,7 +80,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## Project Structure
 
 ```
-claude-academy/
+klaude-academy/
 ├── content/                    # All lesson content
 │   ├── modules/               # 13 modules with MDX lessons
 │   │   ├── 01-claude-fundamentals/
@@ -236,7 +236,7 @@ Your lesson content here in Markdown...
 cp .env.example .env.local
 
 # CI/CD secrets — already configured in GitHub
-# View at: https://github.com/Khader9Jber/claude-academy/settings/secrets/actions
+# View at: https://github.com/Khader9Jber/klaude-academy/settings/secrets/actions
 ```
 
 > **Security:** Never put real tokens in `.env.example`. It's committed to git. Use `.env.local` (gitignored) for local secrets and GitHub Secrets for CI.
@@ -258,7 +258,7 @@ Push to main
     │
     └── Deploy ──────── CI Gate (waits for CI to pass)
                               ├── Netlify       → klaude-academy.netlify.app (primary)
-                              ├── GitHub Pages  → khader9jber.github.io/claude-academy
+                              ├── GitHub Pages  → khader9jber.github.io/klaude-academy
                               └── Vercel        → backup (has deployment protection issues on free plan)
 
 Pull Requests to main
@@ -268,7 +268,7 @@ Pull Requests to main
     └── PR Preview ──── Netlify deploy preview URL posted as PR comment
 ```
 
-**Monitor pipeline:** [github.com/Khader9Jber/claude-academy/actions](https://github.com/Khader9Jber/claude-academy/actions)
+**Monitor pipeline:** [github.com/Khader9Jber/klaude-academy/actions](https://github.com/Khader9Jber/klaude-academy/actions)
 
 ---
 
@@ -323,7 +323,7 @@ All selectors use `data-testid` attributes — stable, decoupled from content.
 Push to `main`. The pipeline handles everything:
 - Builds with correct config for each platform
 - Deploys to Netlify (primary, SSR with full auth support)
-- Deploys to GitHub Pages (with `/claude-academy` basePath, static)
+- Deploys to GitHub Pages (with `/klaude-academy` basePath, static)
 - Vercel available as backup (has deployment protection issues on free plan)
 
 ### Manual Netlify deploy
@@ -347,7 +347,7 @@ Go to [supabase.com](https://supabase.com) and sign up for a free account.
 
 ### 2. Create a new project
 
-Click "New Project", give it a name (e.g., `claude-academy`), set a database password, and choose a region close to your users.
+Click "New Project", give it a name (e.g., `klaude-academy`), set a database password, and choose a region close to your users.
 
 ### 3. Copy your API credentials
 

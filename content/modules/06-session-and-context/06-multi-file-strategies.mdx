@@ -1,0 +1,265 @@
+---
+title: "Working Across Large Codebases"
+slug: "multi-file-strategies"
+order: 6
+difficulty: "intermediate"
+duration: 18
+tags: ["context", "large-codebase", "multi-file", "navigation", "strategy"]
+objectives:
+  - "Navigate and work effectively in codebases too large to fit in context"
+  - "Use strategic file referencing to give Claude the right context without overload"
+  - "Apply the progressive disclosure pattern for large-scale changes"
+  - "Avoid context window exhaustion during multi-file operations"
+quiz:
+  - id: "multi-file-1"
+    question: "Your codebase has 500+ files. How should you give Claude context?"
+    type: "multiple-choice"
+    options:
+      - "Reference every file with @src/"
+      - "Let Claude figure it out"
+      - "Reference only the specific files relevant to the current task, and let Claude discover related files as needed"
+      - "Copy-paste all the code into the prompt"
+    correct: 2
+    explanation: "Loading 500 files would exhaust the context window immediately. Instead, reference the specific files relevant to your task (2-5 files typically), and let Claude use its tools to discover related files (imports, callers, tests) as needed. This keeps context focused and leaves room for Claude's response."
+  - id: "multi-file-2"
+    question: "What is 'progressive disclosure' in the context of Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Slowly revealing features to the user"
+      - "Starting with a high-level overview, then drilling into specific files only as needed for the task"
+      - "Encrypting your code"
+      - "Using Claude in presentation mode"
+    correct: 1
+    explanation: "Progressive disclosure means starting with a map (directory structure, key file names) before diving into details. Claude first understands the landscape, then you guide it to the specific files that matter. This prevents Claude from reading 50 files when it only needs 5."
+  - id: "multi-file-3"
+    question: "When should you start a fresh Claude session during multi-file work?"
+    type: "multiple-choice"
+    options:
+      - "Never — always keep one session"
+      - "When switching to a different task, or when context has grown so large that Claude's responses slow down or lose focus"
+      - "Every 5 minutes"
+      - "Only when Claude crashes"
+    correct: 1
+    explanation: "Two signs you need a fresh session: (1) you're switching to a completely different task (old context is noise), or (2) your context has grown so large that responses are slow, Claude references old decisions, or it loses track of what you're currently doing. Start fresh, reference only the files needed for the new task."
+  - id: "multi-file-4"
+    question: "What's the best way to make a consistent change across 20+ files?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to change all 20 files at once"
+      - "Change each file manually"
+      - "Have Claude change one file as a pattern, verify it, then apply the same pattern to batches of 3-5 files at a time"
+      - "Use find and replace"
+    correct: 2
+    explanation: "The batch pattern approach: have Claude change ONE file, verify the change is correct, then apply the same pattern in small batches (3-5 files). This catches issues early, prevents Claude from making 20 incorrect changes, and keeps context manageable. For purely mechanical changes, find-and-replace or codemod tools may be even better."
+---
+
+## The 500-File Problem
+
+Small projects are easy. Reference a few files, Claude reads them all, and it has complete context. But real-world codebases aren't small. You're working in a monorepo with 800 files, or a microservice with 200 files across 40 directories, or a legacy application where a single feature touches files in 12 different directories.
+
+Claude can't hold all of that in context at once — and even if it could, flooding it with irrelevant code makes it slower and less focused. The skill isn't loading more files. It's loading the *right* files.
+
+## Strategy 1: The Surgical Reference
+
+Instead of referencing broad directories, reference exactly the files you need:
+
+**Bad:**
+```
+Look at all the files in src/services/ and refactor the error handling
+```
+
+This might load 30 service files, burning thousands of tokens on services you're not touching.
+
+**Good:**
+```
+Refactor error handling in these 3 service files:
+@src/services/UserService.ts
+@src/services/OrderService.ts  
+@src/services/PaymentService.ts
+
+Follow the AppError pattern from @src/lib/errors.ts
+```
+
+Four file references. Claude has exactly what it needs and nothing extra.
+
+### How to Identify the Right Files
+
+Before asking Claude to make changes, figure out which files matter:
+
+```
+I need to add a "workspace" concept to our multi-tenant system. 
+Before making any changes, tell me which files would need to 
+be modified. Look at the directory structure and import graph.
+```
+
+Claude explores the codebase, identifies the affected files, and gives you a list. Now you know which files to reference when you actually start the work.
+
+## Strategy 2: Progressive Disclosure
+
+Start with the big picture, then zoom in.
+
+### Step 1: Landscape
+
+```
+Show me the directory structure of src/ (directories only, not files).
+What are the main modules and how are they organized?
+```
+
+Claude runs `find src -type d` or `ls -R src/` and summarizes the architecture. Now you both have a mental map.
+
+### Step 2: Key Files
+
+```
+For the auth system specifically, show me the key files: 
+the main auth middleware, the token service, and the user model.
+```
+
+Claude identifies and reads 3-4 files. You have focused context.
+
+### Step 3: The Work
+
+```
+Now, add role-based access control to the auth middleware.
+The roles should be: admin, member, viewer.
+Check @src/middleware/auth.ts and @src/services/AuthService.ts
+```
+
+You've gone from "500 files" to "2 files that matter" without losing the big picture.
+
+## Strategy 3: The Hub File Pattern
+
+Most codebases have "hub" files that re-export or orchestrate other modules:
+
+- `src/routes/index.ts` — all route registrations
+- `src/services/index.ts` — all service exports
+- `src/types/index.ts` — all shared types
+- `prisma/schema.prisma` — entire data model
+
+Reference the hub file to give Claude structural context without loading implementation details:
+
+```
+Read @src/routes/index.ts to understand the routing structure, 
+then read @src/routes/users.ts specifically — that's where 
+I need changes.
+```
+
+Claude sees the full route map (structural context) and the specific implementation (working context) without loading every route file.
+
+## Strategy 4: Batch Changes
+
+When you need to make the same change across many files, don't dump them all at once.
+
+### The Pattern-First Approach
+
+```
+# Step 1: Create the pattern
+"Migrate @src/services/UserService.ts from callbacks to async/await.
+Show me the result so I can verify the approach."
+
+# Step 2: Verify
+[Review Claude's changes, confirm the pattern is correct]
+
+# Step 3: Apply in batches  
+"Good. Now apply the same async/await migration to these files:
+@src/services/OrderService.ts
+@src/services/ProductService.ts
+@src/services/CartService.ts"
+
+# Step 4: Verify batch
+
+# Step 5: Next batch
+"Same pattern for:
+@src/services/PaymentService.ts
+@src/services/NotificationService.ts
+@src/services/AnalyticsService.ts"
+```
+
+Why batches of 3-5? Because if Claude makes a mistake, you catch it after 3 files, not after 20. And if the context window fills up, you can start a fresh session for the next batch.
+
+### When to Skip Claude Entirely
+
+For purely mechanical changes — renaming a function, updating an import path, changing a configuration value — traditional tools are faster and more reliable:
+
+```bash
+# Rename a function across the codebase
+sed -i 's/oldFunctionName/newFunctionName/g' src/**/*.ts
+
+# Update import paths
+find src -name "*.ts" -exec sed -i 's|@/old/path|@/new/path|g' {} +
+```
+
+Use Claude for changes that require understanding (refactoring logic, updating interfaces, adapting to new APIs). Use find/sed/codemod for changes that are purely textual.
+
+## Strategy 5: Context Checkpoints
+
+During long multi-file sessions, periodically verify that Claude still has accurate context:
+
+```
+Before we continue, summarize what changes we've made so far 
+and which files still need to be updated.
+```
+
+If Claude's summary is wrong or incomplete, you know the context is degrading. Start a fresh session with just the remaining work.
+
+### The Fresh Start Technique
+
+When context gets messy:
+
+```bash
+/clear
+```
+
+```
+[Continuing a refactor — here's where we left off]
+
+We're migrating services from callbacks to async/await.
+Done: UserService, OrderService, ProductService
+Remaining: PaymentService, NotificationService, AnalyticsService
+
+Apply the async/await pattern to @src/services/PaymentService.ts.
+For reference, here's the completed migration: @src/services/UserService.ts
+```
+
+This gives Claude exactly the context it needs — the pattern to follow and the file to change — without the accumulated noise of previous work.
+
+## Strategy 6: Parallel Investigation
+
+For complex tasks, ask Claude to explore multiple angles before committing to an approach:
+
+```
+I need to add full-text search to our product catalog. Before 
+implementing anything:
+
+1. Check how our current database queries work in @src/services/ProductService.ts
+2. Check if we already have any search-related code or dependencies
+3. Look at the product schema in prisma/schema.prisma
+4. Tell me the 2-3 most viable approaches for our stack
+```
+
+Claude investigates, reads the relevant files, and presents options. You choose the approach *before* any code is written. This prevents the expensive mistake of implementing the wrong approach across multiple files.
+
+## The Anti-Patterns
+
+### Don't: Load Everything Up Front
+
+```
+Read @src/ and then refactor the auth system
+```
+
+This tries to load your entire source tree. Claude will spend most of its context window on files that have nothing to do with auth.
+
+### Don't: Make Changes Without Understanding
+
+```
+Add TypeScript types to all files in src/utils/
+```
+
+If you haven't seen what's in those files, you don't know if this is a 5-minute task or a 5-hour task. Always explore first, then act.
+
+### Don't: Keep Going When Context Is Stale
+
+If Claude starts referencing decisions from 30 messages ago that are no longer relevant, or forgets changes you made 10 minutes ago, the context is stale. A fresh session is faster than fighting degraded context.
+
+## Key Takeaway
+
+Working across large codebases requires loading the right files, not all the files. Use surgical references (2-5 specific files per task), progressive disclosure (landscape first, details second), hub files for structural context, and batch changes with pattern verification. Start fresh sessions when switching tasks or when context degrades. For mechanical changes, traditional tools (sed, codemod) are faster and more reliable than Claude. The developers who are most productive with Claude in large codebases are the ones who manage context deliberately — giving Claude exactly what it needs and nothing more.

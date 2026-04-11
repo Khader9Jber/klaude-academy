@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { Search, Menu, X, LogIn, User, BarChart3, LogOut, Trophy, Shield } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
-import { SearchDialog } from "@/components/search/search-dialog";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useAdmin } from "@/hooks/use-admin";
 import { cn } from "@/lib/utils";
@@ -20,7 +19,6 @@ const navLinks = [
 export function SiteHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const userMenuRef = useRef<HTMLDivElement>(null);

@@ -1,0 +1,346 @@
+---
+title: "A Day in the Life: Your Claude Code Workflow"
+slug: "daily-workflow"
+order: 6
+difficulty: "beginner"
+duration: 20
+tags: ["workflow", "daily-routine", "productivity", "real-world", "practical"]
+objectives:
+  - "Map Claude Code features to real-world development tasks throughout a day"
+  - "Know which commands, shortcuts, and features to use at each stage"
+  - "Build an efficient morning-to-evening development workflow"
+  - "Avoid common workflow anti-patterns"
+quiz:
+  - id: "daily-wf-1"
+    question: "What's the best way to start your morning with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Jump straight into coding without any context"
+      - "Start Claude in your project directory so it reads your CLAUDE.md, then review what changed since yesterday"
+      - "Spend an hour writing the perfect prompt"
+      - "Always start by reading every file in the codebase"
+    correct: 1
+    explanation: "Starting Claude in your project directory ensures it loads your CLAUDE.md with project conventions, then you can ask it to summarize recent changes (git log, PR reviews) to get context on what happened since you last worked."
+  - id: "daily-wf-2"
+    question: "When implementing a feature, what's the most productive order?"
+    type: "multiple-choice"
+    options:
+      - "Write all the code, then test at the very end"
+      - "Describe the goal and constraints, let Claude implement incrementally, review each step"
+      - "Ask Claude to build the entire application from scratch"
+      - "Write the code yourself and only ask Claude for help when stuck"
+    correct: 1
+    explanation: "The most productive workflow is iterative: describe your goal and constraints, let Claude implement step by step, and review each step before moving on. This catches issues early and keeps Claude aligned with your vision."
+  - id: "daily-wf-3"
+    question: "What should you do when switching between different types of tasks?"
+    type: "multiple-choice"
+    options:
+      - "Keep the same session — context from old tasks helps"
+      - "Start a fresh session with /clear or a new terminal to avoid context pollution"
+      - "Restart your computer"
+      - "Uninstall and reinstall Claude Code"
+    correct: 1
+    explanation: "When switching from one task type to another (e.g., from bug fixing to feature implementation), starting a fresh session avoids context pollution. The old conversation about bug X doesn't help with feature Y, and it wastes precious context window space."
+  - id: "daily-wf-4"
+    question: "At the end of a coding session, what's the best practice?"
+    type: "multiple-choice"
+    options:
+      - "Just close the terminal"
+      - "Let Claude generate commit messages, review them, commit, and push"
+      - "Manually write everything — Claude can't help with git"
+      - "Commit all files with 'git add . && git commit -m update'"
+    correct: 1
+    explanation: "Claude excels at generating commit messages from diffs. Let it analyze your changes, generate a descriptive commit message, review it for accuracy, then commit and push. This produces much better commit history than 'update' or 'fix stuff' messages."
+---
+
+## A Real Day, Not a Tutorial
+
+Most tutorials show you features in isolation. "Here's how to use `/model`. Here's how to reference files." But nobody works that way. You have a standup at 9:30, three Jira tickets, a PR review from yesterday, and a deploy that broke something.
+
+Let's walk through an actual development day and see how Claude Code fits into each moment. Not the idealized version — the messy, real one.
+
+## 8:45 AM — Getting Started
+
+You open your terminal, navigate to your project, and start Claude Code:
+
+```bash
+cd ~/projects/acme-api
+claude
+```
+
+Claude loads your `CLAUDE.md` and understands the project conventions. Your first prompt of the day:
+
+```
+What changed since yesterday? Show me the last 10 commits 
+and any open PRs that need my review.
+```
+
+Claude runs `git log --oneline -10` and checks for open PRs. You get a quick summary:
+
+```
+Last 10 commits:
+- feat: add user preferences endpoint (Sarah, 2 hours ago)
+- fix: correct timezone handling in scheduler (you, yesterday)
+- chore: update dependencies (CI bot, yesterday)
+...
+
+Open PRs awaiting review:
+- #247: Add rate limiting to auth endpoints (Sarah)
+- #251: Migrate user table to new schema (Alex)
+```
+
+Now you know what happened overnight and what needs your attention.
+
+## 9:00 AM — PR Review
+
+You tackle Sarah's PR first:
+
+```
+Review PR #247 — the rate limiting changes. Focus on:
+1. Are the rate limit values reasonable for our traffic?
+2. Does it handle Redis connection failures gracefully?
+3. Any missing tests?
+```
+
+Claude reads the diff, analyzes the changes, and gives you a structured review. You spot a valid concern it raised about Redis failover and leave a comment on the PR.
+
+**Pro tip:** Use `@` references to point Claude at specific files if the PR diff is large:
+
+```
+Look specifically at @src/middleware/rateLimiter.ts — 
+does the sliding window implementation handle edge cases 
+where Redis is temporarily unavailable?
+```
+
+## 9:30 AM — Standup
+
+You minimize the terminal. Standup takes 15 minutes. When you come back, your Claude session is still there, context intact.
+
+## 9:45 AM — Bug Fix (Ticket #1)
+
+Your first ticket: "Users report 500 errors when updating their profile with special characters in the bio field."
+
+Start a fresh session for this task — the PR review context won't help here:
+
+```bash
+# Hit Escape to end current, or:
+/clear
+```
+
+Then dive in:
+
+```
+There's a bug: users get 500 errors when updating their profile 
+with special characters in the bio field. 
+
+Start by finding where profile updates are handled. 
+Check @src/routes/users.ts and @src/services/userService.ts.
+Show me the validation and sanitization logic.
+```
+
+Claude reads the files, traces the flow, and finds the issue — the bio field isn't being properly escaped before the SQL query, even though you're using Prisma (which should handle it, but there's a raw query lurking in there for a full-text search update).
+
+```
+Found it. Fix the raw query in userService.ts line 87 to use 
+Prisma's parameterized query instead of string interpolation. 
+Write the fix and add a test case with special characters 
+(emoji, quotes, backslashes, angle brackets).
+```
+
+Claude fixes the code and generates a test. You review both, run the tests:
+
+```
+Run the tests for the user service to make sure nothing broke.
+```
+
+Claude runs `npm test -- src/services/userService.test.ts` and everything passes. Time to commit:
+
+```
+Generate a commit message for these changes. 
+Follow the conventional commit format from CLAUDE.md.
+```
+
+```
+fix: escape special characters in profile bio updates
+
+The profile update endpoint used a raw SQL query for full-text
+search indexing that didn't parameterize the bio field. Users
+with emoji, quotes, or angle brackets in their bio triggered
+SQL errors. Replaced with Prisma's parameterized query.
+
+Adds test cases for special character handling.
+```
+
+You review the message, it's accurate, and you commit.
+
+## 11:00 AM — Feature Implementation (Ticket #2)
+
+New task: "Add email notification preferences to user settings."
+
+Fresh session again:
+
+```bash
+/clear
+```
+
+This is a bigger task, so you start by describing the full scope:
+
+```
+I need to add email notification preferences to user settings.
+
+Requirements:
+- Users can toggle: marketing emails, product updates, 
+  security alerts (always on, can't disable), weekly digest
+- Store in the existing user_preferences table
+- New API endpoint: PATCH /api/users/:id/notification-preferences  
+- Validation: security_alerts must always be true
+- Follow the patterns in @src/routes/users.ts for the route
+- Follow the service pattern in @src/services/userService.ts
+
+Start with the database migration, then the service layer, 
+then the route. Don't do everything at once — let me review 
+each step.
+```
+
+Notice the approach: you're telling Claude the full picture but asking it to work incrementally. This is the most productive pattern for feature work.
+
+Claude generates the Prisma migration first. You review it. Then the service method. Review. Then the route. Review. Each step builds on the last, and you catch issues early.
+
+**Watch out:** If you let Claude generate all three layers at once, it often creates inconsistencies between them. The migration might have column names that don't match the service's type definitions. Incremental is slower but produces much cleaner code.
+
+## 12:30 PM — Lunch Break
+
+You can leave the session running. When you come back, context is preserved. But if you've been in this session for 3+ hours and referenced a lot of files, consider whether a fresh session would be cleaner.
+
+## 1:15 PM — Writing Tests (Still Ticket #2)
+
+Back from lunch. The feature code is done. Time for tests:
+
+```
+Write comprehensive tests for the notification preferences feature.
+Cover:
+- Happy path: update each preference individually
+- Validation: reject requests that try to disable security_alerts
+- Auth: reject unauthenticated requests
+- Edge cases: empty body, invalid preference keys, SQL injection attempts
+Follow the test patterns in @src/services/__tests__/userService.test.ts
+```
+
+Claude generates the test file. You scan it, notice it missed testing the case where a user tries to update another user's preferences (authorization, not just authentication), and ask:
+
+```
+Good, but add a test case where user A tries to update 
+user B's notification preferences. Should return 403.
+```
+
+Claude adds the test. You run the full suite:
+
+```
+Run all tests to make sure nothing is broken.
+```
+
+Green across the board.
+
+## 2:30 PM — Documentation
+
+```
+Update the API documentation in @docs/api.md to include 
+the new notification preferences endpoint. Match the format 
+of the existing endpoint docs.
+```
+
+Claude reads the existing docs, matches the format exactly, and adds the new endpoint documentation. You review it in 30 seconds — format is consistent, the request/response examples are accurate.
+
+## 3:00 PM — Code Review Response
+
+Sarah responded to your review comments from this morning. She fixed the Redis failover issue but you want to verify:
+
+```bash
+/clear
+```
+
+```
+Pull the latest changes from PR #247 and check if the Redis 
+failover handling in rateLimiter.ts now properly falls back 
+to in-memory rate limiting when Redis is unavailable.
+```
+
+Claude checks the updated code and confirms the fix looks solid. You approve the PR.
+
+## 4:00 PM — Refactoring (Ticket #3)
+
+Last ticket of the day: "Refactor the email service to support multiple providers (SendGrid, SES, Postmark)."
+
+This is a bigger architectural task, so you use Claude's strength in design:
+
+```
+I need to refactor @src/services/emailService.ts from 
+hardcoded SendGrid to support multiple email providers 
+(SendGrid, AWS SES, Postmark). 
+
+Before writing any code:
+1. Suggest the interface/pattern we should use
+2. Show me what the provider abstraction looks like
+3. Explain how we'll switch providers via config
+
+Don't implement yet — let me approve the design first.
+```
+
+Claude proposes a strategy pattern with a common `EmailProvider` interface and provider-specific implementations. You discuss it, adjust a few things, then approve:
+
+```
+Good approach. Implement the EmailProvider interface 
+and the SendGrid adapter first. We'll add SES and Postmark 
+in follow-up PRs. Keep the existing tests passing.
+```
+
+## 5:30 PM — Wrapping Up
+
+End of day. Time to commit everything, push, and create a PR:
+
+```
+Let's wrap up. Show me all the changes I've made today 
+that aren't committed yet.
+```
+
+Claude runs `git status` and `git diff --stat`. You review what's outstanding, commit in logical chunks:
+
+```
+Create two commits:
+1. The notification preferences feature (migration, service, route, tests, docs)
+2. The email service refactor (interface + SendGrid adapter)
+
+Use conventional commit format for both.
+```
+
+Claude stages the files correctly, generates two separate commits with descriptive messages. Then:
+
+```
+Create a PR for the notification-preferences branch.
+Title: "feat: add email notification preferences"
+Include a summary of changes and testing instructions.
+```
+
+Done. You push, Claude helps draft the PR description, and you close the terminal.
+
+## The Anti-Patterns to Avoid
+
+### Don't: Keep One Session All Day
+
+After 4+ hours and dozens of file references, your context window is packed. Claude's responses get slower and less focused. Start fresh between unrelated tasks.
+
+### Don't: Let Claude Do Everything Without Review
+
+It's tempting to say "implement the whole feature" and walk away. But you'll come back to code that's technically functional but doesn't match your project's patterns, uses the wrong library for something, or has subtle bugs in edge cases.
+
+### Don't: Skip the Plan Step for Big Tasks
+
+For anything that touches 3+ files, ask Claude to propose a plan before writing code. "What files will you create/modify and what's the approach?" catches misaligned assumptions before they become wasted work.
+
+### Don't: Forget to Switch Models
+
+Use Haiku for quick questions and simple edits. Sonnet for most development. Opus for architecture and complex reasoning. Staying on Opus all day burns your budget 3x faster for tasks that don't need it.
+
+## Key Takeaway
+
+An effective Claude Code workflow follows the rhythm of real development: start by reviewing what changed, work through tasks one at a time with fresh sessions, implement features incrementally (plan first, then build step by step), and end the day with clean commits and a PR. The key habits are starting fresh sessions between unrelated tasks, reviewing each step before moving on, using the right model for each task type, and letting Claude handle the tedious parts (commit messages, docs, test boilerplate) while you focus on design decisions and code review.

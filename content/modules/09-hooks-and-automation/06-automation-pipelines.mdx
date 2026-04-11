@@ -1,0 +1,366 @@
+---
+title: "Building Automation Pipelines"
+slug: "automation-pipelines"
+order: 6
+difficulty: "advanced"
+duration: 18
+tags: ["hooks", "automation", "pipelines", "ci-cd", "chaining"]
+objectives:
+  - "Chain multiple hooks into a complete automation pipeline"
+  - "Handle errors and failures gracefully within hook chains"
+  - "Build format-lint-test-notify pipelines with real settings.json examples"
+  - "Debug and monitor pipeline execution"
+quiz:
+  - id: "auto-pipe-1"
+    question: "In a hook pipeline, what happens if an early hook fails?"
+    type: "multiple-choice"
+    options:
+      - "All subsequent hooks are skipped"
+      - "Each hook runs independently — a failure in one doesn't stop the others"
+      - "The entire Claude session crashes"
+      - "The file is automatically reverted"
+    correct: 1
+    explanation: "Hooks under the same event run independently in order. If hook A fails, hooks B and C still execute. This is by design — a formatter failure shouldn't prevent a notification from firing. If you need to stop the pipeline on failure, use exit code 2 in a PreToolUse hook to block the action entirely."
+  - id: "auto-pipe-2"
+    question: "What's the difference between exit code 1 and exit code 2 in a hook?"
+    type: "multiple-choice"
+    options:
+      - "No difference"
+      - "Exit code 1 means the hook failed but the action proceeds; exit code 2 blocks the action entirely"
+      - "Exit code 1 is a warning; exit code 2 restarts Claude"
+      - "Exit code 2 is only for PostToolUse hooks"
+    correct: 1
+    explanation: "Exit code 1 indicates the hook script failed, but Claude's action still proceeds. Exit code 2 actively blocks the action (PreToolUse only) — Claude receives an error message and must find an alternative approach. This distinction lets you create soft warnings (exit 1) vs. hard blocks (exit 2)."
+  - id: "auto-pipe-3"
+    question: "How should you handle a pipeline where formatting must succeed before linting?"
+    type: "multiple-choice"
+    options:
+      - "Put both in one hook command chained with &&"
+      - "It's impossible — hooks always run independently"
+      - "Use separate hook events"
+      - "Run them manually"
+    correct: 0
+    explanation: "To ensure formatting completes before linting, combine them in a single hook command using && (which stops on the first failure): 'prettier --write $file && eslint $file'. This guarantees linting only runs on already-formatted code, and the entire chain stops if formatting fails."
+  - id: "auto-pipe-4"
+    question: "What's the best way to monitor hook pipeline execution?"
+    type: "multiple-choice"
+    options:
+      - "Stare at the terminal"
+      - "Log each hook's execution and result to a file, and use SessionStart to report pipeline status"
+      - "You can't monitor hooks"
+      - "Check the Claude Code dashboard"
+    correct: 1
+    explanation: "Adding logging to each hook (appending timestamps and results to a log file) creates an audit trail. A SessionStart hook can report which pipelines are active. This lets you debug failures, measure execution time, and verify that your pipeline is working as expected."
+---
+
+## From Individual Hooks to Automated Pipelines
+
+You've learned individual hooks: a formatter here, a notification there. But the real power comes from combining them into pipelines — sequences of automated actions that fire every time Claude writes code, runs a command, or completes a task.
+
+A well-built pipeline means Claude's output is always formatted, always passes type checks, always runs relevant tests, and always notifies you when something important happens. You set it up once and forget about it.
+
+## The Anatomy of a Pipeline
+
+A pipeline is just multiple hooks working together across events. Here's the mental model:
+
+```
+Claude wants to write a file
+  ↓
+PreToolUse hooks:  Should this write be allowed?
+  ↓
+[Claude writes the file]
+  ↓
+PostToolUse hooks: Format → Lint → Type-check → Test
+  ↓
+Notification:      Alert if something failed
+```
+
+Each stage has a clear job. Let's build this piece by piece.
+
+## Stage 1: Gate (PreToolUse)
+
+Gates decide whether an action should proceed. They're your first line of defense.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write(*.{ts,tsx})",
+        "command": "branch=$(git branch --show-current 2>/dev/null); if [ \"$branch\" = 'main' ]; then echo 'BLOCKED: Write to a feature branch, not main.' && exit 2; fi"
+      },
+      {
+        "matcher": "Write(*.generated.*)",
+        "command": "echo 'BLOCKED: Generated files should not be modified directly.' && exit 2"
+      },
+      {
+        "matcher": "Bash(rm -rf *)",
+        "command": "echo 'BLOCKED: Recursive force-delete is not allowed.' && exit 2"
+      }
+    ]
+  }
+}
+```
+
+Gates run in order. If any gate exits with code 2, the action is blocked and subsequent gates don't matter — the file doesn't get written.
+
+## Stage 2: Format and Fix (PostToolUse)
+
+After Claude writes a file, clean it up automatically:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write(*.{ts,tsx})",
+        "command": "npx prettier --write $file && npx eslint --fix $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(*.{css,scss})",
+        "command": "npx prettier --write $file && npx stylelint --fix $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(*.py)",
+        "command": "python -m black $file && python -m isort $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(*.go)",
+        "command": "gofmt -w $file && goimports -w $file 2>/dev/null || true"
+      }
+    ]
+  }
+}
+```
+
+**Pro tip:** The `|| true` at the end prevents hook failures from polluting Claude's context with error messages when a linter has issues. Remove it if you want Claude to see and fix lint errors.
+
+## Stage 3: Verify (PostToolUse)
+
+After formatting, verify the code is correct:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write(*.{ts,tsx})",
+        "command": "npx prettier --write $file && npx eslint --fix $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(src/**/*.ts)",
+        "command": "npx tsc --noEmit --pretty 2>&1 | head -20 || true"
+      },
+      {
+        "matcher": "Write(src/**/*.test.ts)",
+        "command": "npx vitest run $file --reporter=verbose 2>&1 | tail -20 || true"
+      }
+    ]
+  }
+}
+```
+
+Notice the ordering: format first, then type-check, then run tests. Each hook gets the result of the previous ones because they operate on the same file.
+
+**Common mistake:** Running `tsc --noEmit` on every single file write can be slow in large projects. Consider limiting it to specific directories or running it only on service/route files.
+
+## Stage 4: Notify (Notification + TaskCompleted)
+
+Alert yourself when Claude finishes work or needs attention:
+
+```json
+{
+  "hooks": {
+    "Notification": [
+      {
+        "command": "osascript -e 'display notification \"Claude needs your attention\" with title \"Claude Code\" sound name \"Glass\"'"
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "command": "osascript -e 'display notification \"Task complete! Check the results.\" with title \"Claude Code\" sound name \"Hero\"'"
+      }
+    ]
+  }
+}
+```
+
+On Linux, replace `osascript` with `notify-send`:
+
+```json
+{
+  "command": "notify-send 'Claude Code' 'Task complete!' --icon=dialog-information"
+}
+```
+
+## The Complete Pipeline
+
+Here's everything combined into a production-ready `settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "echo '🔧 Pipeline active: branch guard → format → lint → typecheck → test → notify'"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write(*)",
+        "command": "branch=$(git branch --show-current 2>/dev/null); if [ \"$branch\" = 'main' ] || [ \"$branch\" = 'master' ]; then echo 'BLOCKED: Create a feature branch first.' && exit 2; fi"
+      },
+      {
+        "matcher": "Write(*.generated.*)",
+        "command": "echo 'BLOCKED: Cannot modify generated files.' && exit 2"
+      },
+      {
+        "matcher": "Bash(git push --force*)",
+        "command": "echo 'BLOCKED: Force push is not allowed.' && exit 2"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(*.{ts,tsx})",
+        "command": "npx prettier --write $file 2>/dev/null && npx eslint --fix $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(*.py)",
+        "command": "python -m black $file 2>/dev/null && python -m isort $file 2>/dev/null || true"
+      },
+      {
+        "matcher": "Write(src/**/*.{ts,tsx})",
+        "command": "npx tsc --noEmit --pretty 2>&1 | head -15 || true"
+      },
+      {
+        "matcher": "Write(src/**/*.test.{ts,tsx})",
+        "command": "npx vitest run $file --reporter=verbose 2>&1 | tail -15 || true"
+      }
+    ],
+    "Notification": [
+      {
+        "command": "osascript -e 'display notification \"Claude needs input\" with title \"Claude Code\" sound name \"Glass\"'"
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "command": "osascript -e 'display notification \"Task done!\" with title \"Claude Code\" sound name \"Hero\"'"
+      }
+    ]
+  }
+}
+```
+
+## Error Handling in Pipelines
+
+### Soft Failures vs. Hard Blocks
+
+- **Exit 0**: Hook succeeded. Pipeline continues.
+- **Exit 1**: Hook failed. Pipeline continues. Claude sees the error output.
+- **Exit 2**: (PreToolUse only) Hard block. Action is prevented.
+
+### Catching Errors Without Blocking
+
+Sometimes you want Claude to know about a problem without stopping the pipeline:
+
+```json
+{
+  "matcher": "Write(src/**/*.ts)",
+  "command": "result=$(npx tsc --noEmit --pretty 2>&1); if [ $? -ne 0 ]; then echo \"TYPE ERRORS FOUND:\n$result\" | head -20; fi; exit 0"
+}
+```
+
+This reports type errors to Claude (so it can fix them) but exits with 0 so the pipeline continues.
+
+### Timeout Protection
+
+Long-running hooks can freeze Claude's workflow. Add timeouts:
+
+```json
+{
+  "matcher": "Write(src/**/*.test.ts)",
+  "command": "timeout 30 npx vitest run $file --reporter=verbose 2>&1 | tail -15 || echo 'Test timed out after 30s'"
+}
+```
+
+The `timeout 30` kills the test runner if it takes longer than 30 seconds. On macOS, install `coreutils` for `gtimeout` or use a different approach:
+
+```bash
+# macOS alternative
+( npx vitest run $file & PID=$!; sleep 30 && kill $PID 2>/dev/null ) 2>&1 | tail -15
+```
+
+## Monitoring Your Pipeline
+
+### Adding Logging
+
+```json
+{
+  "matcher": "Write(*.ts)",
+  "command": "echo \"$(date '+%H:%M:%S') [FORMAT] $file\" >> /tmp/claude-pipeline.log && npx prettier --write $file 2>/dev/null || true"
+}
+```
+
+Check the log to see what your pipeline is doing:
+
+```bash
+tail -f /tmp/claude-pipeline.log
+```
+
+### Pipeline Status on Session Start
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "echo '--- Pipeline Status ---'; echo \"Guards: branch protection, generated files, force push\"; echo \"Formatters: Prettier (TS/TSX), Black (Python)\"; echo \"Checks: TypeScript compiler, Vitest\"; echo \"Notifications: macOS desktop alerts\"; echo '---'"
+      }
+    ]
+  }
+}
+```
+
+When you start a Claude session, you immediately see which pipelines are active.
+
+## Pipeline Patterns by Project Type
+
+### Node.js/TypeScript Project
+
+```json
+{
+  "PostToolUse": [
+    { "matcher": "Write(*.{ts,tsx})", "command": "npx prettier --write $file && npx eslint --fix $file || true" },
+    { "matcher": "Write(src/**/*.ts)", "command": "npx tsc --noEmit 2>&1 | head -15 || true" },
+    { "matcher": "Write(**/*.test.ts)", "command": "npx vitest run $file 2>&1 | tail -10 || true" }
+  ]
+}
+```
+
+### Python Project
+
+```json
+{
+  "PostToolUse": [
+    { "matcher": "Write(*.py)", "command": "python -m black $file && python -m isort $file && python -m flake8 $file || true" },
+    { "matcher": "Write(*.py)", "command": "python -m mypy $file --ignore-missing-imports 2>&1 | head -10 || true" },
+    { "matcher": "Write(tests/**/*.py)", "command": "python -m pytest $file -v 2>&1 | tail -15 || true" }
+  ]
+}
+```
+
+### Rust Project
+
+```json
+{
+  "PostToolUse": [
+    { "matcher": "Write(*.rs)", "command": "rustfmt $file 2>/dev/null || true" },
+    { "matcher": "Write(src/**/*.rs)", "command": "cargo check 2>&1 | head -20 || true" },
+    { "matcher": "Write(tests/**/*.rs)", "command": "cargo test 2>&1 | tail -20 || true" }
+  ]
+}
+```
+
+## Key Takeaway
+
+Automation pipelines chain hooks across events: PreToolUse gates block dangerous actions, PostToolUse hooks format, lint, type-check, and test code automatically, and Notification hooks alert you when attention is needed. Each hook in a pipeline runs independently — a formatter failure doesn't prevent tests from running. Use exit code 2 for hard blocks, `|| true` for soft failures, and timeouts to prevent hangs. Start with a simple format-on-save pipeline and add stages as you identify what your workflow needs. The complete pipeline runs silently in the background, ensuring every file Claude writes is clean, correct, and tested.

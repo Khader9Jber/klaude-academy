@@ -1,0 +1,341 @@
+---
+title: "Compliance Frameworks: SOC 2, HIPAA, GDPR"
+slug: "compliance-frameworks"
+order: 8
+difficulty: "expert"
+duration: 20
+tags: ["compliance", "soc2", "hipaa", "gdpr", "security", "enterprise"]
+objectives:
+  - "Understand how Claude Code usage maps to major compliance frameworks"
+  - "Configure Claude Code to meet SOC 2, HIPAA, and GDPR requirements"
+  - "Build audit trails and access controls for regulated environments"
+  - "Know which compliance concerns Claude Code introduces and how to mitigate them"
+quiz:
+  - id: "compliance-1"
+    question: "What's the primary compliance concern with using Claude Code in a SOC 2 environment?"
+    type: "multiple-choice"
+    options:
+      - "Claude is too slow"
+      - "Code sent to Claude's API is processed by a third-party (Anthropic), requiring vendor assessment and data processing agreements"
+      - "Claude can't write compliant code"
+      - "SOC 2 prohibits all AI usage"
+    correct: 1
+    explanation: "SOC 2 requires understanding and controlling where your data goes. When Claude Code sends code to Anthropic's API, your source code is processed by a third party. This requires a vendor risk assessment, a data processing agreement (DPA), and clear policies about what data can be sent to the API."
+  - id: "compliance-2"
+    question: "How should you handle PHI (Protected Health Information) with Claude Code under HIPAA?"
+    type: "multiple-choice"
+    options:
+      - "Just don't worry about it"
+      - "Never send actual PHI to Claude — use synthetic/anonymized data, configure hooks to block files containing PHI patterns, and ensure a BAA is in place"
+      - "HIPAA only applies to hospitals"
+      - "Encrypt the code and Claude will decrypt it"
+    correct: 1
+    explanation: "Under HIPAA, PHI must be protected from unauthorized disclosure. Sending real patient data to Claude's API without a BAA (Business Associate Agreement) is a violation. The safe approach: use synthetic data during development, configure hooks to block files with PHI patterns, and establish a BAA with Anthropic if any PHI could be in prompts."
+  - id: "compliance-3"
+    question: "Under GDPR, what must you consider when using Claude Code on a codebase that processes EU personal data?"
+    type: "multiple-choice"
+    options:
+      - "Nothing — GDPR only applies to databases"
+      - "Whether code comments, variable names, test fixtures, or configuration files contain personal data that would be sent to Anthropic's API"
+      - "Only cookie consent matters"
+      - "GDPR doesn't apply to AI tools"
+    correct: 1
+    explanation: "GDPR applies to all personal data processing. Code can contain personal data in test fixtures (real email addresses), comments (employee names), config files (contact info), and variable names. Any of this sent to Claude's API constitutes data transfer to a third party, which must be covered by your GDPR data processing documentation."
+  - id: "compliance-4"
+    question: "What's the most practical first step for compliance with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Stop using Claude Code entirely"
+      - "Create an AI usage policy that defines what data can and cannot be sent to Claude, then enforce it with hooks"
+      - "Hope for the best"
+      - "Only use Claude on weekends"
+    correct: 1
+    explanation: "An AI usage policy is the foundation. It defines categories of data (public code, internal code, sensitive code, regulated data), which categories can be sent to Claude, and technical controls (hooks) that enforce the policy automatically. This satisfies the 'documented procedures' requirement of most compliance frameworks."
+---
+
+## Compliance Isn't Optional
+
+If you work at a company that handles health data, financial data, or European user data, you don't get to skip compliance. And if your team is using Claude Code — which sends code to Anthropic's API for processing — compliance officers have legitimate questions that need real answers.
+
+This lesson isn't about scaring you away from Claude Code. It's about using it responsibly in regulated environments. Thousands of companies use AI coding tools in compliant ways. The key is understanding what the frameworks actually require and building the right controls.
+
+## The Core Compliance Question
+
+Every compliance framework asks the same fundamental question about Claude Code:
+
+**"What data leaves your environment, where does it go, and how is it protected?"**
+
+When you use Claude Code, your prompts — which include code snippets, file contents, error messages, and sometimes data samples — are sent to Anthropic's API. This means:
+
+1. Your source code is processed by a third-party service
+2. File contents referenced with `@` are transmitted over the network
+3. Terminal output from command execution may be included in context
+4. Test fixtures and configuration values in code may contain real data
+
+Understanding this data flow is the starting point for every compliance conversation.
+
+## Anthropic's Data Handling
+
+Before diving into frameworks, understand what Anthropic does (and doesn't do) with your data:
+
+- **API usage:** Anthropic does not train on API data by default. Your code sent via the API is not used to improve models.
+- **Retention:** API inputs and outputs are retained for a limited period for safety monitoring, then deleted. Check Anthropic's current data retention policy for specifics.
+- **Encryption:** Data is encrypted in transit (TLS) and at rest.
+- **SOC 2:** Anthropic has its own SOC 2 Type II certification — request the report from their sales team.
+
+This gives you a foundation. But your compliance obligations depend on *your* data, not just Anthropic's posture.
+
+## SOC 2 Compliance
+
+SOC 2 is built around five Trust Service Criteria: Security, Availability, Processing Integrity, Confidentiality, and Privacy. Here's how Claude Code maps to each:
+
+### Security
+
+**Concern:** Access to Claude Code means access to send code to an external API.
+
+**Controls:**
+
+```json
+// .claude/settings.json — enforce authentication
+{
+  "permissions": {
+    "allow": [
+      "Read(*)",
+      "Bash(npm test*)",
+      "Bash(npx prettier*)"
+    ],
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Write(.env*)",
+      "Write(*.pem)",
+      "Write(*.key)"
+    ]
+  }
+}
+```
+
+Add hooks that log all Claude Code usage:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "command": "echo \"$(date -u '+%Y-%m-%dT%H:%M:%SZ'),${USER},prompt_submitted\" >> /var/log/claude-audit.csv"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write(*)",
+        "command": "echo \"$(date -u '+%Y-%m-%dT%H:%M:%SZ'),${USER},file_write,$file\" >> /var/log/claude-audit.csv"
+      }
+    ]
+  }
+}
+```
+
+### Confidentiality
+
+**Concern:** Sensitive code or trade secrets could be sent to Anthropic's API.
+
+**Controls:**
+
+Create a data classification policy and enforce it with hooks:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read(*.env*)",
+        "command": "echo 'BLOCKED: Environment files may contain secrets and cannot be sent to Claude.' && exit 2"
+      },
+      {
+        "matcher": "Read(*secret*)",
+        "command": "echo 'BLOCKED: Files matching *secret* pattern are restricted.' && exit 2"
+      },
+      {
+        "matcher": "Read(*.pem)",
+        "command": "echo 'BLOCKED: Certificate files cannot be read by Claude.' && exit 2"
+      }
+    ]
+  }
+}
+```
+
+### Audit Trail
+
+SOC 2 requires evidence that controls are working. The audit log hooks above create a CSV trail. For production environments, send these to your SIEM:
+
+```bash
+# Example: Forward Claude audit logs to your logging infrastructure
+tail -f /var/log/claude-audit.csv | while read line; do
+  curl -X POST "$LOG_AGGREGATOR_URL" \
+    -H "Content-Type: application/json" \
+    -d "{\"source\": \"claude-code\", \"event\": \"$line\"}"
+done
+```
+
+## HIPAA Compliance
+
+If your codebase handles Protected Health Information (PHI), Claude Code introduces specific risks.
+
+### The Risk
+
+Your code might contain:
+- Test fixtures with real patient names, dates of birth, or medical record numbers
+- Database seed files with real PHI
+- Configuration files with healthcare-specific identifiers
+- Comments referencing specific patients or cases
+
+Any of this sent to Claude's API is a potential HIPAA violation without a Business Associate Agreement (BAA).
+
+### Controls
+
+**Step 1:** Establish whether a BAA with Anthropic is needed and available. Contact Anthropic's enterprise sales team.
+
+**Step 2:** Regardless of BAA status, prevent PHI from reaching Claude:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read(db/seeds/*)",
+        "command": "echo 'BLOCKED: Seed files may contain PHI. Use synthetic data.' && exit 2"
+      },
+      {
+        "matcher": "Read(fixtures/*)",
+        "command": "echo 'BLOCKED: Test fixtures may contain PHI. Use synthetic data.' && exit 2"
+      },
+      {
+        "matcher": "Read(*)",
+        "command": "if grep -qiP '\\b\\d{3}-\\d{2}-\\d{4}\\b' \"$file\" 2>/dev/null; then echo 'BLOCKED: File appears to contain SSN patterns.' && exit 2; fi"
+      }
+    ]
+  }
+}
+```
+
+**Step 3:** Use synthetic data everywhere:
+
+```
+CLAUDE.md rule:
+## Data Handling
+- NEVER use real patient data in tests, fixtures, or examples
+- Always use synthetic data generators (faker.js or similar)
+- If you encounter what appears to be real PHI, stop and alert the team
+```
+
+### Minimum Necessary Standard
+
+HIPAA requires accessing only the minimum necessary PHI. With Claude Code, the minimum necessary is **zero** — Claude doesn't need real patient data to write code. Synthetic data serves the same purpose for development and testing.
+
+## GDPR Compliance
+
+GDPR applies when processing personal data of EU residents. The key articles relevant to Claude Code:
+
+### Article 28: Data Processor
+
+When Claude Code processes your code via Anthropic's API, Anthropic acts as a data processor if your code contains personal data. This requires:
+
+1. **Data Processing Agreement (DPA):** A contract between your company and Anthropic covering data processing terms. Anthropic's terms of service may already cover this — review them with your legal team.
+
+2. **Lawful basis for processing:** Legitimate interest (improving code quality) or consent from the data subjects whose data appears in your code.
+
+### Personal Data in Code
+
+It's more common than you think:
+
+```typescript
+// This test fixture contains personal data
+const testUser = {
+  name: "Maria Gonzalez",          // Real name of a QA tester
+  email: "maria.g@company.com",    // Real email
+  phone: "+34 612 345 678"         // Real phone number
+};
+
+// This config has personal data
+const SUPPORT_EMAIL = "john.smith@company.com";
+
+// This comment has personal data
+// Fixed by Sarah Chen on 2024-03-15 per ticket from patient M. Johnson
+```
+
+All of this is personal data under GDPR. If it gets sent to Claude's API, it's an international data transfer (likely to the US) that needs to be documented.
+
+### Controls
+
+```
+CLAUDE.md:
+## GDPR
+- Do not reference real employee names in comments
+- Test fixtures must use faker-generated data, not real user data
+- Configuration files must use role-based emails (support@, admin@), not personal emails
+- If you encounter personal data in code, flag it for anonymization
+```
+
+## Building an AI Usage Policy
+
+The single most important compliance document you can create:
+
+```markdown
+# AI Coding Tool Usage Policy
+
+## Scope
+This policy covers the use of Claude Code and similar AI coding 
+assistants by all engineering staff.
+
+## Data Classification for AI Tools
+
+### GREEN — Safe to Send to AI
+- Open-source code
+- Generic utility functions
+- Standard configuration templates
+- Public documentation
+- Code that contains no business logic, secrets, or personal data
+
+### YELLOW — Review Before Sending
+- Internal business logic
+- Database schemas
+- API endpoint implementations
+- Code that might contain personal data in comments/fixtures
+
+### RED — Never Send to AI
+- Files containing secrets (API keys, passwords, tokens)
+- Test fixtures with real user data
+- Production configuration with connection strings
+- Code under NDA or client agreements
+- Files containing PHI, PII, or financial data
+
+## Technical Controls
+[Reference your hooks and permissions configuration]
+
+## Monitoring
+[Reference your audit logging setup]
+
+## Incident Response
+If sensitive data is inadvertently sent to an AI tool:
+1. Document the incident
+2. Notify the security team within 24 hours
+3. Assess the data classification of what was sent
+4. Follow the data breach response procedure if applicable
+```
+
+## Practical Implementation Checklist
+
+For any compliance framework:
+
+- [ ] Review Anthropic's data processing terms and SOC 2 report
+- [ ] Classify your codebase data (GREEN/YELLOW/RED)
+- [ ] Configure hooks to block RED files from being read by Claude
+- [ ] Set up audit logging for all Claude Code usage
+- [ ] Create an AI usage policy document
+- [ ] Train developers on what can and can't be sent to AI tools
+- [ ] Add `.claude/settings.json` to your repo with appropriate controls
+- [ ] Review and update quarterly
+
+## Key Takeaway
+
+Compliance with Claude Code comes down to understanding data flow: what leaves your environment, where it goes, and how it's protected. For SOC 2, build access controls and audit trails. For HIPAA, prevent PHI from reaching the API and use synthetic data. For GDPR, document the data processing relationship and anonymize personal data in code. The most practical first step for any framework is creating an AI usage policy with data classification (GREEN/YELLOW/RED) and enforcing it with hooks that block sensitive files. Compliance doesn't mean you can't use Claude Code — it means you use it with documented controls that your auditors can verify.

@@ -1,6 +1,6 @@
 # Test Suites and Test Cases
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 3.0
 **Date:** 2026-04-05
@@ -323,9 +323,9 @@
 | Field | Value |
 |-------|-------|
 | **ID** | TC-PS-013 |
-| **Description** | When state changes, the new state is serialized to localStorage under the key `claude-academy-progress` |
+| **Description** | When state changes, the new state is serialized to localStorage under the key `klaude-academy-progress` |
 | **Preconditions** | localStorage is available and empty |
-| **Steps** | 1. Call `markLessonComplete("mod/lesson")` 2. Read `localStorage.getItem("claude-academy-progress")` 3. Parse the JSON |
+| **Steps** | 1. Call `markLessonComplete("mod/lesson")` 2. Read `localStorage.getItem("klaude-academy-progress")` 3. Parse the JSON |
 | **Expected Result** | The parsed JSON contains `completedLessons` with `["mod/lesson"]` |
 | **Priority** | P1 |
 | **Status** | Not Run |

@@ -5,9 +5,9 @@ Klaude Academy is an interactive learning website for mastering Claude and Claud
 
 ## Live URLs
 - **Primary:** https://klaude-academy.netlify.app
-- **Static fallback:** https://khader9jber.github.io/claude-academy/
-- **Repo:** https://github.com/Khader9Jber/claude-academy
-- **Pipeline:** https://github.com/Khader9Jber/claude-academy/actions
+- **Static fallback:** https://khader9jber.github.io/klaude-academy/
+- **Repo:** https://github.com/Khader9Jber/klaude-academy
+- **Pipeline:** https://github.com/Khader9Jber/klaude-academy/actions
 - **Supabase:** https://supabase.com/dashboard/project/vgqacstxxwkeftxpuxcn
 
 ## Tech Stack

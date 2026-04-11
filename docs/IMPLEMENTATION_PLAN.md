@@ -1,6 +1,6 @@
 # Implementation Plan
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 2.0
 **Date:** 2026-04-05
@@ -463,16 +463,16 @@ src/components/progress/progress-dashboard.tsx
 **Deliverables:**
 
 - Netlify production deployment at `https://klaude-academy.netlify.app` (primary)
-- GitHub Pages deployment at `https://khader9jber.github.io/claude-academy/`
-- Vercel production deployment at `https://claude-academy-course.vercel.app` (backup)
+- GitHub Pages deployment at `https://khader9jber.github.io/klaude-academy/`
+- Vercel production deployment at `https://klaude-academy-course.vercel.app` (backup)
 - Automated deployment on push to main via `deploy.yml` workflow
 - PR preview deploys via `pr-preview.yml` workflow (Netlify)
 
 **Acceptance Criteria:** All met.
 
 - Netlify site accessible at `https://klaude-academy.netlify.app`
-- GitHub Pages site accessible at `https://khader9jber.github.io/claude-academy/`
-- Vercel backup site accessible at `https://claude-academy-course.vercel.app`
+- GitHub Pages site accessible at `https://khader9jber.github.io/klaude-academy/`
+- Vercel backup site accessible at `https://klaude-academy-course.vercel.app`
 - All three sites deploy automatically when CI passes
 - PR previews deploy on PR creation/update via Netlify
 
@@ -554,8 +554,8 @@ src/components/progress/progress-dashboard.tsx
 **Acceptance Criteria:**
 
 - Netlify site accessible at `https://klaude-academy.netlify.app` with SSR and full auth
-- GitHub Pages site still accessible at `https://khader9jber.github.io/claude-academy/`
-- Vercel backup still accessible at `https://claude-academy-course.vercel.app`
+- GitHub Pages site still accessible at `https://khader9jber.github.io/klaude-academy/`
+- Vercel backup still accessible at `https://klaude-academy-course.vercel.app`
 - Deploy pipeline runs all three deployments on push to main
 - PR previews deploy to Netlify and comment the preview URL
 
@@ -796,7 +796,7 @@ Full details are documented in `TECH_STACK.md` at the project root. Summary:
 
 **Context:** User progress data needs to persist across browser sessions.
 
-**Decision:** Use the browser's localStorage API via Zustand's `persist` middleware. Data is stored under the key `claude-academy-progress`.
+**Decision:** Use the browser's localStorage API via Zustand's `persist` middleware. Data is stored under the key `klaude-academy-progress`.
 
 **Rationale:**
 

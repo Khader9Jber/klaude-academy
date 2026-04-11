@@ -135,11 +135,17 @@ export function SearchDialog() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search lessons"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-background/80 backdrop-blur-sm"
         onClick={() => setOpen(false)}
+        aria-hidden="true"
       />
 
       {/* Dialog */}
@@ -158,6 +164,7 @@ export function SearchDialog() {
           />
           <button
             onClick={() => setOpen(false)}
+            aria-label="Close search"
             className="rounded-md p-1 text-muted hover:text-text"
           >
             <X className="h-4 w-4" />

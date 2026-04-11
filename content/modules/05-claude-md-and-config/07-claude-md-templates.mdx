@@ -1,0 +1,348 @@
+---
+title: "CLAUDE.md Templates Gallery"
+slug: "claude-md-templates"
+order: 7
+difficulty: "intermediate"
+duration: 18
+tags: ["claude-md", "templates", "configuration", "conventions", "reference"]
+objectives:
+  - "Choose the right CLAUDE.md template for your project type"
+  - "Customize templates with your team's specific conventions"
+  - "Understand which sections matter most for different project types"
+  - "Avoid common CLAUDE.md mistakes that waste tokens or confuse Claude"
+quiz:
+  - id: "claude-tmpl-1"
+    question: "What's the most important section of a CLAUDE.md file?"
+    type: "multiple-choice"
+    options:
+      - "The project description"
+      - "The code conventions section — it directly controls how Claude writes code in your project"
+      - "The git section"
+      - "The license"
+    correct: 1
+    explanation: "Code conventions directly determine the quality and consistency of Claude's output. When you specify 'all errors must use AppError class' or 'validate with Zod at the route level,' Claude follows these rules in every response. Without conventions, Claude guesses at patterns and produces inconsistent code."
+  - id: "claude-tmpl-2"
+    question: "How long should a CLAUDE.md file be?"
+    type: "multiple-choice"
+    options:
+      - "As long as possible — more context is always better"
+      - "One line"
+      - "Focused and practical — typically 50-150 lines covering stack, conventions, patterns, and key commands"
+      - "Exactly 100 lines"
+    correct: 2
+    explanation: "CLAUDE.md is loaded into every Claude session, consuming context window tokens. A 500-line CLAUDE.md wastes tokens on information Claude rarely needs. Keep it focused: tech stack, code conventions, key patterns, important commands. Put detailed docs elsewhere and reference them with @file when needed."
+  - id: "claude-tmpl-3"
+    question: "Should you include 'Don't do X' rules in CLAUDE.md?"
+    type: "multiple-choice"
+    options:
+      - "Never — only include positive instructions"
+      - "Yes — negative constraints ('never use var', 'don't put SQL in routes') are highly effective at preventing common mistakes"
+      - "Only if you have more than 10 rules"
+      - "Only for security rules"
+    correct: 1
+    explanation: "Negative constraints are powerful. Rules like 'Never use var — always const or let', 'Never put raw SQL in route handlers,' and 'Never commit .env files' prevent mistakes Claude would otherwise make. Claude respects both positive and negative instructions in CLAUDE.md."
+  - id: "claude-tmpl-4"
+    question: "When should you use a project CLAUDE.md vs. a user-level ~/.claude/CLAUDE.md?"
+    type: "multiple-choice"
+    options:
+      - "They're the same"
+      - "Project CLAUDE.md for project-specific conventions (shared with team); user-level for personal preferences (only your sessions)"
+      - "Only use project-level"
+      - "Only use user-level"
+    correct: 1
+    explanation: "Project CLAUDE.md goes in the repo root and is shared with everyone on the team — it defines project conventions. User-level ~/.claude/CLAUDE.md is for your personal preferences across all projects (editor habits, response style, etc.). Both are loaded, with project-level taking priority for conflicts."
+---
+
+## Stop Writing CLAUDE.md From Scratch
+
+Every new project needs a CLAUDE.md, and every time you start one from scratch, you forget something important. By the third project, you're copying from the previous one and tweaking. That's essentially what templates are — starting points that capture best practices so you don't reinvent the wheel.
+
+This gallery gives you battle-tested templates for common project types. Copy the one that matches your project, spend 10 minutes customizing it, and you're done.
+
+## Template 1: Next.js Full-Stack Application
+
+```markdown
+# Project CLAUDE.md
+
+## Overview
+[One-sentence description of what this app does]
+
+## Tech Stack
+- Framework: Next.js 15 (App Router)
+- Language: TypeScript (strict mode)
+- Styling: Tailwind CSS 4
+- Database: PostgreSQL via Prisma
+- Auth: NextAuth.js v5
+- Testing: Vitest (unit), Playwright (e2e)
+- Package manager: pnpm
+
+## Code Conventions
+- Use Server Components by default; add 'use client' only when needed
+- All database access goes through src/lib/db/ — never import Prisma directly in components
+- API routes use route handlers in app/api/ — no pages/api/
+- Error boundaries in every layout.tsx
+- Validate all API input with Zod schemas in src/lib/validators/
+- Use next/image for all images — no raw <img> tags
+
+## File Structure
+- app/(marketing)/ — public pages (landing, pricing, about)
+- app/(dashboard)/ — authenticated pages
+- app/api/ — API route handlers
+- src/components/ui/ — reusable UI components
+- src/components/ — feature-specific components
+- src/lib/ — utilities, db, auth config
+- src/hooks/ — custom React hooks
+
+## Commands
+- pnpm dev — local dev server
+- pnpm build — production build
+- pnpm test — unit tests
+- pnpm test:e2e — Playwright tests
+- pnpm db:push — push schema changes
+- pnpm db:studio — open Prisma Studio
+
+## Git
+- Conventional commits: feat:, fix:, chore:, docs:, test:
+- Branch naming: feat/short-description, fix/short-description
+- Always run pnpm build before pushing
+
+## Don'ts
+- Never use 'any' type — use 'unknown' and narrow
+- Never put database queries in components — use server actions or API routes
+- Never commit .env.local
+- Never use default exports except for pages and layouts
+```
+
+## Template 2: Express.js REST API
+
+```markdown
+# Project CLAUDE.md
+
+## Overview
+[Description]
+
+## Tech Stack
+- Runtime: Node.js 20
+- Framework: Express.js
+- Language: TypeScript
+- ORM: Prisma (PostgreSQL)
+- Auth: JWT (access + refresh tokens)
+- Validation: Zod
+- Testing: Vitest + supertest
+- Docs: OpenAPI / Swagger
+
+## Architecture
+- Routes → Middleware → Controller → Service → Repository
+- Dependency injection via constructor (no global singletons)
+- All errors thrown as AppError (src/lib/AppError.ts)
+- All async handlers wrapped with asyncHandler utility
+
+## Code Conventions
+- One route file per resource (src/routes/users.ts, src/routes/orders.ts)
+- One service class per domain (src/services/UserService.ts)
+- Validation schemas co-located with routes (src/routes/users.schema.ts)
+- All responses follow: { data, meta } for success, { error } for failures
+- Use factory functions for test data (src/__tests__/factories/)
+- HTTP status codes: 200 (ok), 201 (created), 204 (deleted), 
+  400 (bad request), 401 (unauth), 403 (forbidden), 404 (not found), 
+  409 (conflict), 422 (validation), 500 (server error)
+
+## Commands
+- npm run dev — dev server with hot reload
+- npm run build — compile TypeScript
+- npm test — run all tests
+- npm run test:watch — watch mode
+- npm run lint — ESLint
+- npm run migrate — run pending migrations
+
+## Don'ts
+- Never use raw SQL — always use Prisma
+- Never put business logic in route handlers
+- Never return stack traces in production error responses
+- Never use console.log — use the logger (src/lib/logger.ts)
+```
+
+## Template 3: Python FastAPI Application
+
+```markdown
+# Project CLAUDE.md
+
+## Overview
+[Description]
+
+## Tech Stack
+- Language: Python 3.12
+- Framework: FastAPI
+- ORM: SQLAlchemy 2.0 (async)
+- Database: PostgreSQL
+- Auth: OAuth2 with JWT
+- Validation: Pydantic v2
+- Testing: pytest + httpx
+- Linting: ruff, mypy
+
+## Code Conventions
+- Async everywhere — all endpoints and DB operations are async
+- One router per resource (app/routers/users.py)
+- Pydantic models for all request/response schemas (app/schemas/)
+- SQLAlchemy models in app/models/
+- Business logic in app/services/ — routers only handle HTTP
+- Dependencies use FastAPI's Depends() — never import directly
+- Type hints on every function (enforced by mypy)
+
+## Commands
+- uv run uvicorn app.main:app --reload — dev server
+- uv run pytest — run tests
+- uv run ruff check . — lint
+- uv run mypy . — type check
+- alembic upgrade head — run migrations
+
+## Don'ts
+- Never use sync database operations
+- Never put business logic in routers
+- Never use print() — use structlog logger
+- Never hardcode config values — use pydantic-settings
+```
+
+## Template 4: React Component Library
+
+```markdown
+# Project CLAUDE.md
+
+## Overview
+Shared component library used across [org name] applications.
+
+## Tech Stack
+- React 19
+- TypeScript (strict)
+- Styling: CSS Modules + design tokens
+- Build: Vite (library mode)
+- Testing: Vitest + React Testing Library
+- Docs: Storybook 8
+
+## Component Conventions
+- Every component gets its own directory: src/components/Button/
+  - Button.tsx — component implementation
+  - Button.module.css — styles
+  - Button.test.tsx — tests
+  - Button.stories.tsx — Storybook stories
+  - index.ts — re-export
+- All components must accept className prop for composition
+- All interactive components must be keyboard-accessible
+- All components must have displayName set
+- Props interfaces named: ComponentNameProps (e.g., ButtonProps)
+- Use forwardRef for all components that render DOM elements
+
+## Design Tokens
+- Colors: var(--color-primary-500), var(--color-neutral-100), etc.
+- Spacing: var(--space-1) through var(--space-12)
+- Font sizes: var(--text-sm), var(--text-base), var(--text-lg), etc.
+- Never use hardcoded colors or pixel values
+
+## Commands
+- pnpm dev — Storybook dev server
+- pnpm test — run tests
+- pnpm build — build library
+- pnpm lint — ESLint + Stylelint
+
+## Don'ts
+- Never use inline styles — use CSS Modules
+- Never use any hardcoded colors — use design tokens
+- Never skip the Storybook story — every component needs one
+- Never use default exports
+```
+
+## Template 5: CLI Tool / Node Package
+
+```markdown
+# Project CLAUDE.md
+
+## Overview
+[CLI tool name] — [what it does in one sentence]
+
+## Tech Stack
+- Language: TypeScript
+- CLI framework: Commander.js
+- Output formatting: chalk + ora (spinners)
+- Config: cosmiconfig (reads .toolrc, tool.config.js, etc.)
+- Testing: Vitest
+- Build: tsup
+
+## Code Conventions
+- Commands in src/commands/ — one file per command
+- Shared utilities in src/utils/
+- All user-facing output goes through src/utils/output.ts (for testability)
+- Error messages must be actionable: "File not found: config.json. Run 'tool init' to create one."
+- Exit codes: 0 (success), 1 (runtime error), 2 (invalid usage)
+- Support --json flag on all commands for scriptable output
+
+## Commands
+- pnpm dev — watch mode
+- pnpm build — compile with tsup
+- pnpm test — run tests
+- pnpm link — install globally for local testing
+
+## Don'ts
+- Never use process.exit() directly — throw an error and let the top-level handler exit
+- Never use console.log directly — use the output utility
+- Never assume TTY — check process.stdout.isTTY before using colors/spinners
+```
+
+## Template 6: Minimal Starter
+
+For when you need something quick:
+
+```markdown
+# CLAUDE.md
+
+## Stack
+TypeScript, [framework], [database]
+
+## Rules
+- [Most important convention]
+- [Second most important convention]
+- [What to never do]
+
+## Commands
+- npm run dev
+- npm test
+- npm run build
+```
+
+Sometimes six lines is enough. You can always add more as the project grows.
+
+## Common CLAUDE.md Mistakes
+
+### Mistake: Too Much Information
+
+A 300-line CLAUDE.md that includes API documentation, database schema, deployment runbooks, and meeting notes. Claude reads all of it every session, burning context window tokens on information it rarely needs.
+
+**Fix:** Keep CLAUDE.md focused on conventions and patterns. Put detailed docs in separate files and reference them with `@docs/api.md` when needed.
+
+### Mistake: Too Vague
+
+```markdown
+## Rules
+- Write good code
+- Follow best practices
+- Keep it clean
+```
+
+Claude already tries to do these things. This CLAUDE.md adds nothing.
+
+**Fix:** Be specific: "Use Zod for validation. Use AppError for errors. Use factories for test data."
+
+### Mistake: Outdated Information
+
+Your CLAUDE.md says "use Jest" but you migrated to Vitest six months ago. Claude keeps generating Jest tests.
+
+**Fix:** Update CLAUDE.md when you change tools or conventions. Treat it like documentation — if it's wrong, it's worse than nothing.
+
+### Mistake: No Negative Constraints
+
+Without "don't" rules, Claude makes predictable mistakes: using `any` types, putting queries in components, committing secrets, using `console.log` instead of your logger.
+
+**Fix:** Add a "Don'ts" section with the 3-5 mistakes you want to prevent.
+
+## Key Takeaway
+
+A good CLAUDE.md is focused (50-150 lines), specific (exact tools and patterns, not vague advice), and maintained (updated when conventions change). Start with the template that matches your project type, customize the stack and conventions sections, add 3-5 negative constraints, and keep it current. The CLAUDE.md is loaded into every session, so every line should earn its place — if Claude doesn't need to know it for day-to-day coding, it doesn't belong in CLAUDE.md.

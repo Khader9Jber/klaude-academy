@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -6,9 +7,11 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, estimateReadingTime } from "@/lib/utils";
 import { getModules, getModule, getLesson } from "@/lib/content";
 import { Breadcrumb } from "@/components/layout";
+import { ReadingProgress } from "@/components/ui/reading-progress";
+import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import { LessonSidebar } from "./lesson-sidebar";
 import { MarkCompleteButton } from "./mark-complete";
 
@@ -18,6 +21,34 @@ const difficultyColors: Record<string, string> = {
   advanced: "bg-purple/10 text-purple border-purple/20",
   expert: "bg-accent/10 text-accent border-accent/20",
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ moduleSlug: string; lessonSlug: string }>;
+}): Promise<Metadata> {
+  const { moduleSlug, lessonSlug } = await params;
+  const mod = getModule(moduleSlug);
+  const lesson = getLesson(moduleSlug, lessonSlug);
+
+  if (!mod || !lesson) {
+    return { title: "Lesson Not Found" };
+  }
+
+  const description = lesson.objectives.length > 0
+    ? `Learn: ${lesson.objectives.slice(0, 2).join(". ")}. Part of the ${mod.title} module.`
+    : `${lesson.title} - Part of the ${mod.title} module in Klaude Academy.`;
+
+  return {
+    title: lesson.title,
+    description,
+    openGraph: {
+      title: `${lesson.title} | Klaude Academy`,
+      description,
+      type: "article",
+    },
+  };
+}
 
 export async function generateStaticParams() {
   const modules = getModules();
@@ -80,6 +111,9 @@ export default async function LessonPage({
   const lessonId = `${moduleSlug}/${lessonSlug}`;
 
   return (
+    <>
+      <ReadingProgress />
+      <ScrollToTop />
     <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8">
       <Breadcrumb
         items={[
@@ -113,7 +147,7 @@ export default async function LessonPage({
               </span>
               <span className="flex items-center gap-1 text-xs text-muted">
                 <Clock className="h-3.5 w-3.5" />
-                {formatDuration(lesson.duration)}
+                {formatDuration(estimateReadingTime(lesson.content))} read
               </span>
             </div>
 
@@ -259,6 +293,7 @@ export default async function LessonPage({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

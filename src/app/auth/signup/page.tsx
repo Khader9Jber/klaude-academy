@@ -61,24 +61,9 @@ export default function SignupPage() {
         setSuccess(true);
         setSubmitting(false);
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again in a few minutes.");
       setSubmitting(false);
-    }
-  };
-
-  const handleOAuthSignup = async (provider: "google" | "github") => {
-    setError(null);
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (oauthError) {
-      setError(oauthError.message);
     }
   };
 

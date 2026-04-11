@@ -79,9 +79,10 @@ export default function EditLessonPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
-  const { user } = useAdmin();
+  useAdmin();
+  const supabaseReady = isSupabaseConfigured();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(supabaseReady && !!id);
   const [notFound, setNotFound] = useState(false);
   const [moduleSlug, setModuleSlug] = useState<string>(MODULES[0].slug);
   const [title, setTitle] = useState("");
@@ -102,17 +103,7 @@ export default function EditLessonPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const supabaseReady = isSupabaseConfigured();
-
-  useEffect(() => {
-    if (!supabaseReady || !id) {
-      setLoading(false);
-      return;
-    }
-    loadContent();
-  }, [supabaseReady, id]);
-
-  async function loadContent() {
+  const loadContent = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     const { data, error: fetchError } = await supabase
@@ -145,7 +136,12 @@ export default function EditLessonPage() {
     }
 
     setLoading(false);
-  }
+  }, [id]);
+
+  useEffect(() => {
+    if (!supabaseReady || !id) return;
+    loadContent(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [supabaseReady, id, loadContent]);
 
   const handleTitleChange = useCallback(
     (value: string) => {

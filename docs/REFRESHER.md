@@ -6,7 +6,7 @@ A personal refresher for when you come back to this project after a break.
 
 ## What You Built
 
-Claude Academy is a complete interactive learning website for mastering Claude and Claude Code. It has 74 lessons across 13 modules organized in 4 skill arcs (Foundation, Practitioner, Power User, Expert), 294 quiz questions, interactive exercises, light/dark mode (dark default), and it's deployed to 2 platforms. It has an optional Supabase backend for authentication (email, Google, GitHub), cross-device progress sync, a public leaderboard, and completion certificates. The site works fully without a backend -- Supabase adds user accounts and sync on top.
+Klaude Academy is a complete interactive learning website for mastering Claude and Claude Code. It has 74 lessons across 13 modules organized in 4 skill arcs (Foundation, Practitioner, Power User, Expert), 294 quiz questions, interactive exercises, light/dark mode (dark default), and it's deployed to 2 platforms. It has an optional Supabase backend for authentication (email, Google, GitHub), cross-device progress sync, a public leaderboard, and completion certificates. The site works fully without a backend -- Supabase adds user accounts and sync on top.
 
 It also has a full admin dashboard at `/admin` (admin-only, protected by `app_metadata.role === 'admin'`) with 6 sections: Dashboard (overview stats), Content (create/edit/delete lessons with markdown editor and quiz builder), Users (list, search, view details, manage roles), Analytics (page views, completion rates, quiz performance, user growth charts), Announcements (type badges and scheduling), and Settings (configurable site options). The admin system added 4 new database tables (`managed_content`, `site_settings`, `announcements`, `analytics_events`) via `supabase/migrations/002_admin.sql`, an `is_admin()` SQL function, a `useAdmin()` React hook, and an `AdminGuard` component. You can make a user admin with: `SUPABASE_SERVICE_ROLE_KEY=xxx npx tsx scripts/make-admin.ts user@email.com`.
 
@@ -54,10 +54,10 @@ cp .env.example .env.local
 ## Your Live URLs
 
 - **Netlify (primary)**: https://klaude-academy.netlify.app
-- **GitHub Pages**: https://khader9jber.github.io/claude-academy/
-- **Vercel (backup)**: https://claude-academy-course.vercel.app
-- **Repo**: https://github.com/Khader9Jber/claude-academy
-- **Pipeline**: https://github.com/Khader9Jber/claude-academy/actions
+- **GitHub Pages**: https://khader9jber.github.io/klaude-academy/
+- **Vercel (backup)**: https://klaude-academy-course.vercel.app
+- **Repo**: https://github.com/Khader9Jber/klaude-academy
+- **Pipeline**: https://github.com/Khader9Jber/klaude-academy/actions
 
 ---
 
@@ -212,7 +212,7 @@ Quick reference to key decisions. Full details in `docs/ARCHITECTURE.md` (Sectio
 
 ## If Something Breaks
 
-1. **Check the pipeline**: https://github.com/Khader9Jber/claude-academy/actions
+1. **Check the pipeline**: https://github.com/Khader9Jber/klaude-academy/actions
    - Look at the most recent workflow run. Red means failure -- click into it to see which job failed and read the logs.
 
 2. **Run locally**:

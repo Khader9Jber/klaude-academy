@@ -1,6 +1,6 @@
 # QA Summary Report
 
-**Project:** Claude Academy Learning Platform
+**Project:** Klaude Academy Learning Platform
 **Date:** 2026-04-04
 **QA Phase:** Post-build validation
 **Vitest Version:** 4.1.2
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Claude Academy passes all v0.1.0 QA checks. The project builds successfully with zero TypeScript errors, all 46 unit tests pass, all 74 MDX lesson files validate without issues, and every expected file is present. v0.2.0 adds 36 new test cases (9 unit, 6 component, 21 E2E) covering Supabase auth, theme toggling, leaderboard, certificates, and profile features. The v0.2.0 tests are currently pending execution.
+Klaude Academy passes all v0.1.0 QA checks. The project builds successfully with zero TypeScript errors, all 46 unit tests pass, all 74 MDX lesson files validate without issues, and every expected file is present. v0.2.0 adds 36 new test cases (9 unit, 6 component, 21 E2E) covering Supabase auth, theme toggling, leaderboard, certificates, and profile features. The v0.2.0 tests are currently pending execution.
 
 **QA Verdict: PASS (v0.1.0) | PENDING (v0.2.0)**
 
@@ -179,7 +179,7 @@ None.
 
 ### Minor (can fix post-launch)
 
-1. **Duplicate store files**: Both `src/lib/progress-store.ts` and `src/lib/store.ts` export `useProgressStore` with the same localStorage key (`claude-academy-progress`) but different interfaces. Only `progress-store.ts` is used by the app (it matches the `ProgressState` type from `src/types/progress.ts`). The `store.ts` file appears to be an earlier version that could be removed to avoid confusion.
+1. **Duplicate store files**: Both `src/lib/progress-store.ts` and `src/lib/store.ts` export `useProgressStore` with the same localStorage key (`klaude-academy-progress`) but different interfaces. Only `progress-store.ts` is used by the app (it matches the `ProgressState` type from `src/types/progress.ts`). The `store.ts` file appears to be an earlier version that could be removed to avoid confusion.
 
 2. **Duplicate type definitions**: `QuizQuestion` is defined in both `src/types/content.ts` and `src/types/index.ts` with slightly different shapes (content.ts allows `correct: number | number[]` for multiple-select; index.ts only allows `correct: number`). This is not causing build errors but could lead to confusion.
 
@@ -232,4 +232,4 @@ No blocking items. The project is deployment-ready.
 
 ## QA Verdict: PASS (v0.1.0) | PENDING (v0.2.0)
 
-The Claude Academy project passes all v0.1.0 quality gates. All 74 lessons are valid, all 46 unit tests pass, the build succeeds with zero errors, and every expected file is present. v0.2.0 adds 36 new test cases across 9 suites covering authentication, theme, leaderboard, certificates, and profile features. These tests are pending execution by the test runner agent.
+The Klaude Academy project passes all v0.1.0 quality gates. All 74 lessons are valid, all 46 unit tests pass, the build succeeds with zero errors, and every expected file is present. v0.2.0 adds 36 new test cases across 9 suites covering authentication, theme, leaderboard, certificates, and profile features. These tests are pending execution by the test runner agent.

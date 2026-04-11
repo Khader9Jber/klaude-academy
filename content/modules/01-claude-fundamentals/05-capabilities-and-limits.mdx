@@ -1,0 +1,239 @@
+---
+title: "Claude's Capabilities and Limitations"
+slug: "capabilities-and-limits"
+order: 5
+difficulty: "beginner"
+duration: 18
+tags: ["capabilities", "limitations", "hallucination", "verification", "trust"]
+objectives:
+  - "Identify what Claude genuinely excels at and where it struggles"
+  - "Recognize hallucination patterns and when Claude is likely making things up"
+  - "Apply practical 'trust but verify' strategies to Claude's output"
+  - "Know when NOT to trust Claude blindly"
+quiz:
+  - id: "cap-limits-1"
+    question: "Which task is Claude MOST reliable at?"
+    type: "multiple-choice"
+    options:
+      - "Telling you today's stock price"
+      - "Performing exact floating-point arithmetic on large numbers"
+      - "Analyzing and refactoring existing code with clear patterns"
+      - "Guaranteeing that generated code has zero bugs"
+    correct: 2
+    explanation: "Claude excels at pattern recognition, code analysis, and refactoring. It can read existing code, understand its structure, and produce well-organized transformations. It cannot access real-time data (stock prices), struggles with precise arithmetic, and cannot guarantee bug-free output."
+  - id: "cap-limits-2"
+    question: "What is a 'hallucination' in the context of LLMs?"
+    type: "multiple-choice"
+    options:
+      - "When the model crashes"
+      - "When the model generates confident-sounding information that is factually incorrect or fabricated"
+      - "When the model refuses to answer"
+      - "When the model outputs random characters"
+    correct: 1
+    explanation: "Hallucination refers to Claude generating plausible-sounding but incorrect or fabricated information. The dangerous part is that hallucinated content often sounds just as confident as accurate content, making it hard to spot without verification."
+  - id: "cap-limits-3"
+    question: "When is Claude MOST likely to hallucinate?"
+    type: "multiple-choice"
+    options:
+      - "When writing a for loop"
+      - "When asked about niche libraries, specific API details, or recent events after its training cutoff"
+      - "When formatting text as markdown"
+      - "When reading a file you pointed it to"
+    correct: 1
+    explanation: "Claude is most likely to hallucinate when asked about obscure or niche topics, specific API details for less-popular libraries, or events after its training data cutoff. It has less training data on these topics, so it fills gaps with plausible-sounding but potentially wrong information."
+  - id: "cap-limits-4"
+    question: "What is the best 'trust but verify' strategy for Claude's code output?"
+    type: "multiple-choice"
+    options:
+      - "If it looks right, ship it"
+      - "Never use Claude's code at all"
+      - "Run the code, check edge cases, review the logic — treat it like a junior developer's PR"
+      - "Only use Claude for comments, never for actual code"
+    correct: 2
+    explanation: "The best approach is treating Claude's output like a pull request from a talented but sometimes careless junior developer. Run it, test edge cases, review the logic, and verify any claims about APIs or library behavior. Trust the structure, verify the details."
+---
+
+## Claude Is Not Magic — It's a Tool
+
+Every new Claude user goes through the same arc. First, amazement: "This thing is incredible, it just wrote my entire auth system." Then, a week later, frustration: "It confidently told me to use `response.data.users` but the API actually returns `response.body.items` and I spent an hour debugging that."
+
+Understanding where Claude shines and where it stumbles isn't just academic — it directly determines how productive you'll be. The developers who get the most out of Claude aren't the ones who trust it blindly. They're the ones who know exactly when to lean on it and when to double-check.
+
+## Where Claude Genuinely Excels
+
+### Code Analysis and Refactoring
+
+This is Claude's sweet spot. Give it existing code, and it can:
+
+- Trace data flow across files and functions
+- Identify patterns, anti-patterns, and potential bugs
+- Refactor complex logic into cleaner structures
+- Explain what unfamiliar code does, line by line
+
+```
+"Read @src/services/orderProcessor.ts and identify any race 
+conditions in the concurrent order handling logic."
+```
+
+Claude is excellent here because it's doing pattern recognition on code — something it has enormous training data for. I once pointed Claude at a 400-line function I'd been meaning to refactor for months, and it correctly identified three separate responsibilities that should have been split into their own services. That kind of structural analysis is genuinely hard for humans to do quickly.
+
+### Writing and Documentation
+
+Claude produces clear, well-structured prose. Technical writing, documentation, commit messages, PR descriptions, API docs — all strong areas. It can match a writing style if you give it examples, and it handles tone shifts (formal docs vs. casual comments) naturally.
+
+### Reasoning About Architecture
+
+When you describe a system's constraints and ask Claude for design advice, it draws on patterns from millions of codebases. It can suggest appropriate design patterns, identify separation-of-concern issues, and propose architectures that account for your stated requirements.
+
+### Translation Between Formats
+
+JSON to TypeScript interfaces. SQL to Prisma schema. Python to JavaScript. OpenAPI spec to route handlers. Claude handles format translation reliably because both the source and target formats are well-represented in its training data.
+
+### Boilerplate and Scaffolding
+
+Setting up project structures, config files, CI/CD pipelines, Dockerfiles — Claude is fast and accurate for these tasks because they follow well-established patterns. You'll still want to review the output, but the starting point will be solid.
+
+## Where Claude Struggles
+
+### Precise Arithmetic
+
+Claude is not a calculator. It processes numbers as tokens, not as mathematical values.
+
+```
+You: What is 7,849 × 3,267?
+Claude: 25,634,283
+
+Actual answer: 25,634,883
+```
+
+Claude got close — suspiciously close — but wrong. For any calculation where precision matters (financial math, cryptographic operations, scientific computing), use actual computation tools. Claude can write the code that does the math correctly; it just can't reliably do the math in its head.
+
+**Pro tip:** Instead of asking Claude to calculate something, ask it to write a script that calculates it. The script will be correct even when Claude's mental math isn't.
+
+### Real-Time or Post-Training Data
+
+Claude's training data has a cutoff date. It doesn't know about:
+
+- Today's news, stock prices, or weather
+- Libraries released after its training cutoff
+- API changes made after its training cutoff
+- Your company's internal documentation (unless you provide it)
+
+```
+You: What's the latest version of Next.js?
+Claude: As of my last update, Next.js 14... [may be outdated]
+```
+
+**Watch out:** Claude won't always tell you it doesn't know. Sometimes it will confidently state outdated information as if it's current. If you're asking about anything time-sensitive, verify independently.
+
+### Niche Library APIs
+
+Claude is excellent with popular libraries (React, Express, Prisma, etc.) but gets increasingly unreliable with less common ones. The less popular the library, the more likely Claude will hallucinate method names, parameter orders, or return types.
+
+I once asked Claude to help me with a specific function in a niche Rust crate. It confidently generated code using `client.fetch_with_retry()` — a method that simply didn't exist in that library. The method name sounded completely reasonable, and the code around it was well-structured, but that one fabricated method cost me 20 minutes of confused debugging.
+
+**Common mistake:** Trusting Claude's import statements and API calls for less-popular packages without checking the actual documentation.
+
+### Counting and Spatial Reasoning
+
+Ask Claude to count the number of items in a list, and it might get it wrong. Ask it to reason about spatial relationships in a complex data structure, and results vary. These tasks require precise sequential processing that doesn't align well with how language models work.
+
+```
+You: How many 'r's are in the word "strawberry"?
+Claude: There are 2 r's in "strawberry."
+
+Actual answer: 3
+```
+
+### Long, Multi-Step Logical Chains
+
+Claude handles individual reasoning steps well, but very long chains of dependent logic — where step 15 depends on the exact result of step 3 — can accumulate errors. Each step might be 95% likely to be correct, but across 20 dependent steps, the cumulative accuracy drops.
+
+### Knowing What It Doesn't Know
+
+This is the most dangerous limitation. Claude doesn't have a reliable internal "confidence meter." It will state uncertain information with the same confident tone as well-established facts. There's no flashing red light that says "I'm guessing here."
+
+## The Hallucination Problem
+
+Hallucination is when Claude generates confident-sounding information that's fabricated. It's not lying — it doesn't have intent. It's producing the most statistically likely next tokens, and sometimes those tokens form plausible-but-wrong statements.
+
+### When Hallucination Is Most Likely
+
+- **Specific version numbers or dates** — Claude might say "introduced in v3.2.1" when it was actually v3.4.0
+- **Niche API details** — method names, parameter orders, return types for less-popular libraries
+- **Citations and references** — paper titles, URLs, author names can be partially or fully fabricated
+- **Specific numbers and statistics** — "this approach is 40% faster" when no benchmark supports that claim
+- **Historical details** — dates, people, sequences of events can be subtly wrong
+
+### How to Spot Potential Hallucination
+
+Watch for these patterns:
+
+1. **Suspiciously specific details** with no source — "The benchmarks show a 37.2% improvement" (where did that number come from?)
+2. **Confident claims about niche topics** — if you're asking about something obscure and Claude answers without hesitation, be skeptical
+3. **URLs and links** — Claude generates plausible-looking URLs that often don't exist
+4. **"As of [date]" statements** — often used to add false credibility to outdated or fabricated information
+
+## Trust But Verify: Practical Strategies
+
+### Strategy 1: Treat Claude Like a Junior Developer's PR
+
+The best mental model for Claude's code output: a talented junior developer who writes clean code but sometimes misuses APIs, overlooks edge cases, or makes assumptions about your codebase.
+
+You wouldn't merge a junior developer's PR without reviewing it. Don't merge Claude's code without reviewing it either.
+
+**Review checklist:**
+- Do the imports actually exist in this library version?
+- Do the method signatures match the real API?
+- Are edge cases handled (null, empty, error states)?
+- Does this match your project's patterns and conventions?
+
+### Strategy 2: Ask Claude to Show Its Work
+
+```
+"Explain your reasoning for choosing this approach. What alternatives 
+did you consider? What are the tradeoffs?"
+```
+
+When Claude explains its reasoning, you can spot gaps. If it says "I chose X because of Y" and you know Y isn't true in your context, you've caught an issue before it becomes a bug.
+
+### Strategy 3: Run It
+
+This sounds obvious, but many people read Claude's code, think "that looks right," and move on. Actually execute the code. Run the tests. Hit the endpoint. Check the database. The fastest way to verify Claude's output is to see if it actually works.
+
+### Strategy 4: Verify Claims Independently
+
+When Claude says "the `fs.readdir` function accepts an `encoding` option," check the Node.js docs. When it says "Prisma supports composite unique constraints," verify in the Prisma documentation. The 30 seconds you spend checking saves the 30 minutes you'd spend debugging a hallucinated API call.
+
+### Strategy 5: Use Claude to Check Claude
+
+After Claude generates code, ask it to review its own output:
+
+```
+"Now review the code you just wrote. Look for:
+1. Any API calls that might not match the actual library interface
+2. Edge cases you didn't handle
+3. Potential race conditions or error states"
+```
+
+This sometimes catches issues Claude missed in its initial generation. It's not foolproof — Claude can hallucinate in both directions — but it adds a useful verification layer.
+
+## The Reliability Spectrum
+
+Here's a rough guide for how much to trust Claude across different tasks:
+
+| Task | Trust Level | Verify How? |
+|---|---|---|
+| Code structure and patterns | High | Code review |
+| Popular library usage (React, Express) | High | Quick docs check |
+| Writing and documentation | High | Read for accuracy |
+| Config file generation | Medium-High | Try to build/run |
+| Niche library APIs | Medium | Always check docs |
+| Specific version numbers | Low | Check release notes |
+| Mathematical calculations | Low | Run the math yourself |
+| URLs and citations | Very Low | Click every link |
+| Post-training-cutoff info | Very Low | Check current sources |
+
+## Key Takeaway
+
+Claude excels at code analysis, refactoring, writing, architecture reasoning, and format translation — tasks that leverage pattern recognition over large codebases. It struggles with precise arithmetic, real-time data, niche APIs, and knowing when it's uncertain. The most dangerous limitation is hallucination: confident-sounding fabricated details, especially for niche topics, specific numbers, and API signatures. Treat Claude's output like a talented junior developer's pull request — trust the structure, verify the details, and always run the code before shipping it.

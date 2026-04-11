@@ -1,0 +1,341 @@
+---
+title: "The MCP Server Gallery"
+slug: "mcp-server-gallery"
+order: 6
+difficulty: "intermediate"
+duration: 22
+tags: ["mcp", "servers", "integrations", "gallery", "tools"]
+objectives:
+  - "Know the 15+ most useful MCP servers and what each one does"
+  - "Install and configure MCP servers for common development workflows"
+  - "Identify which MCP servers solve your specific needs"
+  - "Discover new MCP servers as the ecosystem grows"
+quiz:
+  - id: "mcp-gallery-1"
+    question: "Which MCP server lets Claude read and write files on your local filesystem?"
+    type: "multiple-choice"
+    options:
+      - "@anthropic/mcp-server-slack"
+      - "@anthropic/mcp-server-filesystem"
+      - "@anthropic/mcp-server-github"
+      - "@anthropic/mcp-server-memory"
+    correct: 1
+    explanation: "The filesystem MCP server gives Claude controlled access to your local filesystem. You specify which directories it can access, and Claude can read, write, search, and manage files within those boundaries."
+  - id: "mcp-gallery-2"
+    question: "Why would you use the GitHub MCP server instead of just using git commands?"
+    type: "multiple-choice"
+    options:
+      - "It's faster"
+      - "It gives Claude access to GitHub-specific features like issues, PRs, reviews, and actions — things git CLI can't do"
+      - "It replaces git entirely"
+      - "It's required for Claude to work"
+    correct: 1
+    explanation: "The GitHub MCP server exposes GitHub's API to Claude — issues, pull requests, reviews, actions, releases, and more. Regular git commands only handle repository operations (commits, branches, merges). The MCP server bridges the gap to GitHub's collaboration features."
+  - id: "mcp-gallery-3"
+    question: "What's the main gotcha when setting up database MCP servers?"
+    type: "multiple-choice"
+    options:
+      - "They don't work"
+      - "They're too expensive"
+      - "You must use read-only credentials to prevent Claude from accidentally modifying production data"
+      - "They only work with MySQL"
+    correct: 2
+    explanation: "Database MCP servers give Claude direct SQL access. If you connect with read-write credentials, Claude could accidentally DROP a table or DELETE records. Always use read-only credentials, especially for production databases. Create a dedicated read-only database user for Claude."
+  - id: "mcp-gallery-4"
+    question: "How do you discover new MCP servers?"
+    type: "multiple-choice"
+    options:
+      - "They're all built into Claude"
+      - "Check the MCP server registry, GitHub, npm, and community directories like mcpservers.org"
+      - "Anthropic emails you about each one"
+      - "You can only use servers Anthropic makes"
+    correct: 1
+    explanation: "MCP is an open protocol — anyone can build servers. New servers appear on npm, GitHub, and community directories. The ecosystem is growing rapidly, with servers for databases, APIs, cloud services, developer tools, and more."
+---
+
+## Your Claude's App Store
+
+MCP servers are like apps for Claude. Each one gives Claude a new capability — access to a database, a messaging platform, a cloud provider, a browser. Without MCP servers, Claude can only read/write local files and run shell commands. With them, Claude can query your production database, post to Slack, create GitHub issues, search the web, and interact with dozens of other services.
+
+This lesson is your reference guide to the MCP servers worth knowing about. For each one: what it does, how to install it, the most useful things you can do with it, and the gotchas to watch out for.
+
+## How to Install MCP Servers
+
+All MCP servers are configured in your Claude Code settings. The most common pattern:
+
+```bash
+claude mcp add <server-name> -- npx @namespace/mcp-server-name <args>
+```
+
+Or add them directly to `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["@namespace/mcp-server-name", "--arg1", "value"]
+    }
+  }
+}
+```
+
+## Tier 1: Essential Servers
+
+These are the servers most developers should install immediately.
+
+### Filesystem Server
+
+**What it does:** Gives Claude controlled access to read, write, and search files on your local filesystem.
+
+**Install:**
+```bash
+claude mcp add filesystem -- npx @anthropic-ai/mcp-server-filesystem /path/to/allowed/directory
+```
+
+**Use cases:**
+- Read and analyze files outside the current project directory
+- Search across multiple projects simultaneously
+- Manage configuration files in your home directory
+
+**Gotcha:** You must specify which directories Claude can access. Don't give it access to your entire home directory — scope it to the directories you actually need.
+
+### GitHub Server
+
+**What it does:** Full GitHub API access — repositories, issues, PRs, reviews, actions, releases.
+
+**Install:**
+```bash
+claude mcp add github -- npx @anthropic-ai/mcp-server-github
+# Requires GITHUB_TOKEN environment variable
+```
+
+**Use cases:**
+- Create and manage issues directly from conversation: "Create an issue for the login bug we just found"
+- Review and comment on PRs without leaving the terminal
+- Check CI/CD status: "Are all checks passing on PR #247?"
+
+**Gotcha:** Your `GITHUB_TOKEN` needs the right scopes. For full functionality, you need `repo`, `issues`, `pull_requests`, and `actions` permissions. A token with only `read:org` won't let Claude create issues.
+
+### Memory Server
+
+**What it does:** Persistent memory across sessions. Claude can store and recall information between conversations.
+
+**Install:**
+```bash
+claude mcp add memory -- npx @anthropic-ai/mcp-server-memory
+```
+
+**Use cases:**
+- Remember project decisions: "Remember that we decided to use Prisma over TypeORM"
+- Track ongoing work: "Remember I'm halfway through the auth refactor"
+- Store personal preferences: "I prefer tabs over spaces, always use arrow functions"
+
+**Gotcha:** Memory persists in a local file. It's not encrypted. Don't store secrets, passwords, or API keys in Claude's memory.
+
+## Tier 2: Database Servers
+
+### PostgreSQL Server
+
+**What it does:** Direct SQL access to PostgreSQL databases.
+
+**Install:**
+```bash
+claude mcp add postgres -- npx @anthropic-ai/mcp-server-postgres "postgresql://readonly_user:password@host:5432/dbname"
+```
+
+**Use cases:**
+- Explore database schema: "Show me all tables and their relationships"
+- Debug data issues: "Find all users who signed up in the last 24 hours but haven't verified their email"
+- Generate reports: "What are the top 10 most-ordered products this month?"
+
+**Watch out:** Always use a **read-only database user**. I cannot stress this enough. If you give Claude read-write access to a production database, one misunderstood prompt could lead to `DROP TABLE users;`. Create a dedicated user:
+
+```sql
+CREATE USER claude_readonly WITH PASSWORD 'secure_password';
+GRANT CONNECT ON DATABASE mydb TO claude_readonly;
+GRANT USAGE ON SCHEMA public TO claude_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO claude_readonly;
+```
+
+### SQLite Server
+
+**What it does:** Read and query SQLite databases.
+
+**Install:**
+```bash
+claude mcp add sqlite -- npx @anthropic-ai/mcp-server-sqlite /path/to/database.db
+```
+
+**Use cases:**
+- Analyze local development databases
+- Query application data during debugging
+- Explore datasets stored as SQLite files
+
+**Gotcha:** SQLite files are locked during writes. If your application is actively writing to the database, Claude might encounter lock errors.
+
+## Tier 3: Communication and Collaboration
+
+### Slack Server
+
+**What it does:** Read and post Slack messages, search channels, manage threads.
+
+**Install:**
+```bash
+claude mcp add slack -- npx @anthropic-ai/mcp-server-slack
+# Requires SLACK_BOT_TOKEN and SLACK_TEAM_ID
+```
+
+**Use cases:**
+- Post deployment notifications: "Post to #deployments that v2.3.1 is live"
+- Search for context: "Find the Slack thread where we discussed the caching strategy"
+- Summarize conversations: "What was discussed in #engineering today?"
+
+**Gotcha:** The Slack bot needs appropriate channel permissions. It can only access channels it's been invited to.
+
+### Linear Server
+
+**What it does:** Manage Linear issues, projects, and cycles.
+
+**Install:**
+```bash
+claude mcp add linear -- npx @anthropic-ai/mcp-server-linear
+# Requires LINEAR_API_KEY
+```
+
+**Use cases:**
+- Create issues from bugs you find during development
+- Update issue status as you work: "Mark LIN-234 as In Progress"
+- Query your sprint: "What issues are assigned to me in the current cycle?"
+
+## Tier 4: Web and Browser
+
+### Puppeteer / Browser Server
+
+**What it does:** Claude can control a browser — navigate pages, take screenshots, interact with elements.
+
+**Install:**
+```bash
+claude mcp add puppeteer -- npx @anthropic-ai/mcp-server-puppeteer
+```
+
+**Use cases:**
+- Test web apps visually: "Navigate to localhost:3000/login and screenshot the page"
+- Scrape data from web pages for analysis
+- Automate browser-based testing workflows
+
+**Gotcha:** Puppeteer downloads Chromium, which is ~300MB. Make sure you have disk space and a decent internet connection for the initial install.
+
+### Fetch / Web Server
+
+**What it does:** Make HTTP requests — fetch URLs, call APIs, download content.
+
+**Install:**
+```bash
+claude mcp add fetch -- npx @anthropic-ai/mcp-server-fetch
+```
+
+**Use cases:**
+- Read API documentation: "Fetch the Stripe API docs for webhooks"
+- Test API endpoints: "Hit our staging API at /health and show me the response"
+- Download and analyze remote files
+
+## Tier 5: Cloud and Infrastructure
+
+### AWS Server
+
+**What it does:** Interact with AWS services — S3, Lambda, DynamoDB, CloudWatch, etc.
+
+**Use cases:**
+- Check CloudWatch logs: "Show me the last 50 error logs from the auth Lambda"
+- Manage S3 buckets: "List all files in the uploads bucket from today"
+- Query DynamoDB: "Find the user record for email user@example.com"
+
+**Watch out:** Use IAM credentials with minimal permissions. Don't give Claude your root AWS credentials. Create an IAM user with read-only access to only the services you need.
+
+### Docker Server
+
+**What it does:** Manage Docker containers, images, and compose services.
+
+**Use cases:**
+- Check running containers: "Which containers are running and what ports are exposed?"
+- Read container logs: "Show me the last 100 lines from the api container"
+- Manage development environments: "Restart the database container"
+
+## Tier 6: Developer Tools
+
+### Sentry Server
+
+**What it does:** Access Sentry error tracking — view issues, stack traces, and trends.
+
+**Use cases:**
+- Investigate errors: "What's the most common error in production this week?"
+- Get context for bug fixes: "Show me the stack trace and affected users for SENTRY-1234"
+- Track fix impact: "Has the error rate for NullPointerException in auth decreased since yesterday's deploy?"
+
+### Brave Search Server
+
+**What it does:** Web search capabilities via the Brave Search API.
+
+**Install:**
+```bash
+claude mcp add brave-search -- npx @anthropic-ai/mcp-server-brave-search
+# Requires BRAVE_API_KEY
+```
+
+**Use cases:**
+- Look up documentation: "Search for how to configure Prisma connection pooling"
+- Research error messages: "Search for 'EMFILE too many open files node' solutions"
+- Find current information that's past Claude's training cutoff
+
+## Discovering New Servers
+
+The MCP ecosystem is growing fast. Here's where to find new servers:
+
+1. **Official Anthropic servers:** Check the [@anthropic-ai npm scope](https://www.npmjs.com/org/anthropic-ai) for first-party servers
+2. **Community directories:** Sites like mcpservers.org aggregate community-built servers
+3. **GitHub search:** Search for "mcp-server" on GitHub — new ones appear weekly
+4. **npm search:** `npm search mcp-server` shows published packages
+
+### Evaluating a New Server
+
+Before installing a community MCP server, check:
+
+- **Stars and downloads** — popularity is a rough quality signal
+- **Last updated** — abandoned servers may not work with current MCP versions
+- **Source code** — glance at the code to verify it's not doing anything sketchy
+- **README quality** — good docs usually mean good code
+
+## Managing Multiple Servers
+
+When you have several MCP servers configured, your `.claude/settings.json` might look like:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["@anthropic-ai/mcp-server-github"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["@anthropic-ai/mcp-server-postgres", 
+               "postgresql://readonly:pass@localhost:5432/mydb"]
+    },
+    "memory": {
+      "command": "npx", 
+      "args": ["@anthropic-ai/mcp-server-memory"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["@anthropic-ai/mcp-server-filesystem", "/home/user/projects"]
+    }
+  }
+}
+```
+
+**Pro tip:** Each MCP server runs as a separate process. Having 10+ servers configured can slow down Claude Code's startup. Only configure the servers you actively use. You can always add more later.
+
+## Key Takeaway
+
+MCP servers extend Claude's capabilities from basic file operations to interacting with databases, APIs, cloud services, browsers, and collaboration tools. The essential servers for most developers are filesystem, GitHub, and a database server. Always use read-only credentials for databases and minimal-permission tokens for cloud services. The MCP ecosystem is open and growing — anyone can build a server, and new ones appear regularly on npm and GitHub. Start with 2-3 servers that match your workflow, and add more as you identify genuine needs.

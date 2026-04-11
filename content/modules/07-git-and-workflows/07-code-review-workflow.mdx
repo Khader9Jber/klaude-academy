@@ -1,0 +1,368 @@
+---
+title: "Automated Code Review with Claude"
+slug: "code-review-workflow"
+order: 7
+difficulty: "intermediate"
+duration: 18
+tags: ["code-review", "automation", "ci-cd", "headless", "git"]
+objectives:
+  - "Set up Claude Code to review pull request diffs automatically"
+  - "Use headless mode for CI-driven code reviews"
+  - "Configure review criteria based on your CLAUDE.md rules"
+  - "Interpret and act on automated review output"
+quiz:
+  - id: "code-review-1"
+    question: "What's the best way to feed a PR diff to Claude for review?"
+    type: "multiple-choice"
+    options:
+      - "Copy-paste the diff into the chat"
+      - "Pipe 'git diff main...HEAD' to claude -p with review instructions"
+      - "Take a screenshot of the diff"
+      - "Email the diff to Claude"
+    correct: 1
+    explanation: "Piping the git diff directly to claude -p gives Claude the exact changes to review. Combined with --append-system-prompt for review criteria and --max-turns to limit execution, this creates a fully automated review pipeline."
+  - id: "code-review-2"
+    question: "Why use --allowedTools in a CI review pipeline?"
+    type: "multiple-choice"
+    options:
+      - "To make Claude faster"
+      - "To restrict Claude to read-only operations so it can't modify code during review"
+      - "To reduce costs"
+      - "It's not needed"
+    correct: 1
+    explanation: "--allowedTools restricts which tools Claude can use. In a CI review, you want Claude to read and analyze code, not modify it. Limiting to Read and Bash(git *) ensures the review is observation-only — no accidental writes to your codebase."
+  - id: "code-review-3"
+    question: "What makes a Claude code review more useful than a generic linter?"
+    type: "multiple-choice"
+    options:
+      - "It's faster"
+      - "It can check for logical errors, architectural issues, and project-specific conventions that linters can't catch"
+      - "It catches more syntax errors"
+      - "It automatically fixes all issues"
+    correct: 1
+    explanation: "Linters catch syntax and style issues. Claude can reason about logic, identify race conditions, check that new code follows your project's architectural patterns (documented in CLAUDE.md), spot missing error handling, and evaluate whether the approach makes sense — things no static analysis tool can do."
+  - id: "code-review-4"
+    question: "How do you make Claude check against your project's specific rules during review?"
+    type: "multiple-choice"
+    options:
+      - "Hope it reads your mind"
+      - "Reference your CLAUDE.md in the review prompt, or use --append-system-prompt to inject project rules"
+      - "Create a separate AI model trained on your rules"
+      - "Write a custom linter instead"
+    correct: 1
+    explanation: "Your CLAUDE.md contains project conventions and rules. Referencing it in the review prompt (or injecting its contents via --append-system-prompt) ensures Claude evaluates the diff against YOUR specific standards, not just generic best practices."
+---
+
+## Code Review Is Where Claude Saves the Most Time
+
+Here's a secret most teams discover eventually: Claude's biggest productivity win isn't code generation — it's code review. A thorough human review of a 500-line PR takes 30-60 minutes. Claude does it in 30 seconds and catches things humans miss because they're tired, rushed, or too familiar with the codebase.
+
+This isn't about replacing human reviewers. It's about having Claude do the first pass — catching the obvious issues, checking conventions, flagging potential bugs — so human reviewers can focus on architecture, design decisions, and the things that require judgment.
+
+## Interactive Reviews
+
+The simplest approach: ask Claude to review a diff in your current session.
+
+```
+Review the changes I'm about to commit. Focus on:
+1. Security issues
+2. Missing error handling
+3. Violations of our CLAUDE.md conventions
+4. Missing tests for new functionality
+```
+
+Claude reads the staged changes (`git diff --cached`), analyzes them, and provides feedback. This is your personal pre-commit review.
+
+### Reviewing Specific Files
+
+```
+Review only the changes in @src/services/paymentService.ts.
+This handles Stripe webhooks — check for:
+- Webhook signature verification
+- Idempotency handling
+- Error recovery for failed charges
+```
+
+### Reviewing a Branch Against Main
+
+```
+Compare this branch against main and review all changes.
+git diff main...HEAD
+
+Focus on breaking changes and backward compatibility.
+```
+
+## Headless Reviews for CI/CD
+
+The real power is automated reviews that run on every PR without human intervention.
+
+### Basic CI Review Script
+
+```bash
+#!/bin/bash
+# scripts/claude-review.sh
+
+# Get the diff against the base branch
+DIFF=$(git diff origin/main...HEAD)
+
+if [ -z "$DIFF" ]; then
+  echo "No changes to review."
+  exit 0
+fi
+
+# Run Claude review
+echo "$DIFF" | claude -p "Review this git diff for:
+1. Security vulnerabilities (SQL injection, XSS, auth bypass)
+2. Error handling gaps (uncaught promises, missing try/catch)
+3. Performance issues (N+1 queries, missing indexes, large payloads)
+4. Missing input validation
+5. Race conditions in async code
+
+Format your response as:
+## Critical Issues (must fix before merge)
+## Warnings (should fix, but not blocking)  
+## Suggestions (nice to have improvements)
+## Summary (1-2 sentence overall assessment)
+
+If there are no issues in a category, write 'None found.'
+Be specific — include file names, line numbers, and code snippets." \
+  --output-format text \
+  --max-turns 5 \
+  --allowedTools "Read" "Bash(git *)"
+```
+
+### GitHub Actions Integration
+
+```yaml
+# .github/workflows/claude-review.yml
+name: Claude Code Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Claude Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          git diff origin/main...HEAD | claude -p "You are reviewing a pull request. Analyze this diff and provide:
+
+          ## Security Issues
+          Any vulnerabilities, injection points, or auth problems.
+
+          ## Bug Risks
+          Logic errors, edge cases, race conditions.
+
+          ## Convention Violations
+          Inconsistencies with typical project patterns.
+
+          ## Missing Tests
+          New code paths that lack test coverage.
+
+          ## Verdict
+          APPROVE, REQUEST_CHANGES, or COMMENT with a one-line explanation.
+
+          Be concise. Only flag real issues, not style preferences." \
+            --output-format text \
+            --max-turns 3 \
+            --allowedTools "Read" > review.md
+
+      - name: Post Review Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.md', 'utf8');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Claude Code Review\n\n${review}\n\n---\n*Automated review by Claude Code*`
+            });
+```
+
+**Pro tip:** Set `--max-turns 3` for CI reviews. You want Claude to read and analyze, not start an extended investigation that burns API credits. Three turns is enough to read the diff, check a few related files for context, and produce the review.
+
+## Custom Review Criteria from CLAUDE.md
+
+The most powerful pattern: inject your project's specific rules into the review prompt.
+
+If your `CLAUDE.md` says:
+```markdown
+## Code Conventions
+- All API endpoints must validate input with Zod schemas
+- All database queries must go through the service layer, never from routes
+- Error responses must use the AppError class from src/lib/errors.ts
+- All new endpoints need integration tests
+```
+
+Your review script becomes:
+
+```bash
+#!/bin/bash
+# Read CLAUDE.md rules
+RULES=$(cat CLAUDE.md)
+
+git diff origin/main...HEAD | claude -p "Review this diff against these project rules:
+
+$RULES
+
+For each rule violation, cite the specific rule and the file/line that violates it." \
+  --max-turns 5 \
+  --allowedTools "Read" "Bash(git *)"
+```
+
+Now Claude doesn't just check for generic best practices — it checks for your team's specific conventions. This catches things like "you added a database query directly in the route handler instead of going through the service layer" that no linter can detect.
+
+## Real Review Output
+
+Here's what a typical Claude review looks like:
+
+```markdown
+## Critical Issues
+
+**1. SQL Injection in search endpoint**
+`src/routes/search.ts:34` — User input is interpolated directly 
+into the SQL query:
+  ```ts
+  const results = await db.$queryRaw`
+    SELECT * FROM products WHERE name LIKE '%${query}%'
+  `;
+  ```
+  Fix: Use parameterized query with Prisma.sql template tag.
+
+## Warnings
+
+**1. Missing error handling in webhook processor**
+`src/services/webhookService.ts:78` — The Stripe webhook handler 
+doesn't catch StripeSignatureVerificationError. If signature 
+verification fails, it throws an unhandled exception instead of 
+returning 400.
+
+**2. No input validation on PATCH /users/:id**
+`src/routes/users.ts:112` — The request body is passed directly 
+to the service without Zod validation. Per CLAUDE.md conventions, 
+all API endpoints must validate input with Zod schemas.
+
+## Suggestions
+
+**1. Consider adding an index**
+`prisma/migrations/20240115_add_orders.sql` — The new `orders` 
+table has a `user_id` column that will be frequently queried but 
+has no index. This will cause slow queries as the table grows.
+
+## Summary
+REQUEST_CHANGES — One critical SQL injection vulnerability must 
+be fixed before merge. Two warnings about missing error handling 
+and input validation should also be addressed.
+```
+
+This is the kind of review that takes a human 30 minutes to produce. Claude does it in seconds.
+
+## Reviewing Against Specific Concerns
+
+You can create specialized review scripts for different concerns:
+
+### Security Review
+
+```bash
+claude -p "Security audit of this diff. Check for:
+- Injection vulnerabilities (SQL, NoSQL, command, LDAP)
+- Authentication/authorization bypasses
+- Sensitive data exposure (logging secrets, returning PII)
+- CORS misconfigurations
+- Insecure cryptographic practices
+- Missing rate limiting on sensitive endpoints
+
+$(git diff origin/main...HEAD)" \
+  --append-system-prompt "You are a senior security engineer. Be thorough and paranoid. False positives are acceptable; false negatives are not." \
+  --max-turns 5
+```
+
+### Performance Review
+
+```bash
+claude -p "Performance review of this diff. Check for:
+- N+1 query patterns
+- Missing database indexes for new queries
+- Unbounded data fetching (no pagination/limits)
+- Memory leaks (event listeners not cleaned up, growing arrays)
+- Blocking operations on the main thread
+- Unnecessary re-renders in React components
+
+$(git diff origin/main...HEAD)" \
+  --max-turns 5
+```
+
+### API Contract Review
+
+```bash
+claude -p "Review this diff for API contract changes. Check:
+- Are any existing response shapes changed? (breaking change)
+- Are required fields added to request bodies? (breaking change)
+- Are status codes changed? (breaking change)
+- Are there new endpoints that need documentation?
+- Do new endpoints follow RESTful naming conventions?
+
+$(git diff origin/main...HEAD)" \
+  --max-turns 3
+```
+
+## Team Workflow Integration
+
+### Pre-Push Hook
+
+Run a quick Claude review before every push:
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-push
+
+echo "Running Claude review..."
+
+REVIEW=$(git diff origin/main...HEAD | claude -p "Quick review: any critical security or correctness issues in this diff? Answer YES or NO with a one-line explanation." --max-turns 1 --output-format text 2>/dev/null)
+
+if echo "$REVIEW" | grep -qi "YES"; then
+  echo "Claude found potential issues:"
+  echo "$REVIEW"
+  echo ""
+  echo "Push anyway? (y/n)"
+  read -r response
+  if [ "$response" != "y" ]; then
+    exit 1
+  fi
+fi
+```
+
+### Slack Notification on Review
+
+```bash
+# After the CI review runs:
+REVIEW=$(cat review.md)
+curl -X POST "$SLACK_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d "{\"text\": \"Claude reviewed PR #$PR_NUMBER:\\n$REVIEW\"}"
+```
+
+## Key Takeaway
+
+Automated code review with Claude catches security vulnerabilities, convention violations, missing error handling, and logic bugs in seconds rather than minutes. The setup is straightforward: pipe `git diff` to `claude -p` with specific review criteria, limit with `--max-turns` and `--allowedTools` for safety, and post results as PR comments. The real power comes from injecting your CLAUDE.md conventions into the review prompt, turning Claude from a generic reviewer into one that knows your team's specific rules and patterns. Use it as a first pass, not a replacement for human reviewers — it handles the tedious checks so humans can focus on design and architecture.

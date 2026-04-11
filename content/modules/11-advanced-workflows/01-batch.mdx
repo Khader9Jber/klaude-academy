@@ -3,7 +3,7 @@ title: "/batch: Codebase-Wide Migrations"
 slug: "batch-migrations"
 order: 1
 difficulty: "advanced"
-duration: 16
+duration: 22
 tags: ["batch", "migrations", "parallel", "codebase"]
 objectives:
   - "Use /batch for codebase-wide migrations"
@@ -55,11 +55,13 @@ quiz:
 
 ## The Migration Problem
 
-Some tasks touch many files with the same pattern. Migrating from CommonJS to ES modules. Adding TypeScript to a JavaScript project. Converting class components to functional components. Updating 30 test files to a new assertion library.
+You know that feeling: you've decided to migrate from one library to another, or add TypeScript types to your JavaScript project, or update your test framework. You look at the file count and your stomach drops. 30 files. All need the same transformation. Each one slightly different.
 
-Doing this one file at a time — even with Claude — is tedious. You give the same instruction 30 times and wait for each file to be converted.
+Doing this one file at a time — even with Claude — is tedious. You give the same instruction 30 times, wait for each file to be processed, run the tests, fix any issues, and move on. A migration that should take an afternoon stretches into two days of mind-numbing repetition.
 
-**/batch** automates this entirely. You describe the migration once, Claude decomposes it into work units, and 5-30 parallel agents execute them simultaneously.
+I once spent an entire day migrating 25 Express route handlers to Fastify. One. At. A. Time. Each file took about 10 minutes — give Claude the instruction, wait, review, fix the test, commit. By file 15, I was making more mistakes than Claude because my brain had checked out from the monotony.
+
+**/batch** automates this entirely. You describe the migration once, Claude decomposes it into independent work units, and 5-30 parallel agents execute them simultaneously. That 25-file migration? About 15 minutes, including review.
 
 ## How /batch Works
 
@@ -71,22 +73,24 @@ Doing this one file at a time — even with Claude — is tedious. You give the 
 "Migrate all route files from Express to Fastify. Each file in src/routes/ 
 defines Express routes that need to be converted to Fastify syntax. 
 For each file:
-1. Convert Express route definitions to Fastify
-2. Update middleware usage to Fastify plugins
-3. Convert req/res to Fastify's request/reply
-4. Update the corresponding test file
-5. Ensure all tests pass"
+1. Convert Express route definitions to Fastify route shorthand
+2. Replace Express middleware with Fastify hooks/plugins
+3. Convert req/res patterns to Fastify's request/reply
+4. Update the corresponding test file in src/routes/__tests__/
+5. Run the test file and ensure all tests pass"
 ```
 
-### Step 2: Claude Decomposes
+The key here is describing both the *what* (convert Express to Fastify) and the *how* (the specific steps each file needs). The more specific your description, the more consistent the parallel agents will be.
 
-Claude analyzes the task and creates work units:
+### Step 2: Claude Decomposes the Task
+
+Claude analyzes your codebase and creates a decomposition plan:
 
 ```
 Batch Plan: Migrate Express → Fastify
 
 Work Units (15 files):
-┌─────────────────────────────────────────��────┐
+┌──────────────────────────────────────────────┐
 │ Unit 1:  src/routes/auth.ts + auth.test.ts   │
 │ Unit 2:  src/routes/users.ts + users.test.ts │
 │ Unit 3:  src/routes/orders.ts + orders.test.ts│
@@ -97,26 +101,36 @@ Work Units (15 files):
 │ ... (8 more units)                            │
 └──────────────────────────────────────────────┘
 
+Each unit will: Convert Express → Fastify, update tests, verify passing.
+
 Approve? [Y/n]
 ```
 
-### Step 3: You Approve
+This is your checkpoint. Look at the decomposition carefully before approving.
 
-Review the work units. Are they complete? Are the boundaries right? Approve or modify.
+### Step 3: You Approve (or Adjust)
+
+This step matters more than people think. Before hitting Y, check:
+
+- **Are the boundaries right?** If `auth.ts` imports a helper from `auth-utils.ts`, those should be in the same work unit, not separate ones.
+- **Is anything missing?** Maybe Claude missed a route file in a subdirectory.
+- **Is anything that shouldn't be there?** Maybe one of the "route files" is actually a middleware that shouldn't be migrated yet.
+
+If the decomposition isn't right, say so: "Move auth-utils.ts into Unit 1 with auth.ts, and remove webhooks.ts — that one uses a different pattern we'll handle separately."
 
 ### Step 4: Parallel Execution
 
-5-30 agents spin up simultaneously. Each agent:
+Once you approve, 5-30 agents spin up simultaneously. Each agent gets its work unit and executes the full cycle:
 
 1. **Implements**: Converts the assigned file to the new pattern
-2. **Tests**: Runs the relevant test file
-3. **Simplifies**: Optionally runs `/simplify` for code quality
+2. **Tests**: Runs the relevant test file to verify the conversion
+3. **Simplifies**: Optionally runs `/simplify` to catch quality issues
 4. **Commits**: Creates a commit with a descriptive message
-5. **PRs**: Optionally creates a PR for review
+5. **PRs**: Optionally creates a PR (useful for team review)
 
-### Step 5: Live Status
+### Step 5: Live Status Dashboard
 
-You see a live status table showing progress:
+You see a real-time status table:
 
 ```
 Batch Progress: Migrate Express → Fastify
@@ -127,113 +141,172 @@ auth      │ ✓ Complete │ 12/12 │ 45s
 users     │ ✓ Complete │ 8/8   │ 38s
 orders    │ ⟳ Testing  │ 6/10  │ 52s
 products  │ ⟳ Working  │ -     │ 30s
-payments  │ ◯ Queued   │ -     │ -
+payments  │ ⟳ Working  │ -     │ 22s
 webhooks  │ ◯ Queued   │ -     │ -
+inventory │ ◯ Queued   │ -     │ -
 ...
+
+Completed: 2/15 │ In Progress: 3 │ Queued: 10
 ```
 
-## A Real Example: CommonJS to ES Modules
+Watch it. It's satisfying. More importantly, if one agent gets stuck or fails, you can see it immediately and intervene.
 
-One of the most common migrations:
+## A Real-World Migration: CommonJS to ES Modules
+
+Let me walk through a migration I actually did. We had a Node.js project with 35 files still using `require()` and `module.exports`. The newer parts of the codebase used ES module syntax, but nobody wanted to touch the legacy files.
 
 ```bash
 /batch
 
 "Convert all CommonJS files in src/ to ES modules:
-- Replace require() with import statements
-- Replace module.exports with export/export default
-- Add .js extensions to relative imports (required for ES modules)
-- Update any dynamic require() to dynamic import()
-- Ensure each file's tests still pass after conversion
+- Replace require('x') with import x from 'x'
+- Replace const { a, b } = require('x') with import { a, b } from 'x'
+- Replace module.exports = x with export default x
+- Replace module.exports.foo = bar with export const foo = bar
+- Add .js extensions to all relative imports (required for Node.js ES modules)
+- Convert any dynamic require() to dynamic import()
+- Update the corresponding test file if it exists
+- Run the file's tests after conversion
 
-Files to convert: all .js files in src/ that use require() or module.exports"
+Important: Some files use conditional require() — convert those to 
+dynamic import() with await. Flag any file where this makes the 
+function async when it wasn't before."
 ```
 
-Claude decomposes based on the dependency graph, ensures files are processed in the right order, and each agent handles one module.
+That last instruction is critical. A naive conversion would miss the fact that converting `const config = require('./config')` inside an `if` block to `const config = await import('./config')` means the containing function now needs to be `async`. Claude caught these cases because I told it to look for them.
+
+Result: 35 files converted in about 12 minutes. Three files needed minor manual fixes (unusual dynamic require patterns). The rest were clean.
+
+### The Dependency Graph Matters
+
+One thing Claude does well during decomposition: it analyzes the dependency graph. If `user-service.ts` imports from `base-service.ts`, and both need conversion, Claude puts them in the same work unit or processes `base-service.ts` first. You don't have to think about this — but it's worth knowing it's happening, because it means you can trust the decomposition for most cases.
+
+**Watch out**: If your codebase has circular dependencies (A imports B, B imports C, C imports A), /batch might struggle with the decomposition. Fix circular deps first, then batch.
 
 ## /batch vs. Other Approaches
 
-### vs. Single Agent
+### vs. Single Agent (Manual, Sequential)
 
 | Aspect | /batch | Single Agent |
 |---|---|---|
-| Speed | 5-30x parallel | Sequential |
-| Independence | Each unit must be independent | Can handle dependencies |
-| Token cost | Higher (parallel contexts) | Lower |
+| Speed | 5-30x faster (parallel) | Sequential — one file at a time |
+| Independence | Each unit must be independent | Can handle inter-dependent changes |
+| Token cost | Higher (parallel contexts) | Lower per-session |
+| Consistency | Very high (same instruction, parallel) | Drift over time (context grows) |
 | Best for | 10+ independent files | 1-5 files or dependent changes |
+| Mental overhead | Low — describe once, watch | High — repeat instruction, babysit |
 
-### vs. claude -p (Headless)
+That "consistency" row is underrated. When you manually process 30 files sequentially, the conversation context grows with each file. By file 25, Claude has 24 previous files in context, which can cause subtle drift — maybe it starts using a slightly different naming convention because the recent context biased it. /batch agents start fresh for each unit, so they're all working from the same instruction.
+
+### vs. claude -p (Headless Loop)
+
+You could script the migration with headless mode:
 
 ```bash
-# Headless approach (sequential, one at a time)
+# Headless approach: sequential, one at a time
 for file in src/routes/*.ts; do
-  claude -p "Convert $file from Express to Fastify" --max-turns 15
+  claude -p "Convert $file from Express to Fastify. Run its tests." --max-turns 15
 done
-
-# /batch approach (parallel, managed)
-/batch "Convert all route files from Express to Fastify"
 ```
 
-/batch is better because it:
-- Runs in parallel (faster)
-- Manages the full cycle (implement → test → commit)
-- Provides live status monitoring
-- Handles decomposition intelligently
+This works, but /batch is better for several reasons:
 
-Headless is better when:
-- You need custom processing per file
-- The files aren't independent
-- You want fine-grained control
+- **/batch runs in parallel** — 5-30 files at once vs. one at a time
+- **/batch manages the full cycle** — implement, test, simplify, commit, PR
+- **/batch shows live status** — you can see which files are done, in progress, or stuck
+- **/batch handles decomposition** — it figures out the right unit boundaries, not you
 
-## Best Practices for /batch
+The headless approach is better when you need custom per-file logic (different instruction per file), when files aren't independent, or when you want fine-grained shell scripting around each conversion.
 
-### 1. Ensure Independence
+## Best Practices from Painful Experience
 
-/batch works best when work units are independent. Files that depend on each other should be in the same unit:
+### 1. Ensure Independence (Seriously)
+
+I once ran /batch on a service layer where half the services called each other. Agent 3 converted `order-service.ts` to use new return types, while Agent 7 was simultaneously converting `inventory-service.ts` which calls `order-service`. The result: Agent 7's conversion assumed the old return types, causing 8 test failures.
+
+The fix: audit dependencies before batching. If files call each other, they're not independent.
 
 ```bash
-# Good: Independent route files
-"Convert each route file and its test"
-
-# Bad: Files with circular dependencies
-"Refactor the service layer" (services call each other)
+# Quick dependency check before batching
+"Before we batch, analyze src/routes/ and tell me which files 
+import from each other. Group dependent files together."
 ```
 
-### 2. Include Tests
+### 2. Always Include Tests in the Instruction
 
-Always include test execution in your batch description:
+If you don't tell /batch to run tests, it won't. And you'll end up with 30 converted files where 5 of them have subtle bugs that only show up when you run the test suite manually afterward.
 
 ```bash
-"For each file: convert AND run its tests. If tests fail, fix the conversion."
+# Bad: no test verification
+"Convert each route file from Express to Fastify"
+
+# Good: tests are part of the work unit
+"Convert each route file AND run its test file. 
+If any test fails, fix the conversion until tests pass."
 ```
 
-### 3. Start Small
+### 3. Do a Test Run First
 
-Test with 2-3 files first before running a full batch:
+Before batching 30 files, batch 2-3 representative ones:
 
 ```bash
 "Convert only src/routes/auth.ts and src/routes/users.ts first, 
-as a test run. If successful, I'll run the full batch."
+as a test run. I want to review the conversion pattern before 
+running the full batch."
 ```
 
-### 4. Review Before Merge
+Review the output. Is the conversion correct? Is the style consistent? Did it handle edge cases? If not, refine your instruction and *then* run the full batch. Fixing an instruction before parallel execution saves massive rework.
 
-Each work unit creates a commit (and optionally a PR). Review the changes before merging:
+### 4. Review Before Merging
+
+Each work unit creates a commit. After the batch completes, review the aggregate change:
 
 ```bash
-# After batch completes
-git log --oneline -15
-# Review each commit
+# See all the commits the batch created
+git log --oneline -20
+
+# Review the full diff
 git diff HEAD~15..HEAD
+
+# Run the full test suite (not just individual file tests)
+pnpm test
+
+# If everything looks good, you're done
+# If not, individual commits make it easy to revert specific files
+git revert <commit-hash>  # Revert just the problematic file
+```
+
+The individual commits are a safety net. If one agent's conversion was wrong, you revert just that commit without touching the other 14 successful conversions.
+
+### 5. Write Specific Instructions
+
+Vague instructions produce inconsistent results across parallel agents:
+
+```bash
+# Bad: vague, agents will interpret differently
+"Update the route files to be modern"
+
+# Good: specific, every agent applies the same transformation
+"In each route file:
+1. Replace router.get('/path', handler) with app.get('/path', schema, handler)
+2. Add Zod validation schemas for all request params and body
+3. Replace res.json() with reply.send()
+4. Replace next(error) with throw new AppError(message, statusCode)
+5. Keep existing comments and documentation"
 ```
 
 ## When NOT to Use /batch
 
-- **Fewer than 5 files**: A single agent is faster with less overhead
-- **Complex dependencies**: Files that reference each other need coordinated changes
-- **Architectural changes**: Changes that affect shared patterns need a single vision
-- **Debugging**: Use /debug or systematic debugging instead
+Not every multi-file change is a batch job:
+
+- **Fewer than 5 files**: The overhead of decomposition isn't worth it. Just do them sequentially.
+- **Complex dependencies between files**: If changing file A affects how file B should be changed, a single agent session gives better results.
+- **Architectural changes**: Renaming a core concept that flows through 50 files needs a single coherent vision, not 50 independent agents.
+- **Debugging**: If you're hunting a bug that spans multiple files, use /plan and systematic debugging, not /batch.
+- **Changes that need human judgment per file**: If each file needs a different decision ("should this function stay or be removed?"), batch can't help.
+
+The sweet spot is: many files, same transformation, independent from each other. Think "find and replace on steroids" rather than "redesign the architecture."
 
 ## Key Takeaway
 
-/batch is the power tool for codebase-wide migrations. It decomposes a large task into independent work units, runs 5-30 parallel agents, and each agent implements, tests, and commits its unit. The workflow is: describe the migration, approve the decomposition, watch parallel execution, review results. Use /batch when you have 10+ independent files needing the same transformation. For dependent changes or small scopes, a single agent session is more effective.
+/batch is the power tool for codebase-wide migrations. It decomposes a large task into independent work units, runs 5-30 parallel agents, and each agent implements, tests, simplifies, commits, and optionally creates a PR for its unit. The workflow is: describe the migration with specific instructions, review and approve the decomposition, watch parallel execution on the live dashboard, then review the aggregate results before merging. Always include tests in your batch instruction, always do a 2-3 file test run first, and always verify independence between files. For dependent changes, small scopes, or architectural decisions, a single agent session is more effective.

@@ -22,6 +22,23 @@ export function slugify(text: string): string {
 }
 
 /**
+ * Estimate reading time from content string
+ * Uses average reading speed of 200 words per minute for technical content
+ */
+export function estimateReadingTime(content: string): number {
+  const words = content.trim().split(/\s+/).length;
+  const minutes = Math.ceil(words / 200);
+  return Math.max(1, minutes);
+}
+
+/**
+ * Count words in a content string
+ */
+export function wordCount(content: string): number {
+  return content.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
  * Format a duration in minutes to a human-readable string
  */
 export function formatDuration(minutes: number): string {

@@ -1,6 +1,6 @@
 # Master Test Plan
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 3.0
 **Date:** 2026-04-05

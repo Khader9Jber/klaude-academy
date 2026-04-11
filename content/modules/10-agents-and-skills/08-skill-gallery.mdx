@@ -1,0 +1,478 @@
+---
+title: "The Skill Gallery: 10 Production-Ready Skills"
+slug: "skill-gallery"
+order: 8
+difficulty: "advanced"
+duration: 25
+tags: ["skills", "gallery", "production", "templates", "automation"]
+objectives:
+  - "Understand 10 production-ready skill patterns for common development tasks"
+  - "Copy and adapt skill definitions for your own projects"
+  - "Know which skill pattern fits which type of task"
+  - "Customize trigger patterns and instructions for your team's needs"
+quiz:
+  - id: "skill-gal-1"
+    question: "What makes a skill 'production-ready' vs. a basic prompt?"
+    type: "multiple-choice"
+    options:
+      - "Skills are written in Python"
+      - "Production-ready skills have detailed instructions, edge case handling, output format specifications, and verification steps"
+      - "Skills cost more tokens"
+      - "Skills require a paid plan"
+    correct: 1
+    explanation: "A production-ready skill goes beyond a simple prompt. It includes detailed context about the task, handles edge cases explicitly, specifies the exact output format, includes verification steps (run tests, check types), and defines what success looks like. This makes the output reliable and consistent."
+  - id: "skill-gal-2"
+    question: "Where should you place a SKILL.md file for Claude Code to recognize it?"
+    type: "multiple-choice"
+    options:
+      - "In the root directory"
+      - "In .claude/skills/ directory with the skill name as the filename"
+      - "Anywhere — Claude finds it automatically"
+      - "In node_modules/"
+    correct: 1
+    explanation: "Skill files go in .claude/skills/<skill-name>.md or .claude/commands/<skill-name>.md. Claude Code reads these directories and makes the skills available as slash commands. The filename (minus .md) becomes the command name."
+  - id: "skill-gal-3"
+    question: "Why should skills include a 'verification' section?"
+    type: "multiple-choice"
+    options:
+      - "It's required by the runtime"
+      - "So Claude checks its own work — runs tests, type checks, or validates output before declaring the task complete"
+      - "For documentation purposes only"
+      - "To slow Claude down"
+    correct: 1
+    explanation: "Verification steps make skills reliable. Without them, Claude might generate code that doesn't compile, tests that don't pass, or migrations that don't run. Adding 'After completing, run X to verify' catches these issues before they reach you."
+  - id: "skill-gal-4"
+    question: "How should you handle a skill that needs project-specific context?"
+    type: "multiple-choice"
+    options:
+      - "Hardcode everything into the skill"
+      - "Reference CLAUDE.md conventions and use @file references to point at project patterns to follow"
+      - "Ask the user every time"
+      - "Skills can't use project context"
+    correct: 1
+    explanation: "The best skills reference CLAUDE.md for project conventions and use @file references to point at existing code patterns. This way the skill adapts to each project automatically — it follows your naming conventions, uses your error handling patterns, and matches your test structure."
+---
+
+## Skills You Can Use Today
+
+Building custom skills from scratch is powerful, but you don't always need to start from zero. This gallery contains 10 complete, battle-tested skill definitions that solve common development tasks. Each one has been refined through real usage — handling the edge cases that simpler prompts miss.
+
+For each skill, you'll get: what it does, the complete SKILL.md content, trigger patterns, and examples of how to use it. Copy them into your `.claude/commands/` directory, customize for your project, and start using them immediately.
+
+## Skill 1: Database Migration Generator
+
+**What it does:** Generates database migration files that follow your ORM's conventions, handle rollbacks, and include data migration logic when needed.
+
+**File:** `.claude/commands/migrate.md`
+
+```markdown
+# Database Migration Skill
+
+Generate a database migration for the requested schema change.
+
+## Instructions
+
+1. Read the current schema from the Prisma schema file (or equivalent ORM config)
+2. Understand the requested change and its implications
+3. Generate a migration that:
+   - Follows the project's migration naming convention
+   - Includes both up and down migrations
+   - Handles existing data (data migrations when column types change)
+   - Adds appropriate indexes for new foreign keys
+   - Preserves NOT NULL constraints with sensible defaults for existing rows
+
+## Conventions
+- Follow the patterns in existing migrations in prisma/migrations/
+- Migration names: YYYYMMDD_description_in_snake_case
+- Always add indexes on foreign key columns
+- Always include a down migration comment explaining how to reverse
+
+## Verification
+After generating the migration:
+1. Run `npx prisma migrate dev --name <migration_name>` to test it
+2. Verify the database schema matches expectations
+3. Run existing tests to ensure nothing broke
+
+## Output
+Generate only the migration SQL file. Do not modify the Prisma schema directly — 
+let prisma migrate handle that.
+```
+
+**Usage:**
+```
+/migrate Add a "preferences" JSON column to the users table with a default of {}
+```
+
+## Skill 2: Comprehensive Refactor
+
+**What it does:** Refactors a file or module while preserving behavior, running tests at each step, and documenting what changed.
+
+**File:** `.claude/commands/refactor.md`
+
+```markdown
+# Refactor Skill
+
+Refactor the specified code while preserving all existing behavior.
+
+## Instructions
+
+1. Read the target file(s) completely
+2. Identify all callers/importers of the code being refactored
+3. Run existing tests BEFORE making changes (baseline)
+4. Plan the refactor — list every change you'll make
+5. Implement changes incrementally:
+   - One logical change at a time
+   - Run tests after each change
+   - If tests fail, revert the last change and try a different approach
+6. Update all callers/importers to match the new interface
+7. Run the full test suite at the end
+
+## Rules
+- NEVER change behavior — only structure
+- NEVER delete tests (you may add new ones)
+- If a refactor requires changing the public API, list the breaking changes and ask for approval
+- Follow the code patterns in CLAUDE.md
+
+## Verification
+1. All existing tests pass
+2. No new TypeScript/type errors
+3. No new lint warnings
+4. The diff makes logical sense (git diff --stat)
+```
+
+**Usage:**
+```
+/refactor Extract the email sending logic from @src/services/userService.ts into a dedicated EmailService class
+```
+
+## Skill 3: Documentation Generator
+
+**What it does:** Generates or updates documentation for code, APIs, or features — matching your project's doc style.
+
+**File:** `.claude/commands/document.md`
+
+```markdown
+# Documentation Skill
+
+Generate or update documentation for the specified code or feature.
+
+## Instructions
+
+1. Read the code being documented thoroughly
+2. Read existing docs to match format and style
+3. Generate documentation that includes:
+   - Purpose / what this does (1-2 sentences)
+   - Usage examples (at least 2)
+   - Parameters / configuration options (table format)
+   - Error cases and how to handle them
+   - Related files / see also
+
+## Style
+- Use the same heading levels, formatting, and tone as existing docs
+- Include real code examples, not pseudocode
+- Be concise — developers skim docs, they don't read novels
+- Put the most common use case first
+
+## Verification
+- All code examples in the docs should actually work
+- All referenced files should exist
+- All parameter names should match the actual code
+```
+
+**Usage:**
+```
+/document @src/services/paymentService.ts — generate JSDoc comments and update API docs
+```
+
+## Skill 4: Internationalization (i18n) Converter
+
+**What it does:** Extracts hardcoded strings from components and replaces them with i18n translation keys.
+
+**File:** `.claude/commands/i18n.md`
+
+```markdown
+# Internationalization Skill
+
+Extract hardcoded strings from components and replace with i18n keys.
+
+## Instructions
+
+1. Read the target file(s)
+2. Identify all user-facing hardcoded strings (ignore log messages, error codes, and variable names)
+3. Generate translation keys following the pattern: `<page>.<section>.<element>`
+4. Replace hardcoded strings with the i18n function call (t('key'))
+5. Add the extracted strings to the English translation file
+6. Ensure the import for the translation hook is added
+
+## Conventions
+- Key format: page.section.element (e.g., settings.notifications.title)
+- Translation file: src/locales/en.json
+- Translation hook: import { useTranslation } from 'react-i18next'
+- Don't extract: aria labels (extract separately), developer-facing strings, enum values
+
+## Verification
+1. The component renders identically (visually unchanged)
+2. All extracted strings appear in the translation file
+3. No hardcoded user-facing strings remain
+4. TypeScript compilation passes
+```
+
+**Usage:**
+```
+/i18n @src/components/Settings/NotificationSettings.tsx
+```
+
+## Skill 5: Accessibility Audit
+
+**What it does:** Audits React components for accessibility issues and generates fixes.
+
+**File:** `.claude/commands/a11y.md`
+
+```markdown
+# Accessibility Audit Skill
+
+Audit and fix accessibility issues in the specified components.
+
+## Instructions
+
+1. Read the target component(s)
+2. Check for these issues (in priority order):
+   - Missing alt text on images
+   - Missing aria-labels on interactive elements without visible text
+   - Missing keyboard navigation (onClick without onKeyDown)
+   - Incorrect heading hierarchy (h1 → h3 skipping h2)
+   - Missing form labels
+   - Color contrast issues (if colors are hardcoded)
+   - Missing focus indicators
+   - Missing skip-to-content links (page-level components only)
+3. Fix each issue directly in the code
+4. Add a comment explaining the fix for non-obvious changes
+
+## Priority
+- P0: Screen readers can't access content (missing alt, missing labels)
+- P1: Keyboard users can't navigate (missing keyboard handlers)
+- P2: Semantic HTML issues (wrong heading levels, div instead of button)
+- P3: Enhancement (focus indicators, skip links)
+
+## Verification
+1. Run accessibility linter if available: npx eslint --rule 'jsx-a11y/*' $file
+2. Check that all interactive elements are keyboard-accessible
+3. Verify heading hierarchy is correct
+```
+
+**Usage:**
+```
+/a11y @src/components/Dashboard/ — audit all dashboard components
+```
+
+## Skill 6: Test Generator
+
+**What it does:** Generates comprehensive tests for a file, matching your project's test patterns.
+
+**File:** `.claude/commands/test.md`
+
+```markdown
+# Test Generator Skill
+
+Generate comprehensive tests for the specified file.
+
+## Instructions
+
+1. Read the target file completely
+2. Read existing tests in the same directory to match patterns
+3. Generate tests covering:
+   - Happy path for each public function/method
+   - Error cases (invalid input, missing data, network failures)
+   - Edge cases (empty arrays, null values, boundary values)
+   - Integration points (does it call the right dependencies?)
+4. Use the project's testing framework and patterns
+
+## Conventions
+- Follow test patterns in existing test files (same directory)
+- Use descriptive test names: "should return 404 when user not found"
+- Group related tests with describe blocks
+- Use factories/fixtures for test data, not inline objects
+- Mock external dependencies, not internal modules
+
+## Verification
+1. All generated tests pass: npx vitest run <test-file>
+2. No type errors in the test file
+3. Coverage increases (check with --coverage flag)
+```
+
+**Usage:**
+```
+/test @src/services/orderService.ts — generate tests with 90%+ coverage
+```
+
+## Skill 7: Security Audit
+
+**What it does:** Performs a focused security audit on specified code.
+
+**File:** `.claude/commands/security.md`
+
+```markdown
+# Security Audit Skill
+
+Perform a security audit on the specified code.
+
+## Check Categories
+
+1. **Injection**: SQL injection, command injection, XSS, template injection
+2. **Authentication**: Token handling, session management, password storage
+3. **Authorization**: Missing access checks, IDOR vulnerabilities, privilege escalation
+4. **Data Exposure**: PII in logs, secrets in code, excessive API responses
+5. **Cryptography**: Weak algorithms, hardcoded keys, insecure random
+6. **Dependencies**: Known vulnerable packages (check package.json)
+
+## Output Format
+
+For each finding:
+- **Severity**: CRITICAL / HIGH / MEDIUM / LOW
+- **File**: path and line number
+- **Issue**: one-sentence description
+- **Impact**: what could happen if exploited
+- **Fix**: specific code change to resolve
+
+## Rules
+- Be thorough but avoid false positives — only report real issues
+- CRITICAL = exploitable now, HIGH = exploitable with effort, 
+  MEDIUM = defense-in-depth issue, LOW = best practice improvement
+- If you find a CRITICAL issue, say so clearly at the top of your response
+```
+
+**Usage:**
+```
+/security @src/routes/auth.ts @src/middleware/auth.ts — audit the authentication flow
+```
+
+## Skill 8: API Endpoint Generator
+
+**What it does:** Generates a complete API endpoint following your project's patterns.
+
+**File:** `.claude/commands/api.md`
+
+```markdown
+# API Endpoint Generator Skill
+
+Generate a complete API endpoint with route, service, validation, and tests.
+
+## Instructions
+
+1. Read existing routes to match patterns (check src/routes/)
+2. Generate these files:
+   - Route handler (src/routes/<resource>.ts)
+   - Service method (src/services/<resource>Service.ts)
+   - Validation schema (Zod, Joi, or project standard)
+   - Test file (src/routes/__tests__/<resource>.test.ts)
+3. Follow RESTful conventions for the HTTP method and URL
+
+## Conventions
+- Follow the patterns in CLAUDE.md and existing route files
+- All inputs validated before reaching the service layer
+- All errors use the project's error handling pattern
+- Response format matches existing API responses
+- Include OpenAPI/Swagger JSDoc comments if the project uses them
+
+## Verification
+1. TypeScript compiles without errors
+2. Generated tests pass
+3. Route registers correctly (check with a quick manual test description)
+```
+
+**Usage:**
+```
+/api Create a PATCH /api/users/:id/preferences endpoint that updates user notification preferences
+```
+
+## Skill 9: Performance Profiler
+
+**What it does:** Analyzes code for performance issues and suggests optimizations.
+
+**File:** `.claude/commands/perf.md`
+
+```markdown
+# Performance Profiler Skill
+
+Analyze code for performance issues and generate optimizations.
+
+## Check Categories
+
+1. **Database**: N+1 queries, missing indexes, unbounded queries, unnecessary JOINs
+2. **Memory**: Unbounded arrays, memory leaks from event listeners, large object copies
+3. **Rendering** (React): Unnecessary re-renders, missing memoization, large component trees
+4. **Network**: Excessive API calls, missing caching, large payloads, no pagination
+5. **Algorithms**: O(n^2) loops that could be O(n), unnecessary sorting, redundant computation
+
+## Output Format
+
+For each issue:
+- **Impact**: HIGH / MEDIUM / LOW (based on likely performance impact)
+- **Location**: file and line
+- **Issue**: what's slow and why
+- **Fix**: specific code change with before/after
+- **Estimated improvement**: rough estimate (e.g., "reduces DB queries from N to 1")
+
+## Rules
+- Focus on issues that matter at scale, not micro-optimizations
+- Don't suggest premature optimization for code that runs rarely
+- Prioritize by impact: a missing database index > an unnecessary re-render
+```
+
+**Usage:**
+```
+/perf @src/services/orderService.ts — the order listing endpoint is slow with 1000+ orders
+```
+
+## Skill 10: Config/Environment Setup
+
+**What it does:** Generates environment configuration, Docker setup, or deployment config for a project.
+
+**File:** `.claude/commands/setup.md`
+
+```markdown
+# Environment Setup Skill
+
+Generate or update project configuration and environment setup.
+
+## Instructions
+
+1. Read the project's current setup (package.json, docker-compose, .env.example)
+2. Understand what's being added or changed
+3. Generate/update:
+   - Environment variables (.env.example with descriptions)
+   - Docker configuration (if using Docker)
+   - CI/CD configuration (if applicable)
+   - Setup documentation (if README has a setup section)
+
+## Conventions
+- Never include actual secrets — use placeholder values
+- Include descriptions for every environment variable
+- Docker configs should include health checks
+- Always update .env.example, never .env directly
+
+## Verification
+1. Docker builds successfully (if applicable)
+2. All required environment variables are documented
+3. The setup instructions actually work on a fresh clone
+```
+
+**Usage:**
+```
+/setup Add Redis configuration — we're adding caching to the API
+```
+
+## Making Skills Your Own
+
+These 10 skills are starting points. To customize for your project:
+
+1. **Adjust file paths** — change `src/routes/` to match your project structure
+2. **Update tool references** — swap `vitest` for `jest`, `Prisma` for `TypeORM`, etc.
+3. **Add project-specific rules** — reference your CLAUDE.md conventions
+4. **Tune verification steps** — add or remove checks based on your CI setup
+
+The best skills evolve over time. Start with a basic version, use it for a week, and refine based on what works and what it misses.
+
+## Key Takeaway
+
+Production-ready skills go beyond simple prompts — they include detailed instructions, handle edge cases, specify output formats, and verify their own work. The 10 skills in this gallery cover the most common development tasks: migrations, refactoring, documentation, i18n, accessibility, testing, security, API design, performance, and environment setup. Copy them into your `.claude/commands/` directory, customize the file paths and tool references for your project, and iterate based on real usage. Good skills save hours per week by encoding your team's best practices into repeatable, automated workflows.

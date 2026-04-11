@@ -1,8 +1,8 @@
-# Claude Academy -- Content Plan
+# Klaude Academy -- Content Plan
 
 Last updated: 2026-04-04
 
-This document is the single source of truth for Claude Academy's content strategy. It covers what exists, what needs improvement, what to build next, and exactly how to add new content. Anyone contributing content should read this first.
+This document is the single source of truth for Klaude Academy's content strategy. It covers what exists, what needs improvement, what to build next, and exactly how to add new content. Anyone contributing content should read this first.
 
 ---
 
@@ -1022,7 +1022,7 @@ Run through this checklist before publishing any new or updated lesson.
 
 ### Vision
 
-Translate Claude Academy into Arabic to serve Arabic-speaking developers. This requires both content translation and significant technical work for RTL (right-to-left) layout support.
+Translate Klaude Academy into Arabic to serve Arabic-speaking developers. This requires both content translation and significant technical work for RTL (right-to-left) layout support.
 
 ### Phase 1: Foundation (Weeks 1-4) -- Module 1 Only
 

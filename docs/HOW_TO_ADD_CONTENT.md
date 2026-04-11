@@ -195,7 +195,7 @@ git push
 The CI/CD pipeline automatically:
 1. Lints → type-checks → runs tests → runs E2E
 2. Deploys to Netlify (https://klaude-academy.netlify.app)
-3. Deploys to GitHub Pages (https://khader9jber.github.io/claude-academy/)
+3. Deploys to GitHub Pages (https://khader9jber.github.io/klaude-academy/)
 
 ---
 

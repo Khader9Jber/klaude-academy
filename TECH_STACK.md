@@ -1,8 +1,8 @@
-# Claude Academy — Technical Architecture
+# Klaude Academy — Technical Architecture
 
 ## Project Overview
 
-Claude Academy is a comprehensive interactive learning website for mastering Claude and Claude Code. It is built as a static-first Next.js application with plans for a future backend.
+Klaude Academy is a comprehensive interactive learning website for mastering Claude and Claude Code. It is built as a static-first Next.js application with plans for a future backend.
 
 ---
 
@@ -139,7 +139,7 @@ The backend is optional. Without Supabase env vars, the site runs as a fully sta
 | Option | Notes |
 |--------|-------|
 | Netlify (primary) | SSR support, full auth, automatic deploys on git push — https://klaude-academy.netlify.app |
-| GitHub Pages (secondary) | Static hosting, free, tied to repo — https://khader9jber.github.io/claude-academy/ |
+| GitHub Pages (secondary) | Static hosting, free, tied to repo — https://khader9jber.github.io/klaude-academy/ |
 | Vercel (backup) | Has deployment protection issues on free plan — kept as fallback |
 | Any static host | The build output is just HTML/CSS/JS files — works anywhere |
 
@@ -232,7 +232,7 @@ npx tsc --noEmit     # Type check without building
 ## Project Structure Summary
 
 ```
-claude-academy/
+klaude-academy/
 ├── content/              # All lesson content (MDX + JSON)
 │   ├── modules/          # 13 module folders, each with _module.json + lesson MDX files
 │   ├── templates/        # Copy-paste template library data

@@ -1,5 +1,5 @@
 -- ============================================
--- Claude Academy — Admin Role System
+-- Klaude Academy — Admin Role System
 -- ============================================
 -- Uses Supabase app_metadata for admin flag
 -- (cannot be modified by users via client SDK)

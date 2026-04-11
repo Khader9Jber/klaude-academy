@@ -1,0 +1,385 @@
+---
+title: "Troubleshooting Common Issues"
+slug: "troubleshooting"
+order: 6
+difficulty: "beginner"
+duration: 16
+tags: ["troubleshooting", "errors", "debugging", "installation", "auth"]
+objectives:
+  - "Diagnose and fix the most common Claude Code installation failures"
+  - "Resolve authentication and permission errors"
+  - "Handle slow responses, timeouts, and rate limiting"
+  - "Know where to find logs and how to report issues"
+quiz:
+  - id: "troubleshoot-1"
+    question: "You run 'claude' and get 'command not found'. What's the most likely cause?"
+    type: "multiple-choice"
+    options:
+      - "Claude Code doesn't exist"
+      - "The npm global bin directory is not in your PATH"
+      - "Your internet is down"
+      - "You need to restart your computer"
+    correct: 1
+    explanation: "When npm installs a global package, the binary goes into npm's global bin directory. If that directory isn't in your shell's PATH, the system can't find the 'claude' command. Run 'npm config get prefix' to find the directory and add its /bin subdirectory to your PATH."
+  - id: "troubleshoot-2"
+    question: "Claude Code shows 'Authentication failed'. What should you try first?"
+    type: "multiple-choice"
+    options:
+      - "Reinstall Node.js"
+      - "Run 'claude auth login' to re-authenticate"
+      - "Delete your entire home directory"
+      - "Switch to a different computer"
+    correct: 1
+    explanation: "Authentication failures are usually caused by expired tokens or corrupted credentials. Running 'claude auth login' forces a fresh authentication flow. If using an API key, check that ANTHROPIC_API_KEY is set correctly in your environment."
+  - id: "troubleshoot-3"
+    question: "Claude's responses are extremely slow. Which is NOT a likely cause?"
+    type: "multiple-choice"
+    options:
+      - "You're hitting rate limits on your plan"
+      - "Your context window is very large (many files referenced)"
+      - "Your terminal font is too small"
+      - "The model you selected (e.g., Opus) is slower than Sonnet"
+    correct: 2
+    explanation: "Terminal font size has zero impact on Claude's response speed. Rate limits, large context windows, and model choice (Opus is slower than Sonnet) all directly affect response time. If Claude seems slow, check your plan's usage, reduce context size, or switch to a faster model."
+  - id: "troubleshoot-4"
+    question: "You see 'EACCES: permission denied' during npm install -g. What's the fix?"
+    type: "multiple-choice"
+    options:
+      - "Use sudo npm install -g (always)"
+      - "Fix npm's global directory permissions or use a node version manager like nvm"
+      - "Uninstall npm"
+      - "Run as root permanently"
+    correct: 1
+    explanation: "EACCES errors mean npm's global directory is owned by root. The best fix is using a node version manager (nvm, fnm) which installs Node in your home directory, or reconfiguring npm's prefix to a user-owned directory. Using sudo works but creates more permission problems down the road."
+---
+
+## Every Developer Hits These Walls
+
+You'll run into issues with Claude Code. Everyone does. The good news is that 90% of the problems people encounter fall into about a dozen categories, and every single one has a straightforward fix.
+
+This lesson is your troubleshooting reference. Bookmark it. When something breaks, come here first.
+
+## Installation Issues
+
+### "command not found: claude"
+
+You installed Claude Code but your terminal doesn't recognize the command.
+
+**Diagnosis:** npm's global bin directory isn't in your PATH.
+
+**Fix:**
+
+```bash
+# Find where npm installs global binaries
+npm config get prefix
+# Output: /usr/local  (or ~/.nvm/versions/node/v20.x.x)
+
+# The binary is at <prefix>/bin/claude
+# Add it to your PATH in ~/.zshrc or ~/.bashrc:
+export PATH="$(npm config get prefix)/bin:$PATH"
+
+# Then reload your shell
+source ~/.zshrc
+```
+
+**Pro tip:** If you're using `nvm` or `fnm`, this is usually handled automatically. But if you installed Node via Homebrew and then switched to nvm, you might have stale PATH entries. Check with `which node` to confirm which Node installation is active.
+
+### EACCES Permission Denied
+
+```
+npm ERR! Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/@anthropic-ai'
+```
+
+**Diagnosis:** npm's global directory is owned by root, and you're installing as a regular user.
+
+**Fix (recommended):** Use a node version manager instead of the system Node:
+
+```bash
+# Install nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# Install Node through nvm (installs to your home directory)
+nvm install 20
+nvm use 20
+
+# Now global installs work without sudo
+npm install -g @anthropic-ai/claude-code
+```
+
+**Fix (quick but not ideal):** Change npm's global directory:
+
+```bash
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+source ~/.zshrc
+npm install -g @anthropic-ai/claude-code
+```
+
+**Common mistake:** Running `sudo npm install -g`. This works once but creates ownership issues that haunt you for every future global install.
+
+### Node.js Version Too Old
+
+```
+npm ERR! engine Unsupported engine
+npm ERR! notsup Required: {"node":">=18.0.0"}
+```
+
+**Diagnosis:** Claude Code requires Node.js 18 or later.
+
+**Fix:**
+
+```bash
+# Check your current version
+node --version
+
+# If it's below 18, upgrade:
+nvm install 20
+nvm use 20
+nvm alias default 20
+
+# Verify
+node --version
+# v20.x.x
+
+# Now install Claude Code
+npm install -g @anthropic-ai/claude-code
+```
+
+## Authentication Problems
+
+### "Authentication failed" or "Invalid API key"
+
+```
+Error: Authentication failed. Please check your credentials.
+```
+
+**Diagnosis:** Your auth token expired, or your API key is wrong.
+
+**Fix for browser auth (Pro/Max plans):**
+
+```bash
+# Re-authenticate
+claude auth login
+
+# This opens your browser for Anthropic login
+# Follow the prompts and authorize Claude Code
+```
+
+**Fix for API key auth:**
+
+```bash
+# Check if the key is set
+echo $ANTHROPIC_API_KEY
+
+# If empty or wrong, set it:
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+
+# Make it permanent (add to ~/.zshrc or ~/.bashrc):
+echo 'export ANTHROPIC_API_KEY="sk-ant-your-key-here"' >> ~/.zshrc
+```
+
+**Watch out:** API keys start with `sk-ant-`. If yours doesn't, you might have copied a different key (like a Supabase key or OpenAI key) by mistake. Double-check at console.anthropic.com.
+
+### "Rate limit exceeded"
+
+```
+Error: rate_limit_error - You've exceeded your rate limit
+```
+
+**Diagnosis:** You've used your rolling 5-hour token budget.
+
+**Fix:** Wait for tokens to roll off (usage drops off gradually over 5 hours), or:
+
+- Switch to a cheaper model: `/model haiku` uses fewer tokens per dollar
+- Enable extra usage overflow in your account settings (bills at API rates)
+- Check if heavy claude.ai usage is draining your shared budget
+
+```bash
+# Check your current usage (if available)
+claude usage
+```
+
+### Auth Works in Terminal but Not in VS Code
+
+**Diagnosis:** VS Code might use a different shell environment than your terminal.
+
+**Fix:**
+
+```bash
+# Check which shell VS Code is using
+# VS Code Terminal → check the shell selector (top-right of terminal panel)
+
+# Ensure your API key or auth config is in the right shell profile:
+# For zsh: ~/.zshrc
+# For bash: ~/.bashrc
+
+# After editing, restart VS Code entirely (not just the terminal)
+```
+
+## Runtime Errors
+
+### Claude Seems Stuck or Unresponsive
+
+Claude has been "thinking" for over a minute with no output.
+
+**Diagnosis:** This usually means Claude is doing heavy processing (reading many files, running long commands) or you've hit a rate limit mid-response.
+
+**Fix:**
+
+1. **Wait 30 more seconds** — Opus responses with extended thinking can legitimately take 60+ seconds
+2. **Press Escape** to cancel the current operation
+3. **Check your network** — run `ping api.anthropic.com` in another terminal
+4. **Start a new session** — if Claude is stuck in a loop, `/clear` or start fresh
+
+### "Context window exceeded" or Truncation Warnings
+
+```
+Warning: Context is getting large. Some earlier messages may be summarized.
+```
+
+**Diagnosis:** You've loaded too many files or had too long a conversation. Claude's context window is filling up.
+
+**Fix:**
+
+- Start a fresh session: `/clear` or `claude` in a new terminal
+- Reference fewer files — use specific file paths instead of entire directories
+- Use `/compact` to compress the conversation history
+- Split your task into smaller conversations
+
+**Pro tip:** If you're on a Pro plan with 200K context, you'll hit this much sooner than on Max with 1M context. For large codebase work, Max is worth it for the context window alone.
+
+### Command Execution Failures
+
+```
+Claude wants to run: npm test
+[Permission denied by user]
+```
+
+**Diagnosis:** Claude asked to run a command, and your permission settings blocked it.
+
+**Fix:** You can:
+
+1. **Allow the specific command** when prompted — type `y` to allow once
+2. **Update permissions** for commands you trust:
+
+```bash
+# In your project's .claude/settings.json:
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test*)",
+      "Bash(npx prettier*)",
+      "Bash(git *)"
+    ]
+  }
+}
+```
+
+3. **Use trust mode** for development (not recommended for production):
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+### "Module not found" After Installation
+
+```
+Error: Cannot find module '@anthropic-ai/claude-code'
+```
+
+**Diagnosis:** The global npm installation didn't complete correctly, or there's a version conflict.
+
+**Fix:**
+
+```bash
+# Remove and reinstall
+npm uninstall -g @anthropic-ai/claude-code
+npm install -g @anthropic-ai/claude-code
+
+# Verify the installation
+claude --version
+
+# If still failing, clear npm cache:
+npm cache clean --force
+npm install -g @anthropic-ai/claude-code
+```
+
+## Performance Issues
+
+### Slow Responses
+
+If every response takes 15-30 seconds when it used to take 3-5:
+
+1. **Check your model** — run `/model` to see what you're using. Opus is significantly slower than Sonnet. Haiku is the fastest.
+2. **Check your context size** — if you've been in the same session for hours and referenced many files, context is huge. Start fresh.
+3. **Check your plan usage** — when you're near your limit, responses may throttle.
+4. **Check your network** — latency to Anthropic's servers matters. Try `curl -o /dev/null -s -w "%{time_total}" https://api.anthropic.com/v1/messages`
+
+### High Token Burn Rate
+
+You're burning through your 5-hour budget way too fast.
+
+**Strategies:**
+
+- Use Haiku for simple tasks (formatting, small edits, quick questions)
+- Use Sonnet for most development work
+- Reserve Opus for complex architecture decisions and large refactors
+- Start fresh sessions instead of letting context grow endlessly
+- Use `/compact` to compress conversation history
+
+## Getting Help
+
+### Check Logs
+
+```bash
+# Claude Code stores logs at:
+ls ~/.claude/logs/
+
+# View recent logs
+cat ~/.claude/logs/claude-code.log | tail -50
+```
+
+### Check Version
+
+```bash
+claude --version
+# Make sure you're on the latest version
+
+# Update to latest
+npm update -g @anthropic-ai/claude-code
+```
+
+### Common Debug Steps
+
+When something weird is happening and you can't figure out why:
+
+```bash
+# 1. Check your version
+claude --version
+
+# 2. Check your auth status  
+claude auth status
+
+# 3. Check your environment
+echo $ANTHROPIC_API_KEY
+echo $SHELL
+node --version
+npm --version
+
+# 4. Try a minimal test
+claude -p "Say hello"
+
+# 5. If that works, the issue is session-specific — start fresh
+claude
+```
+
+### Where to Report Issues
+
+- **GitHub Issues:** https://github.com/anthropics/claude-code/issues
+- **Anthropic Status:** https://status.anthropic.com (check if there's an outage)
+- **Discord/Community:** Search for your error message — someone else has probably hit it
+
+## Key Takeaway
+
+Most Claude Code issues fall into four buckets: installation (PATH and permissions), authentication (expired tokens or wrong API keys), runtime (context overflow or stuck sessions), and performance (wrong model or bloated context). The fix for 80% of problems is one of: fix your PATH, re-authenticate with `claude auth login`, start a fresh session, or switch to a faster model. When in doubt, check `claude --version`, verify your auth, and try a minimal `claude -p "hello"` to isolate whether the issue is global or session-specific.

@@ -3,7 +3,7 @@ title: "/loop: Scheduled Background Tasks"
 slug: "loop-background-tasks"
 order: 3
 difficulty: "advanced"
-duration: 13
+duration: 18
 tags: ["loop", "scheduled", "background", "monitoring"]
 objectives:
   - "Set up /loop for recurring tasks"
@@ -45,150 +45,214 @@ quiz:
 
 ## Always-On AI Automation
 
-**/loop** turns Claude Code into a persistent background worker. Instead of running a task once, you describe a recurring task and Claude executes it on a schedule — monitoring, checking, alerting, and even taking action.
+Here's a workflow problem that drove me nuts before I discovered /loop: I'd deploy to staging, go work on something else, then 45 minutes later remember "oh, I should check if the deployment is healthy." By then, if something was wrong, it had been broken for almost an hour with nobody looking at it.
+
+**/loop** turns Claude Code into a persistent background worker. Instead of running a task once and hoping you remember to check back, you describe a recurring task and Claude executes it on a schedule — monitoring, checking, alerting, and even taking action automatically.
+
+It's like hiring a junior developer whose entire job is to watch a dashboard and ping you when something needs attention. Except this one never gets bored, never forgets, and costs a fraction of a penny per check.
 
 ## Setting Up a Loop
 
+The basic syntax is simple:
+
 ```bash
 /loop
 ```
 
-Claude asks you to describe:
-1. **What to do**: The recurring task
-2. **How often**: The interval (default: 10 minutes)
+Claude asks you to describe two things:
+1. **What to do**: The recurring task, in plain English
+2. **How often**: The interval between runs
 
-### Example: PR Monitor
+You can also specify the interval and command inline:
 
 ```bash
-/loop
+/loop 30m /check-prs        # Run /check-prs every 30 minutes
+/loop 2h                     # Run a custom task every 2 hours (Claude asks what)
+/loop                        # Claude asks for both the task and interval
+```
+
+### Example: The PR Monitor That Saved My Weekend
+
+This is the loop I set up after a Friday deployment went sideways because nobody reviewed a critical PR for 36 hours:
+
+```bash
+/loop 30m
 
 "Every 30 minutes, check all open PRs in this repo:
-1. List PRs that have been open for more than 24 hours without a review
-2. Check CI status on each PR
-3. Alert me if any PR has failing CI
-4. If a Dependabot PR has passing CI and only patches, auto-approve it"
+1. List any PR that's been open for more than 24 hours without a review
+2. Check CI status on each open PR
+3. If any PR has failing CI, alert me with the failure reason
+4. If a Dependabot PR has passing CI and only bumps a patch version, auto-approve it"
 ```
 
-Claude sets up a background loop that runs every 30 minutes, monitoring your PRs.
+The result: I catch stale PRs before they become multi-day blockers. CI failures get flagged within 30 minutes instead of whenever someone happens to check. And Dependabot patch updates get merged automatically, which used to be a weekly chore that nobody wanted to do.
 
-### Example: Deployment Health
+### Example: Deployment Health Monitor
+
+After deploying, I set this up and go work on other things with peace of mind:
 
 ```bash
-/loop
+/loop 10m
 
-"Every 2 hours, check deployment health:
-1. Run the health check endpoint: curl https://api.myapp.com/health
-2. Check response time (should be under 200ms)
-3. Check recent error rate in logs
-4. Alert me if anything is degraded"
+"Check deployment health:
+1. Run: curl -s https://api.myapp.com/health
+2. Check that status is 200 and response time is under 200ms
+3. Run: curl -s https://api.myapp.com/health/db — check database connection
+4. If anything is degraded, alert me immediately with specifics
+5. If everything's fine, just log '✓ healthy' (don't spam me with details)"
 ```
 
-### Example: Dependency Updates
+That last point is important — you don't want a notification every 10 minutes saying "everything's fine." Tell Claude to be quiet when things are normal and loud when they're not.
+
+### Example: Dependency Vulnerability Watch
 
 ```bash
-/loop
+/loop 24h
 
-"Once per day (every 24 hours):
-1. Run pnpm outdated
-2. Check for known vulnerabilities with pnpm audit
-3. If there are critical vulnerabilities, alert me immediately
-4. Generate a summary of what needs updating"
+"Once per day:
+1. Run pnpm audit --json
+2. Parse the output for critical and high-severity vulnerabilities
+3. If there are any critical vulnerabilities, alert me immediately
+4. For high-severity, compile a summary with affected packages and available fixes
+5. If everything is clean, just log the date and 'no vulnerabilities found'"
 ```
 
-## How /loop Works
+This replaced a manual process where I'd remember to run `npm audit` maybe once a month and then panic when there were 15 critical vulnerabilities that had been sitting there for weeks.
+
+## How /loop Works Under the Hood
+
+Understanding the mechanics helps you write better loops:
 
 ```
 You: /loop → describe task and interval
   ↓
-Claude starts background worker
+Claude starts a background worker process
   ↓
 Every [interval]:
-  1. Claude executes the task
-  2. If action needed → triggers Notification hook
-  3. Results logged for review
+  1. Claude executes the task (runs commands, reads files, calls APIs)
+  2. Evaluates results against your criteria
+  3. If action needed → triggers Notification hook (if configured)
+  4. Results logged in the session for you to review
   ↓
-Worker persists until stopped
+Worker persists until you stop it or the session ends
 ```
 
-The loop runs as a persistent background process. You can continue working in other sessions while it runs.
+The loop runs as part of your Claude Code session. You can continue working in other terminal tabs or sessions while it runs in the background. Each iteration is essentially a new message in the conversation, so Claude has context of previous iterations — it knows what it found last time.
+
+**This context persistence is powerful.** A deployment health loop doesn't just tell you "response time is 450ms." It tells you "response time is 450ms, which is up from 120ms thirty minutes ago — something changed in the last interval." Claude can detect trends, not just snapshots.
 
 ## Interval Syntax
 
 Specify intervals when setting up the loop:
 
 ```bash
-/loop 5m /check-ci          # Every 5 minutes
-/loop 30m /review-prs       # Every 30 minutes
-/loop 2h /health-check      # Every 2 hours
-/loop 24h /dependency-audit  # Once per day
+/loop 5m /check-ci          # Every 5 minutes — for active monitoring
+/loop 15m                    # Every 15 minutes — good default for most checks
+/loop 30m /review-prs       # Every 30 minutes — PR monitoring
+/loop 1h                     # Every hour — less urgent checks
+/loop 2h /health-check      # Every 2 hours — steady-state monitoring
+/loop 24h /dependency-audit  # Once per day — maintenance tasks
 ```
 
-The default interval is 10 minutes if not specified.
+**How to pick the right interval**: Think about how quickly you need to know about a problem. Deployment health after a release? Every 5-10 minutes. PR reviews? Every 30 minutes is fine — PRs aren't that urgent. Dependency vulnerabilities? Once a day is plenty.
 
-## Combining with Slash Commands
+The default interval is 10 minutes if you don't specify one.
 
-/loop works well with custom slash commands:
+## Combining with Custom Slash Commands
 
-```bash
-# Create a command for what the loop should do
+The real power of /loop emerges when you combine it with custom commands. Instead of writing the full task description each time, create reusable commands:
+
+```markdown
 # .claude/commands/check-prs.md
 ---
 description: "Check PR status and alert if action needed"
 ---
-List all open PRs. For each:
-1. Check CI status
-2. Check if review is requested
-3. If PR is stale (>48h), flag it
-Report any items needing attention.
+List all open PRs in this repo. For each one:
+1. How long has it been open?
+2. Does it have a reviewer assigned?
+3. What's the CI status?
+4. If the PR is stale (>48 hours with no activity), flag it
+5. If CI is failing, include the failure reason
 
-# Then loop it
-/loop 30m /check-prs
+Report ONLY items that need attention. If everything looks good, 
+just say "All PRs healthy" — don't list every PR.
 ```
+
+```markdown
+# .claude/commands/health.md
+---
+description: "Quick deployment health check"
+---
+Check deployment health:
+1. Hit GET /health — expect 200 with response time <200ms
+2. Hit GET /health/db — expect 200 (database connection OK)
+3. Hit GET /health/redis — expect 200 (cache connection OK)
+4. Check the last 5 minutes of error logs for any spike
+
+Report only problems. If healthy, just say "✓ all systems nominal"
+```
+
+Now setting up loops is clean:
+
+```bash
+/loop 30m /check-prs
+/loop 10m /health
+```
+
+One-line setup for powerful recurring automation. And because the commands are in `.claude/commands/`, they're version-controlled with your project. New team members get the same monitoring capabilities on day one.
 
 ## Loop + Remote Control
 
-The most powerful combination: start a loop on your machine, monitor from anywhere.
+This is the combination I use most. Start a monitoring loop on your machine, enable Remote Control, and check from your phone throughout the day:
 
 ```bash
 # On your development machine
-/loop 15m /monitor-deployment
+/loop 15m /health
 
 # Generate a remote control URL
 /rc
 
 # Scan the QR code on your phone
-# Monitor deployment status from your couch, commute, or coffee shop
 ```
 
-When the loop detects an issue and triggers a Notification hook, you can respond from your phone through Remote Control.
+Now you can check deployment health from your phone while you're in a meeting, at lunch, or commuting. If the loop detects a problem and triggers a notification hook, you can respond through Remote Control: "Roll back to the previous deployment" or "Restart the worker processes."
+
+**Pro tip**: Pair this with Slack notification hooks. Instead of manually checking Remote Control every 15 minutes, let the loop silently do its thing and only bug you when something's wrong. Slack pings you, you open Remote Control on your phone, handle it, done.
 
 ## Practical Loop Recipes
 
-### Auto-Merge Safe PRs
+### Auto-Merge Safe Dependabot PRs
 
 ```bash
 /loop 1h
 
 "Check for Dependabot PRs:
-- If the PR only updates patch versions
-- And CI is passing
-- And it's been open for at least 1 hour
-- Auto-approve and merge it
+- If the PR only updates a patch version (e.g., 1.2.3 → 1.2.4)
+- And all CI checks are passing
+- And the PR has been open for at least 1 hour (gives CI time to run)
+- Then auto-approve and merge it
 
-For non-patch updates, just alert me."
+For minor version updates (1.2.0 → 1.3.0), just alert me.
+For major version updates, alert me urgently — those need manual review."
 ```
 
-### Monitor Error Rate
+I used to spend 15-20 minutes every Monday merging Dependabot PRs. Now it happens automatically for patches, and I only deal with the ones that actually need my attention.
+
+### Error Rate Watchdog
 
 ```bash
 /loop 10m
 
 "Check the application error log at /var/log/app/error.log:
 - Count errors in the last 10 minutes
-- If error rate exceeds 10 errors/minute, alert immediately
-- If a new error type appears that we haven't seen before, alert
-- Include a brief summary of the most common errors"
+- Calculate the error rate (errors per minute)
+- If error rate exceeds 5 errors/minute, alert immediately
+- If a NEW error type appears that wasn't in the previous check, alert
+- Compare to the baseline from 24 hours ago — flag significant increases
+- Include the top 3 most common errors in each check"
 ```
+
+The "compare to baseline" part is what makes this better than a dumb threshold. A service that normally has 2 errors/minute spiking to 10 is concerning. A service that normally has 0 spiking to 3 is an emergency. Claude tracks the context across iterations.
 
 ### Test Suite Guardian
 
@@ -196,43 +260,74 @@ For non-patch updates, just alert me."
 /loop 2h
 
 "Run the full test suite (pnpm test):
-- If all tests pass, log the result
+- If all tests pass, log the time and pass count
 - If any test fails, alert me with:
-  - Which tests failed
-  - The error messages
-  - The last git commit that might have caused it"
+  - Which specific tests failed
+  - The actual error messages
+  - The git log since the last passing run (what commits might have caused it)
+  - A suggested fix if the failure is straightforward"
+```
+
+This catches test regressions early. Instead of discovering at PR time that someone's commit three hours ago broke 12 tests, you find out within 2 hours and can fix it while the context is still fresh.
+
+### Stale Branch Cleanup
+
+```bash
+/loop 24h
+
+"Check for stale git branches:
+- List branches where the last commit is older than 14 days
+- For each stale branch, check if there's an associated PR
+- If the PR was merged or closed, the branch is safe to suggest deleting
+- Generate a report: branches to clean up, branches to check on
+- Don't auto-delete anything — just give me the list"
 ```
 
 ## Stopping a Loop
 
-To stop a running loop:
+When you're done monitoring:
 
 ```bash
 # In the loop session
 /stop
 
-# Or just close the terminal/session
+# Or just close the terminal/session — the loop dies with it
 ```
 
-## Considerations
+## Token Cost Awareness
 
-### Token Cost
-
-Each loop iteration is an API call. A 10-minute loop running for 8 hours is 48 calls. Make sure your loop tasks are efficient:
+Each loop iteration is an API call. This is real money, so be smart about it:
 
 ```bash
 # Expensive: Full codebase analysis every 5 minutes
-# Efficient: Quick health check endpoint every 30 minutes
+# That's 288 API calls in 24 hours, each potentially thousands of tokens
+/loop 5m "Analyze all files in src/ for code quality issues"
+
+# Efficient: Quick HTTP health check every 15 minutes  
+# 96 calls in 24 hours, each just a few hundred tokens
+/loop 15m "curl the /health endpoint, report only if unhealthy"
 ```
 
-### Reliability
+**Rules of thumb**:
+- Health checks and simple status queries: 5-15 minute intervals are fine
+- PR reviews and git operations: 30-60 minute intervals
+- Full test suite runs: 2+ hour intervals
+- Dependency audits and cleanup: 24 hour intervals
 
-Loops persist as long as the Claude Code process is running. If your machine sleeps, restarts, or the terminal closes, the loop stops. For production-grade scheduling, use the /schedule command (covered in Module 13) which runs in the cloud.
+If your loop task involves reading lots of files or running expensive commands, use a longer interval. If it's just hitting an HTTP endpoint and checking the status code, short intervals are cheap.
 
-### Scope
+## Reliability and Limitations
 
-Loops are best for monitoring and lightweight automation. Heavy tasks (full code reviews, large refactorings) should be triggered manually, not looped.
+Be honest about what /loop can and can't do:
+
+**Loops persist as long as the Claude Code process is running.** If your machine sleeps, restarts, or the terminal closes — the loop stops. No crash recovery, no automatic restart. This is fine for daytime monitoring but not great for "I need this to run overnight without fail."
+
+For production-grade scheduling that survives machine restarts, use the **/schedule** command (covered in Module 13). /schedule runs in the cloud and doesn't depend on your local machine being awake. Think of /loop as "local cron" and /schedule as "cloud cron."
+
+**Loops are best for monitoring and lightweight automation.** A loop that runs `curl /health` every 10 minutes is perfect. A loop that runs a full integration test suite every 5 minutes is going to burn through your API credits and probably slow down your machine.
+
+**Context accumulates.** Each iteration adds to the conversation context. After many iterations, you might hit the context window limit. For long-running loops, keep the task description focused so each iteration generates minimal output. The "report only problems" pattern helps — if 90% of iterations just log "all clear," the context grows slowly.
 
 ## Key Takeaway
 
-/loop creates persistent background workers that execute tasks on a recurring interval. Use it for monitoring (PR status, deployment health, error rates), maintenance (dependency updates, auto-merging safe PRs), and quality checks (test suite runs). Combine with Remote Control to monitor from any device. Keep loop tasks lightweight and efficient — each iteration costs tokens. For cloud-based scheduling that survives machine restarts, use /schedule instead.
+/loop creates persistent background workers that execute tasks on a recurring interval. The best use cases are monitoring (PR status, deployment health, error rates), maintenance (dependency updates, auto-merging safe PRs, branch cleanup), and quality checks (test suite runs). Combine with custom slash commands for clean one-line setup, and with Remote Control to monitor from any device. Keep loop tasks lightweight and efficient — each iteration costs tokens, so use longer intervals for expensive tasks and shorter intervals for cheap health checks. For scheduling that survives machine restarts, use /schedule instead.

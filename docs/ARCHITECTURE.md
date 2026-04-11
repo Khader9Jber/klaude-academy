@@ -1,6 +1,6 @@
 # System Architecture Document
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 2.0
 **Date:** 2026-04-05
@@ -32,7 +32,7 @@
 
 ### 1.1 System Overview
 
-Claude Academy is a static-first web application. The entire site is pre-rendered at build time into HTML, CSS, and JavaScript files. There is no server-side rendering at request time, no database, and no backend API. All interactivity (quizzes, progress tracking, search) runs in the user's browser.
+Klaude Academy is a static-first web application. The entire site is pre-rendered at build time into HTML, CSS, and JavaScript files. There is no server-side rendering at request time, no database, and no backend API. All interactivity (quizzes, progress tracking, search) runs in the user's browser.
 
 ### 1.2 Architecture Diagram
 
@@ -70,7 +70,7 @@ Claude Academy is a static-first web application. The entire site is pre-rendere
 |        │               interactive         │                      |
 |        ▼               components          ▼                      |
 |  Static content           │            localStorage               |
-|  is visible            User interacts   (claude-academy-progress) |
+|  is visible            User interacts   (klaude-academy-progress) |
 |  immediately           with quizzes,                              |
 |                        exercises,                                  |
 |                        search, etc.                                |
@@ -248,7 +248,7 @@ Used by module pages, lesson pages, and the progress dashboard. This is the cano
 
 Used by the curriculum page and the progress page. Has a slightly different interface optimized for those views (flat quiz scores, module progress arrays, achievement objects with unlock state).
 
-Both stores persist to localStorage under the same key (`claude-academy-progress`) and share core state (completed lessons, quiz scores, streak).
+Both stores persist to localStorage under the same key (`klaude-academy-progress`) and share core state (completed lessons, quiz scores, streak).
 
 ### 3.2 State Shape
 
@@ -295,11 +295,11 @@ Zustand set() updates state in memory
     ▼
 Zustand persist middleware:
     1. Serializes entire state to JSON
-    2. Calls localStorage.setItem("claude-academy-progress", jsonString)
+    2. Calls localStorage.setItem("klaude-academy-progress", jsonString)
     │
     ▼
 On next page load:
-    1. Zustand persist middleware reads localStorage.getItem("claude-academy-progress")
+    1. Zustand persist middleware reads localStorage.getItem("klaude-academy-progress")
     2. Parses JSON string
     3. Merges with initial state (rehydration)
     4. Components re-render with persisted state
@@ -875,12 +875,12 @@ deploy.yml workflow
     │    Mode: SSR with full auth support
     │
     ├──► GitHub Pages
-    │    URL: https://khader9jber.github.io/claude-academy/
+    │    URL: https://khader9jber.github.io/klaude-academy/
     │    Method: actions/upload-pages-artifact + actions/deploy-pages
     │    Environment variable: DEPLOY_TARGET=github-pages
     │
     └──► Vercel (backup)
-         URL: https://claude-academy-course.vercel.app
+         URL: https://klaude-academy-course.vercel.app
          Note: Has deployment protection issues on free plan
 ```
 
@@ -889,8 +889,8 @@ deploy.yml workflow
 | Platform | URL | Mode | Method | CI Gate |
 |----------|-----|------|--------|---------|
 | **Netlify (primary)** | `https://klaude-academy.netlify.app` | SSR (serverless) | `netlify deploy --prod` | lint + typecheck + test must pass |
-| **GitHub Pages** | `https://khader9jber.github.io/claude-academy/` | Static export | `actions/deploy-pages@v4` | lint + typecheck + test must pass |
-| **Vercel (backup)** | `https://claude-academy-course.vercel.app` | SSR (serverless) | `vercel deploy --prod` | Has deployment protection issues on free plan |
+| **GitHub Pages** | `https://khader9jber.github.io/klaude-academy/` | Static export | `actions/deploy-pages@v4` | lint + typecheck + test must pass |
+| **Vercel (backup)** | `https://klaude-academy-course.vercel.app` | SSR (serverless) | `vercel deploy --prod` | Has deployment protection issues on free plan |
 | **Netlify Preview** (PRs) | Dynamic URL per PR | SSR | `netlify deploy` (non-prod) | Build must succeed |
 
 **SSR vs Static**: Netlify runs the site as an SSR app, which supports auth callbacks (`/auth/callback`) and server-side session management. GitHub Pages uses static export (`output: 'export'`), which does not support auth features -- the site runs in guest-only mode on GitHub Pages. Vercel is available as a backup but has deployment protection issues on the free plan.
@@ -903,8 +903,8 @@ deploy.yml workflow
 
 ### 10.4 Vercel Configuration (Backup)
 
-- **Team/Org**: `claude-academy-org`
-- **URL**: `https://claude-academy-course.vercel.app`
+- **Team/Org**: `klaude-academy-org`
+- **URL**: `https://klaude-academy-course.vercel.app`
 - **Secrets required**: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
 - **Note**: Has deployment protection issues on free plan -- use Netlify as primary
 

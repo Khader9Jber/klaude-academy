@@ -1,5 +1,5 @@
 -- ============================================
--- Claude Academy — Initial Database Schema
+-- Klaude Academy — Initial Database Schema
 -- ============================================
 
 -- User profiles (extends auth.users)

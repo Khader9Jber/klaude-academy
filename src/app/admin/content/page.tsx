@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 import { AdminGuard } from "@/components/admin/admin-guard";
@@ -50,21 +50,12 @@ const MODULE_LABELS: Record<string, string> = {
 
 export default function ContentListPage() {
   const [content, setContent] = useState<ManagedContent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const supabaseReady = isSupabaseConfigured();
+  const [loading, setLoading] = useState(supabaseReady);
   const [tab, setTab] = useState<TabFilter>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const supabaseReady = isSupabaseConfigured();
-
-  useEffect(() => {
-    if (!supabaseReady) {
-      setLoading(false);
-      return;
-    }
-    fetchContent();
-  }, [supabaseReady]);
-
-  async function fetchContent() {
+  const fetchContent = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     const { data, error } = await supabase
@@ -78,7 +69,12 @@ export default function ContentListPage() {
       setContent(data as ManagedContent[]);
     }
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseReady) return;
+    fetchContent(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [supabaseReady, fetchContent]);
 
   async function handleDelete(id: string) {
     const supabase = createClient();

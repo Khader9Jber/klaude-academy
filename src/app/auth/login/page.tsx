@@ -67,21 +67,6 @@ function LoginForm() {
     }
   };
 
-  const handleOAuthLogin = async (provider: "google" | "github") => {
-    setFormError(null);
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (oauthError) {
-      setFormError(oauthError.message);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

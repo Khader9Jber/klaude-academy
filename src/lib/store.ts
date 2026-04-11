@@ -146,6 +146,6 @@ export const useProgressStore = create<ProgressState>()(
         return get().completedLessons.includes(slug);
       },
     }),
-    { name: "claude-academy-progress" }
+    { name: "klaude-academy-progress" }
   )
 );

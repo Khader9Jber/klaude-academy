@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, slugify, formatDuration } from '../utils'
+import { cn, slugify, formatDuration, estimateReadingTime, wordCount } from '../utils'
 
 describe('cn()', () => {
   it('TC-U-001: merges class names correctly', () => {
@@ -79,5 +79,48 @@ describe('formatDuration()', () => {
 
   it('formats 61 minutes as "1h 1m"', () => {
     expect(formatDuration(61)).toBe('1h 1m')
+  })
+})
+
+describe('estimateReadingTime()', () => {
+  it('returns 1 min for very short content', () => {
+    expect(estimateReadingTime('Hello world')).toBe(1)
+  })
+
+  it('returns correct estimate for 200-word text (1 min)', () => {
+    const words = Array(200).fill('word').join(' ')
+    expect(estimateReadingTime(words)).toBe(1)
+  })
+
+  it('returns correct estimate for 400-word text (2 min)', () => {
+    const words = Array(400).fill('word').join(' ')
+    expect(estimateReadingTime(words)).toBe(2)
+  })
+
+  it('returns correct estimate for 1000-word text (5 min)', () => {
+    const words = Array(1000).fill('word').join(' ')
+    expect(estimateReadingTime(words)).toBe(5)
+  })
+
+  it('returns 1 for empty content', () => {
+    expect(estimateReadingTime('')).toBe(1)
+  })
+})
+
+describe('wordCount()', () => {
+  it('counts words in a simple sentence', () => {
+    expect(wordCount('Hello world foo bar')).toBe(4)
+  })
+
+  it('handles multiple whitespace', () => {
+    expect(wordCount('Hello   world  foo')).toBe(3)
+  })
+
+  it('returns 0 for empty string', () => {
+    expect(wordCount('')).toBe(0)
+  })
+
+  it('handles leading/trailing whitespace', () => {
+    expect(wordCount('  Hello world  ')).toBe(2)
   })
 })

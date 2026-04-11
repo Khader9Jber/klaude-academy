@@ -1,0 +1,294 @@
+---
+title: "When Prompts Don't Work: Systematic Debugging"
+slug: "prompt-debugging"
+order: 9
+difficulty: "beginner"
+duration: 16
+tags: ["prompt-engineering", "debugging", "troubleshooting", "iteration"]
+objectives:
+  - "Identify why a prompt produces poor results using a systematic framework"
+  - "Apply the 5 categories of prompt failure to diagnose issues"
+  - "Transform broken prompts into working ones through structured debugging"
+  - "Build a personal prompt debugging checklist"
+quiz:
+  - id: "prompt-debug-1"
+    question: "Your prompt produces a generic, unhelpful response. What's the most likely cause?"
+    type: "multiple-choice"
+    options:
+      - "Claude is broken"
+      - "The prompt lacks specific context — Claude doesn't know enough about your situation to give a targeted answer"
+      - "You used the wrong model"
+      - "The prompt was too long"
+    correct: 1
+    explanation: "Generic responses almost always mean the prompt didn't provide enough context. Claude defaults to broad, safe answers when it doesn't know your specific situation. Adding your tech stack, the exact file, the specific error, and what you've already tried transforms the response from generic to targeted."
+  - id: "prompt-debug-2"
+    question: "Claude's response is well-written but answers the WRONG question. What went wrong?"
+    type: "multiple-choice"
+    options:
+      - "Claude is hallucinating"
+      - "The prompt was ambiguous — Claude interpreted it differently than you intended"
+      - "Claude can't understand English"
+      - "You need a more expensive plan"
+    correct: 1
+    explanation: "When Claude gives a high-quality answer to the wrong question, the problem is ambiguity. Your prompt could be interpreted multiple ways, and Claude picked a different interpretation than you intended. The fix is making the task unambiguous — explicitly state what you want and what you DON'T want."
+  - id: "prompt-debug-3"
+    question: "What's the 'isolation test' for debugging prompts?"
+    type: "multiple-choice"
+    options:
+      - "Running Claude without internet"
+      - "Removing everything from the prompt except the core ask, testing, then adding context back piece by piece"
+      - "Using a different AI model"
+      - "Running the same prompt 10 times"
+    correct: 1
+    explanation: "The isolation test strips a prompt to its bare minimum, tests if that works, then adds context back one piece at a time. This reveals which part of the prompt is causing the problem — maybe a conflicting instruction, maybe excessive context that's distracting Claude from the actual task."
+  - id: "prompt-debug-4"
+    question: "Claude keeps making the same mistake even after correction. What should you do?"
+    type: "multiple-choice"
+    options:
+      - "Keep repeating the correction louder"
+      - "Start a fresh session, rewrite the prompt from scratch with the correction built in, and show an example of correct output"
+      - "Give up on the task"
+      - "Switch to manual coding"
+    correct: 1
+    explanation: "When Claude repeats mistakes despite corrections, the original prompt's context is anchoring its behavior. Starting fresh with a rewritten prompt that includes the correction upfront (not as a follow-up) and an example of what correct output looks like is much more effective than trying to override established context."
+---
+
+## The Prompt Worked in Your Head
+
+You wrote what felt like a clear, specific prompt. Claude responded with something that's... not what you wanted. Maybe it's too generic. Maybe it answered a different question. Maybe it got the format wrong. Maybe it hallucinated an API that doesn't exist.
+
+Most people's instinct at this point is to either rephrase randomly ("let me try saying it differently") or give up ("Claude can't do this"). Both are wrong. Prompt failures have patterns, and patterns have systematic fixes.
+
+## The 5 Categories of Prompt Failure
+
+Every failed prompt falls into one of these categories. Diagnosing which one you're dealing with is half the fix.
+
+### Category 1: Too Vague (Claude Guesses)
+
+**Symptom:** Claude gives a generic, textbook-style response that could apply to any project.
+
+**Example:**
+```
+How do I handle errors in my API?
+```
+
+**Claude's response:** A generic 2000-word essay about error handling best practices covering Express, FastAPI, Django, and Spring Boot.
+
+**Diagnosis:** Claude doesn't know your stack, your patterns, or your specific situation. It defaults to covering all bases.
+
+**Fix:** Add the specifics it needs:
+```
+How should I handle Prisma database errors in the Express route 
+handlers in @src/routes/users.ts? Currently, Prisma throws 
+PrismaClientKnownRequestError but my routes don't catch it, 
+causing 500s. I want to map Prisma error codes to HTTP status 
+codes (P2002 → 409, P2025 → 404, etc.) using our AppError class 
+from @src/lib/errors.ts.
+```
+
+### Category 2: Ambiguous (Claude Misinterprets)
+
+**Symptom:** Claude gives a well-structured, confident response — but to a different question than you intended.
+
+**Example:**
+```
+Clean up the user service
+```
+
+**What you meant:** Remove dead code and unused imports.
+**What Claude did:** Refactored the entire class, renamed methods, changed the interface, and broke 15 tests.
+
+**Diagnosis:** "Clean up" is ambiguous. It could mean remove dead code, refactor, reformat, simplify, optimize, or modernize. Claude picked one interpretation; you wanted another.
+
+**Fix:** Be explicit about what "clean up" means to you:
+```
+Remove dead code and unused imports from @src/services/userService.ts.
+Do NOT refactor, rename methods, or change the public interface. 
+Only remove code that is never called and imports that are never used.
+```
+
+**Pro tip:** When you catch yourself using vague verbs like "clean up," "improve," "fix," "make better," or "optimize," stop and ask yourself: what specifically do I mean? Then say that instead.
+
+### Category 3: Conflicting Instructions
+
+**Symptom:** Claude's response is internally inconsistent, or it follows some instructions while ignoring others.
+
+**Example:**
+```
+Write a user registration endpoint. Keep it simple — just email 
+and password. Also add phone verification, OAuth support, 
+MFA enrollment, GDPR consent tracking, and IP-based rate limiting.
+```
+
+"Keep it simple" conflicts with the feature list. Claude has to choose one — and it might choose the wrong one.
+
+**Diagnosis:** Check your prompt for contradictions. Watch for:
+- "Keep it simple" + long feature list
+- "Be concise" + "explain thoroughly"
+- "Follow pattern A" when pattern A conflicts with another stated constraint
+- Prior conversation context that contradicts the current prompt
+
+**Fix:** Remove the contradiction. Either truly keep it simple, or acknowledge that it's complex:
+
+```
+Write a user registration endpoint with full features: 
+email/password, phone verification, and OAuth support.
+This will be complex — that's fine. Prioritize security 
+and completeness over simplicity.
+```
+
+### Category 4: Missing Constraints (Claude Overdelivers)
+
+**Symptom:** Claude produces way more than you asked for, or makes choices you didn't approve.
+
+**Example:**
+```
+Add a createdAt field to the User model
+```
+
+**What Claude did:** Added `createdAt`, `updatedAt`, `deletedAt`, migrated the database, updated all services to use soft deletes, added API filtering by date range, and wrote 200 lines of code you didn't ask for.
+
+**Diagnosis:** Claude is helpful to a fault. Without constraints, it anticipates what you might want next and does it preemptively.
+
+**Fix:** Explicitly constrain the scope:
+```
+Add ONLY a createdAt field to the User model in the Prisma schema.
+Set it to default to now(). Do not add any other fields. Do not 
+modify any services or routes. Do not run the migration — I'll 
+do that manually.
+```
+
+### Category 5: Context Poisoning (Old Context Overrides New)
+
+**Symptom:** Claude keeps making the same mistake even after you correct it, or it references things from earlier in the conversation that are no longer relevant.
+
+**Example:** You spent 30 minutes discussing a Python approach, then switched to TypeScript. Claude keeps sneaking Python patterns into its TypeScript code.
+
+**Diagnosis:** Earlier conversation context is anchoring Claude's behavior. The more you discussed Python, the more strongly it's anchored.
+
+**Fix:** Start a fresh session:
+```bash
+/clear
+```
+
+Then write your prompt from scratch, with no dependency on previous context. Include the correction upfront:
+
+```
+[Starting fresh] Build a TypeScript Express endpoint for user 
+registration. Use TypeScript idioms — no Python patterns. 
+Validate with Zod, not Pydantic. Use Prisma, not SQLAlchemy.
+```
+
+## The Debugging Framework
+
+When a prompt doesn't work, run through this checklist:
+
+### Step 1: Classify the Failure
+
+Ask yourself: "Is the response too generic, wrong topic, inconsistent, too much, or stuck in old context?"
+
+This tells you which category you're in and points to the fix.
+
+### Step 2: Isolation Test
+
+Strip the prompt to its bare minimum:
+
+```
+# Original (failing) prompt:
+"Using our existing auth middleware from @src/middleware/auth.ts 
+that follows the passport.js pattern with JWT strategy using 
+RS256 algorithm and public/private key pairs stored in .env, 
+add role-based access control that checks the user's role from 
+the workspace_members table joined through the workspaces table 
+where the workspace_id comes from the URL parameter and the 
+user_id comes from the decoded token payload sub field..."
+
+# Isolated version:
+"Add role-based access control to the auth middleware. 
+Check if the user has the required role for the workspace 
+in the URL."
+```
+
+If the isolated version works, add context back piece by piece until it breaks. That reveals which piece of context caused the problem.
+
+### Step 3: Show, Don't Tell
+
+When descriptions fail, show an example of what you want:
+
+```
+# Telling (often fails):
+"Format the error responses consistently"
+
+# Showing (much more reliable):
+"Format error responses like this example:
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Email format is invalid",
+    "field": "email",
+    "status": 422
+  }
+}
+Apply this format to all error responses in @src/routes/users.ts"
+```
+
+### Step 4: Negative Examples
+
+Tell Claude what you DON'T want:
+
+```
+"Write input validation for the registration endpoint.
+DO NOT:
+- Use class-validator (we use Zod)
+- Put validation in the service layer (it goes in the route)
+- Return generic 400 errors (map each validation failure to a specific field)
+- Use try/catch for validation (use Zod's safeParse)"
+```
+
+Sometimes it's easier to define what you want by ruling out what you don't.
+
+### Step 5: Fresh Start with Accumulated Knowledge
+
+If three iterations haven't fixed the issue, start completely fresh. But don't just re-send the original prompt — incorporate everything you've learned:
+
+```bash
+/clear
+```
+
+```
+[Fresh attempt — here's what I need precisely]
+
+Build a Zod validation middleware for Express routes.
+
+Input: A Zod schema object
+Output: An Express middleware function that validates req.body 
+against the schema and returns 422 with field-specific errors 
+on failure.
+
+Example usage:
+  router.post('/users', validate(createUserSchema), createUser)
+
+Example error response:
+  { "errors": [{ "field": "email", "message": "Invalid email format" }] }
+
+Do not use class-validator. Do not validate in the service layer.
+Reference @src/routes/auth.ts for the existing route pattern.
+```
+
+This single prompt contains everything Claude needs: the exact input/output contract, a usage example, an error example, negative constraints, and a file reference for patterns to follow.
+
+## Building Your Debugging Reflex
+
+The more you debug prompts, the faster you get at it. After a few weeks, you'll instinctively write prompts that avoid the common failure modes. Until then, keep this mental checklist handy:
+
+1. Did I give Claude enough context about my specific situation?
+2. Could my prompt be interpreted differently than I intended?
+3. Are any of my instructions contradicting each other?
+4. Did I constrain the scope so Claude doesn't overdeliver?
+5. Is old conversation context polluting the response?
+
+Five questions. Takes 10 seconds to run through them. Saves 10 minutes of back-and-forth.
+
+## Key Takeaway
+
+Prompt failures fall into 5 diagnosable categories: too vague (add specifics), ambiguous (be explicit about your intent), conflicting instructions (remove contradictions), missing constraints (define the scope), and context poisoning (start fresh). The systematic debugging approach is: classify the failure, isolate the prompt to its core, show examples of what you want, state what you don't want, and if all else fails, start a fresh session with a rewritten prompt incorporating everything you've learned. Treating prompt debugging as a skill rather than random guessing dramatically accelerates your effectiveness with Claude.

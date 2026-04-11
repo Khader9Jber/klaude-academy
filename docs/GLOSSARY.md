@@ -1,11 +1,11 @@
 # Project Glossary
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 1.0
 **Date:** 2026-04-04
 
-This glossary defines every term a developer joining the Claude Academy project needs to understand. Terms are organized alphabetically within categories.
+This glossary defines every term a developer joining the Klaude Academy project needs to understand. Terms are organized alphabetically within categories.
 
 ---
 
@@ -31,11 +31,11 @@ The AI safety company that builds Claude. Founded in 2021 by former OpenAI resea
 
 ### Claude
 
-Anthropic's family of large language models (LLMs). Claude is the AI assistant that powers the learning content in this project. Users of Claude Academy are learning how to use Claude effectively.
+Anthropic's family of large language models (LLMs). Claude is the AI assistant that powers the learning content in this project. Users of Klaude Academy are learning how to use Claude effectively.
 
 ### Claude Code
 
-Anthropic's official command-line interface (CLI) for interacting with Claude in a development environment. Claude Code runs in the terminal and can read files, write code, run commands, and assist with software development tasks. It is the primary subject matter of the Claude Academy curriculum.
+Anthropic's official command-line interface (CLI) for interacting with Claude in a development environment. Claude Code runs in the terminal and can read files, write code, run commands, and assist with software development tasks. It is the primary subject matter of the Klaude Academy curriculum.
 
 ### Constitutional AI (CAI)
 
@@ -111,7 +111,7 @@ A set of defined methods for communication between software components. In this 
 
 ### CDN (Content Delivery Network)
 
-A geographically distributed network of servers that caches and serves static files close to users. When Claude Academy is deployed, its HTML/CSS/JS files are served from a CDN (via Vercel, Netlify, or Cloudflare) for fast global access.
+A geographically distributed network of servers that caches and serves static files close to users. When Klaude Academy is deployed, its HTML/CSS/JS files are served from a CDN (via Vercel, Netlify, or Cloudflare) for fast global access.
 
 ### CLI (Command-Line Interface)
 
@@ -119,11 +119,11 @@ A text-based interface for interacting with software by typing commands in a ter
 
 ### CSR (Client-Side Rendering)
 
-A rendering strategy where the browser downloads a minimal HTML shell and then JavaScript builds the full page content. In Claude Academy, pages like the landing page, curriculum, and cheatsheet are effectively CSR because they are marked `"use client"` and build their content in the browser.
+A rendering strategy where the browser downloads a minimal HTML shell and then JavaScript builds the full page content. In Klaude Academy, pages like the landing page, curriculum, and cheatsheet are effectively CSR because they are marked `"use client"` and build their content in the browser.
 
 ### ISR (Incremental Static Regeneration)
 
-A Next.js rendering strategy that rebuilds individual static pages on demand after deployment, without rebuilding the entire site. Not currently used in Claude Academy (the site uses full static export), but relevant to the future backend architecture.
+A Next.js rendering strategy that rebuilds individual static pages on demand after deployment, without rebuilding the entire site. Not currently used in Klaude Academy (the site uses full static export), but relevant to the future backend architecture.
 
 ### SDK (Software Development Kit)
 
@@ -131,11 +131,11 @@ A collection of tools, libraries, and documentation for building applications wi
 
 ### SSG (Static Site Generation)
 
-A rendering strategy where all pages are pre-rendered to HTML at build time. Claude Academy uses SSG via Next.js `output: 'export'`. The build step produces a directory of static files that can be served by any web server. No server-side computation happens at request time.
+A rendering strategy where all pages are pre-rendered to HTML at build time. Klaude Academy uses SSG via Next.js `output: 'export'`. The build step produces a directory of static files that can be served by any web server. No server-side computation happens at request time.
 
 ### SSR (Server-Side Rendering)
 
-A rendering strategy where pages are rendered on the server for each request. Not currently used in Claude Academy, but would be needed if a backend is added (e.g., for user-specific progress pages).
+A rendering strategy where pages are rendered on the server for each request. Not currently used in Klaude Academy, but would be needed if a backend is added (e.g., for user-specific progress pages).
 
 ---
 
@@ -147,11 +147,11 @@ Next.js's file-system-based routing system (introduced in Next.js 13, used in th
 
 ### Client Component
 
-A React component that runs in the browser. Marked with the `"use client"` directive at the top of the file. Client components can use React hooks (useState, useEffect, etc.), event handlers, and browser APIs. In Claude Academy, interactive components (Quiz, SearchDialog, SiteHeader) are client components.
+A React component that runs in the browser. Marked with the `"use client"` directive at the top of the file. Client components can use React hooks (useState, useEffect, etc.), event handlers, and browser APIs. In Klaude Academy, interactive components (Quiz, SearchDialog, SiteHeader) are client components.
 
 ### generateStaticParams
 
-A Next.js function exported from dynamic route pages that tells the build system which parameter values to pre-render. In Claude Academy, `generateStaticParams()` generates all module slug and lesson slug combinations so that every lesson page has a pre-rendered HTML file.
+A Next.js function exported from dynamic route pages that tells the build system which parameter values to pre-render. In Klaude Academy, `generateStaticParams()` generates all module slug and lesson slug combinations so that every lesson page has a pre-rendered HTML file.
 
 ### Hooks (React Hooks)
 
@@ -163,7 +163,7 @@ The process where React attaches JavaScript event handlers and state management 
 
 ### Server Component
 
-A React component that runs only at build time (in the SSG context) or on the server. Server components can read from the filesystem, access databases, and perform other server-side operations. They cannot use React hooks or browser APIs. In Claude Academy, the module page and lesson page outer shells are server components.
+A React component that runs only at build time (in the SSG context) or on the server. Server components can read from the filesystem, access databases, and perform other server-side operations. They cannot use React hooks or browser APIs. In Klaude Academy, the module page and lesson page outer shells are server components.
 
 ### ThemeProvider
 
@@ -199,7 +199,7 @@ A utility library that intelligently merges Tailwind CSS classes, resolving conf
 
 ### shadcn/ui
 
-A collection of beautifully designed, accessible React components built with Tailwind CSS and Radix UI. Claude Academy follows the shadcn/ui philosophy: components are copied into the project (not installed as a dependency), giving full ownership and customization control. The project does not use shadcn/ui directly but builds components in the same style.
+A collection of beautifully designed, accessible React components built with Tailwind CSS and Radix UI. Klaude Academy follows the shadcn/ui philosophy: components are copied into the project (not installed as a dependency), giving full ownership and customization control. The project does not use shadcn/ui directly but builds components in the same style.
 
 ---
 
@@ -239,7 +239,7 @@ A remark plugin that adds GitHub-Flavored Markdown support. Enables syntax for t
 
 ### localStorage
 
-A browser API that stores key-value pairs (strings) persistently on the user's device. Data survives page reloads and browser restarts. Each origin (domain) has ~5MB of storage. Claude Academy stores all progress data in localStorage under the key `claude-academy-progress`.
+A browser API that stores key-value pairs (strings) persistently on the user's device. Data survives page reloads and browser restarts. Each origin (domain) has ~5MB of storage. Klaude Academy stores all progress data in localStorage under the key `klaude-academy-progress`.
 
 ### Persist Middleware
 
@@ -263,15 +263,15 @@ An accessibility testing engine that checks web pages for WCAG compliance. Used 
 
 ### E2E (End-to-End) Testing
 
-Testing that simulates real user behavior across the full application stack. E2E tests navigate between pages, click buttons, fill forms, and verify that the entire system works together. Claude Academy uses Playwright for E2E testing.
+Testing that simulates real user behavior across the full application stack. E2E tests navigate between pages, click buttons, fill forms, and verify that the entire system works together. Klaude Academy uses Playwright for E2E testing.
 
 ### Lighthouse
 
-An open-source tool by Google for auditing web page quality. Measures Performance (load speed, interactivity), Accessibility (WCAG compliance), Best Practices (security headers, console errors), and SEO (meta tags, crawlability). Scores range from 0-100. Claude Academy targets 95+ on all metrics.
+An open-source tool by Google for auditing web page quality. Measures Performance (load speed, interactivity), Accessibility (WCAG compliance), Best Practices (security headers, console errors), and SEO (meta tags, crawlability). Scores range from 0-100. Klaude Academy targets 95+ on all metrics.
 
 ### Playwright
 
-A cross-browser E2E testing framework by Microsoft. Supports Chromium, Firefox, and WebKit. Tests run in real browsers and can simulate user interactions, viewport sizes, and keyboard input. Claude Academy uses Playwright for page navigation tests, interaction tests, and accessibility audits.
+A cross-browser E2E testing framework by Microsoft. Supports Chromium, Firefox, and WebKit. Tests run in real browsers and can simulate user interactions, viewport sizes, and keyboard input. Klaude Academy uses Playwright for page navigation tests, interaction tests, and accessibility audits.
 
 ### React Testing Library
 
@@ -287,7 +287,7 @@ A fast unit test framework built on Vite. ESM-native, compatible with Jest's API
 
 ### Arc
 
-A grouping of related modules that represents a skill level in the Claude Academy curriculum. There are 4 arcs: Foundation (Modules 1-4, green), Practitioner (Modules 5-8, blue), Power User (Modules 9-11, purple), and Expert (Modules 12-13, gold). Each arc has a distinct color used throughout the UI.
+A grouping of related modules that represents a skill level in the Klaude Academy curriculum. There are 4 arcs: Foundation (Modules 1-4, green), Practitioner (Modules 5-8, blue), Power User (Modules 9-11, purple), and Expert (Modules 12-13, gold). Each arc has a distinct color used throughout the UI.
 
 ### Capstone Project
 

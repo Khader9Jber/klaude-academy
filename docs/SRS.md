@@ -1,6 +1,6 @@
 # Software Requirements Specification
 
-## Claude Academy Learning Platform
+## Klaude Academy Learning Platform
 
 **Document Version:** 2.0
 **Date:** 2026-04-05
@@ -22,11 +22,11 @@
 
 ### 1.1 Purpose
 
-This Software Requirements Specification (SRS) defines the functional and non-functional requirements for **Claude Academy**, an interactive learning website that teaches users how to use Claude and Claude Code from beginner to expert level. This document serves as the authoritative reference for developers, testers, and stakeholders throughout the project lifecycle. It follows the IEEE 830 standard for software requirements specification.
+This Software Requirements Specification (SRS) defines the functional and non-functional requirements for **Klaude Academy**, an interactive learning website that teaches users how to use Claude and Claude Code from beginner to expert level. This document serves as the authoritative reference for developers, testers, and stakeholders throughout the project lifecycle. It follows the IEEE 830 standard for software requirements specification.
 
 ### 1.2 Scope
 
-Claude Academy is a free, open-source, static-first web application that delivers a structured curriculum of 13 modules organized into 4 skill arcs: Foundation, Practitioner, Power User, and Expert. The platform provides interactive lessons written in MDX, embedded quizzes and exercises, progress tracking with gamification features (streaks, achievements), a searchable cheatsheet for Claude Code commands, a template library for configuration files, and a Prompt Engineering Lab with an interactive 6-layer prompt builder.
+Klaude Academy is a free, open-source, static-first web application that delivers a structured curriculum of 13 modules organized into 4 skill arcs: Foundation, Practitioner, Power User, and Expert. The platform provides interactive lessons written in MDX, embedded quizzes and exercises, progress tracking with gamification features (streaks, achievements), a searchable cheatsheet for Claude Code commands, a template library for configuration files, and a Prompt Engineering Lab with an interactive 6-layer prompt builder.
 
 The system is built with Next.js 16 (App Router, static export), React 19, TypeScript, Tailwind CSS 4, and Zustand for client-side state management. All data persistence uses the browser's localStorage API. There is no backend, no authentication, and no server-side logic in the current phase.
 
@@ -72,7 +72,7 @@ The system is built with Next.js 16 (App Router, static export), React 19, TypeS
 
 ### 2.1 Product Perspective
 
-Claude Academy is a standalone web application that operates entirely in the user's browser. It is not a component of a larger system. The site is generated at build time as a collection of static HTML, CSS, and JavaScript files that can be deployed to any static hosting provider (Vercel, Netlify, Cloudflare Pages, or any web server).
+Klaude Academy is a standalone web application that operates entirely in the user's browser. It is not a component of a larger system. The site is generated at build time as a collection of static HTML, CSS, and JavaScript files that can be deployed to any static hosting provider (Vercel, Netlify, Cloudflare Pages, or any web server).
 
 The application has no external dependencies at runtime. It does not make network requests after the initial page load (beyond fetching its own static assets). All interactive features -- quizzes, progress tracking, search -- run entirely client-side.
 
@@ -121,7 +121,7 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | Constraint | Description |
 |-----------|-------------|
 | **No Backend** | The current architecture uses `output: 'export'` in next.config.ts, producing a fully static site. There are no server-side endpoints, no database, and no authentication system. |
-| **localStorage** | All user state (progress, quiz scores, streaks, achievements) is stored in the browser's localStorage under the key `claude-academy-progress`. Data is device-specific and cannot sync across browsers or devices. |
+| **localStorage** | All user state (progress, quiz scores, streaks, achievements) is stored in the browser's localStorage under the key `klaude-academy-progress`. Data is device-specific and cannot sync across browsers or devices. |
 | **Client-Side Only** | All computation (search indexing, quiz scoring, progress calculation, streak tracking) happens in the browser. |
 | **Content at Build Time** | MDX lesson content is parsed and rendered at build time via `generateStaticParams`. Adding or modifying content requires a new build. |
 | **No External API Calls** | The application makes no runtime network requests to external APIs. There is no integration with the Anthropic API or any other service. |
@@ -177,7 +177,7 @@ All user classes share the same interface. Content difficulty is indicated by ba
 | ID | Requirement | Priority |
 |----|------------|----------|
 | **FR-21** | The system shall track lesson completion status. A lesson is identified by the composite key `{moduleSlug}/{lessonSlug}`. Once marked complete, a lesson cannot be un-completed (only a full reset clears it). | P1 |
-| **FR-22** | The system shall persist all progress data across browser sessions using localStorage. The Zustand store uses the `persist` middleware with the storage key `claude-academy-progress`. Data is serialized to JSON and deserialized on page load (rehydration). | P1 |
+| **FR-22** | The system shall persist all progress data across browser sessions using localStorage. The Zustand store uses the `persist` middleware with the storage key `klaude-academy-progress`. Data is serialized to JSON and deserialized on page load (rehydration). | P1 |
 | **FR-23** | The system shall calculate module completion percentage as: `Math.round((completedLessonsInModule / totalLessonsInModule) * 100)`. This percentage is displayed on module cards in the curriculum page and on the module overview page as a colored progress bar. | P1 |
 | **FR-24** | The system shall track daily learning streaks. When the user performs an activity (completing a lesson, finishing a quiz, completing an exercise), today's date is added to the `activeDays` array (if not already present). The `currentStreak` is calculated by counting consecutive days backwards from today/yesterday. The `longestStreak` is the maximum of all consecutive day runs in the history. | P2 |
 | **FR-25** | The system shall award achievement badges when milestone conditions are met. Achievements are defined in `src/lib/constants.ts` and include: First Steps (1 lesson), Getting Warmed Up (5 lessons), Dedicated Learner (10 lessons), Knowledge Seeker (25 lessons), Completionist (all ~70 lessons), Foundation Built (all Foundation arc), Practitioner Unlocked (all Practitioner arc), Power Unleashed (all Power User arc), Quiz Ace (100% on any quiz), Three Day Streak, Week Warrior (7 days), Monthly Master (30 days). | P2 |
@@ -208,7 +208,7 @@ All user classes share the same interface. Content difficulty is indicated by ba
 |----|------------|----------|
 | **FR-41** | The system shall have a CI workflow (`.github/workflows/ci.yml`) that runs on every push to `main` or `develop` and on every PR to `main`. The workflow shall execute lint (ESLint), type checking (`tsc --noEmit`), unit tests with coverage (Vitest), E2E tests (Playwright), and production build (`next build`) as separate jobs with a dependency graph: E2E depends on lint, typecheck, and test; build depends on all four. | P1 |
 | **FR-42** | The system shall have a security workflow (`.github/workflows/security.yml`) that runs on every push to `main`, on PRs to `main`, and on a weekly schedule (Monday 8am UTC). The workflow shall perform dependency auditing (`npm audit --audit-level=high` + `audit-ci`), CodeQL static analysis for JavaScript/TypeScript, and secret detection using TruffleHog with `--only-verified` flag. | P1 |
-| **FR-43** | The system shall have a deploy workflow (`.github/workflows/deploy.yml`) that runs on push to `main` and manual dispatch. The workflow shall include a CI gate job (lint + typecheck + test) that must pass before deployment. On success, it shall deploy to both GitHub Pages (via `actions/deploy-pages@v4`) and Vercel production (via `vercel deploy --prod` with alias to `claude-academy-course.vercel.app`). | P1 |
+| **FR-43** | The system shall have a deploy workflow (`.github/workflows/deploy.yml`) that runs on push to `main` and manual dispatch. The workflow shall include a CI gate job (lint + typecheck + test) that must pass before deployment. On success, it shall deploy to both GitHub Pages (via `actions/deploy-pages@v4`) and Vercel production (via `vercel deploy --prod` with alias to `klaude-academy-course.vercel.app`). | P1 |
 | **FR-44** | The system shall have a PR preview workflow (`.github/workflows/pr-preview.yml`) that runs on PRs to `main`. The workflow shall build the site, deploy a preview to Vercel (non-production), and comment on the PR with the preview URL. | P2 |
 | **FR-45** | The CI workflow shall upload artifacts: coverage report (30-day retention), Playwright HTML report (30-day retention), E2E failure screenshots (7-day retention on failure only), and build output (7-day retention). | P2 |
 | **FR-46** | All key interactive and structural elements in the application shall have `data-testid` attributes following kebab-case naming convention. These attributes serve as stable selectors for E2E tests and must be present on: site header, site footer, site logo, navigation links, hero heading, Start Learning button, arc cards, stats bar, module cards, arc sections, module title, lesson items, lesson title, mark complete button, completed indicator, progress heading, progress stats, reset button, prompt lab heading, template cards, category filters, cheatsheet search input, and category tabs. | P1 |
@@ -430,11 +430,11 @@ The Zustand store uses the `persist` middleware with the following configuration
 
 ```typescript
 persist(storeCreator, {
-  name: "claude-academy-progress", // localStorage key
+  name: "klaude-academy-progress", // localStorage key
 })
 ```
 
-The serialized state is a JSON string stored under the key `claude-academy-progress` in the browser's localStorage. The persist middleware handles serialization on every state change and deserialization (rehydration) on initial page load.
+The serialized state is a JSON string stored under the key `klaude-academy-progress` in the browser's localStorage. The persist middleware handles serialization on every state change and deserialization (rehydration) on initial page load.
 
 ### 4.3 Content Files
 

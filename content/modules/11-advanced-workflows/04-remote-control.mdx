@@ -3,7 +3,7 @@ title: "Remote Control and Mobile Workflows"
 slug: "remote-control"
 order: 4
 difficulty: "advanced"
-duration: 13
+duration: 18
 tags: ["remote-control", "mobile", "workflows", "qr-code"]
 objectives:
   - "Set up Remote Control with /rc"
@@ -45,23 +45,25 @@ quiz:
 
 ## Code Sessions, Anywhere
 
-Remote Control turns Claude Code into a remotely accessible tool. Your session runs on your development machine, but you interact with it from any device — phone, tablet, laptop.
+Here's a scenario that happens to me constantly: I kick off a big refactoring task in Claude Code, realize I need to grab lunch, and now I'm sitting at a restaurant wondering if Claude finished the migration or if it's stuck waiting for me to approve a file write.
 
-The key insight: **your code never leaves your machine**. Remote Control provides a browser-based interface to your local session. It's a window, not a copy.
+Remote Control solves this completely. Your session runs on your development machine, but you interact with it from any device — phone, tablet, laptop at a coffee shop. You pull up a URL on your phone, and there's your entire Claude Code session, ready for you to approve, redirect, or just check on.
+
+The key insight: **your code never leaves your machine**. Remote Control provides a browser-based interface to your local session. It's a window, not a copy. Your source code isn't being transmitted anywhere — only the conversation text flows between your machine and the browser.
 
 ## Setting Up Remote Control
 
-During any Claude Code session:
+During any Claude Code session, just type:
 
 ```bash
 /rc
-# or
+# or the full form
 claude remote-control
 ```
 
-Claude generates:
-1. A **unique URL** — open it on any device
-2. A **QR code** — scan with your phone's camera
+Claude generates two things:
+1. A **unique URL** — open it on any device with a browser
+2. A **QR code** — point your phone's camera at it and tap the link
 
 ```
 Remote Control Active
@@ -75,138 +77,182 @@ Scan the QR code or open the URL on any device.
 Your code stays on this machine.
 ```
 
-Open the URL on your phone's browser, and you see the full Claude Code session — conversation history, current state, and the ability to send messages.
+Open the URL on your phone's browser, and you see the full Claude Code session — conversation history, current output, and the ability to send messages and approve actions.
+
+**Pro tip**: The first time you use /rc, scan the QR code with your phone and bookmark the page pattern. Next time, you'll know exactly where to look. The URL changes per session, but the flow becomes second nature.
 
 ## What You Can Do Remotely
 
-- **See the conversation**: Full history and current output
-- **Send messages**: Type instructions from your phone
-- **Approve actions**: When Claude asks for permission, approve or deny remotely
-- **Monitor progress**: Watch long-running tasks without being at your desk
-- **Steer direction**: "Actually, focus on the auth module first"
+Once you're connected from another device, you have meaningful control:
+
+- **See the full conversation**: Scroll back through everything Claude has said and done in this session
+- **Send messages**: Type new instructions from your phone ("Focus on the auth module first")
+- **Approve actions**: When Claude asks for permission to write a file, read a directory, or run a command — approve or deny right from your phone
+- **Monitor progress**: Watch long-running tasks unfold without being chained to your desk
+- **Steer direction**: Mid-task, tell Claude to change priorities or skip something
+
+This is especially powerful for tasks where Claude is mostly autonomous but occasionally needs a human decision. Instead of the task blocking because you walked away, you handle the approval from wherever you are.
 
 ## What You Can't Do Remotely
 
-- **Edit files directly**: You interact through Claude, not a code editor
-- **Run terminal commands**: Commands run through Claude on your machine
-- **Access the file system**: Only through Claude's tools
+There are real limitations to understand:
 
-## Workflow: Worktree + Remote
+- **No direct file editing**: You interact through Claude, not through a code editor. You can tell Claude to edit files, but you can't open a file and type in it.
+- **No terminal access**: Commands run through Claude on your local machine. You can ask Claude to run a command, but you can't open a shell.
+- **No file system browsing**: You see files only through Claude's tools — `Read`, `Glob`, etc.
 
-Start an isolated experiment and monitor from anywhere:
+These limitations are actually a feature: they mean the remote interface is lightweight and works on any device, even a phone with a tiny screen. You're steering Claude, not trying to replicate your full development environment on a 6-inch display.
+
+## Workflow: Worktree + Remote Control
+
+This is my favorite combination. You kick off an experimental refactor in an isolated worktree, then monitor and steer it from wherever you end up.
 
 ```bash
-# At your desk: start an isolated experiment
+# At your desk: start an isolated experiment in a worktree
 claude -w experiment-new-auth
 
-# Give Claude a complex task
+# Give Claude a complex task that'll take a while
 "Refactor the auth module to use the new JWT library. 
-Migrate all routes, update tests, and verify everything passes."
+Migrate all 12 route files, update the middleware chain, 
+rewrite the tests, and verify everything passes."
 
 # Enable remote control
 /rc
 
-# Walk away — go to lunch, commute, whatever
-
-# On your phone: open the QR/URL
-# Claude is working in the worktree
-# You can check progress: "How's it going?"
-# Approve permissions: [Allow] [Deny]
-# Steer: "Skip the email routes, focus on API auth first"
+# Now you can walk away
 ```
 
-When you get back to your desk, the work is done in an isolated worktree. Review and merge if it looks good.
+Here's what happens next: you go grab coffee, commute home, or sit in a meeting. On your phone, you open the Remote Control URL. Maybe Claude is 60% done. Maybe it hit a question — "The refresh token endpoint has two implementations, which one should I keep?" You type "keep the one in auth-v2.ts, it handles edge cases better" and Claude continues.
 
-## Workflow: Agent Team + Remote
+When you get back to your desk, the work is done in an isolated worktree. Your main branch is untouched. You review the changes with `git diff`, run the tests one more time, and merge if it looks good. If it doesn't, you delete the worktree and lose nothing.
 
-Kick off a multi-agent task and monitor from your phone:
+**Watch out**: The worktree session needs to stay alive on your machine. If your laptop sleeps or the terminal closes, the session dies. See the section on keeping your machine awake below.
+
+## Workflow: Agent Team + Remote Control
+
+This is the "I'm running a construction crew from my phone" workflow:
 
 ```bash
-# At your desk: start an agent team task
+# At your desk: kick off a multi-agent task
 "Use agent team to implement the new notification system.
-Split between email, push, and in-app notifications."
+Split the work: one agent handles email notifications,
+one handles push notifications, one handles in-app.
+Each should write their own tests."
 
 # Enable remote control
 /rc
 
 # On your phone: watch the team work
-# See the lead agent decompose the task
-# Watch teammates report progress
-# Approve or redirect as needed
 ```
 
-## Workflow: Loop + Remote
+From your phone, you can see the lead agent decompose the task, watch it assign work to sub-agents, see each sub-agent report progress, and intervene if something goes sideways. Maybe the push notification agent picked the wrong library — you can redirect it before it builds too much on the wrong foundation.
 
-The most common combination — a monitoring loop you check from your phone:
+The remote view shows the full multi-agent conversation, so you have complete visibility into what's happening even when you're not at your desk.
+
+## Workflow: Loop + Remote Control
+
+This is the most common real-world combination — a monitoring loop that you check periodically from your phone:
 
 ```bash
-# Set up a monitoring loop
+# Set up a monitoring loop on your dev machine
 /loop 15m
 
 "Check deployment health: hit the /health endpoint, 
-check error rates, monitor response times. Alert me 
-if anything degrades."
+check error rates in the last 15 minutes, 
+monitor p95 response times. 
+Alert me if anything degrades below our SLAs."
 
 # Enable remote control
 /rc
 
-# On your phone throughout the day:
-# See health check results
-# Get notified of issues
-# Respond: "Roll back to the previous version"
+# Throughout the day, check from your phone
 ```
+
+The loop runs every 15 minutes on your machine. Most of the time, everything's fine and the loop just logs "all clear." But when something goes wrong — response times spike, error rate jumps, a health check fails — you see it on your phone through Remote Control and can take action immediately.
+
+Combine this with notification hooks (covered in Module 9) to get proactive alerts. Slack or Discord pings you when the loop detects a problem, and you open Remote Control to investigate and respond.
 
 ## Security Considerations
 
+This is worth understanding properly, not just skimming.
+
 ### Session Isolation
 
-Each Remote Control session gets a unique URL. Only someone with the URL can access the session. The URL expires when the session ends.
+Each Remote Control session gets a cryptographically unique URL. Only someone with that URL can access the session. The URL expires when the session ends. There's no persistent access — every new session needs a new /rc invocation.
+
+**Common mistake**: Don't share your /rc URL in a public Slack channel or paste it in a GitHub issue. Treat it like a temporary password. Anyone with the URL has full control of your Claude Code session.
 
 ### Data Locality
 
-Your code runs on your machine. The remote device sends text commands and receives text responses. No source code is transmitted to the remote device — only the conversation text.
+This is the most important security property: **your code runs on your machine**. The remote device sends text commands and receives text responses. Your source code, environment variables, secrets, and files are never transmitted to the remote device. The remote browser sees the conversation — the text of what Claude said and what you said — but not the underlying file contents.
+
+Think of it like a phone call to someone at your desk. You can tell them what to do and they can tell you what they see, but the physical files never leave the desk.
 
 ### Network Requirements
 
-Your machine must be accessible (running, not sleeping, connected to the internet). If your machine sleeps, the Remote Control connection drops. Set up caffeine/amphetamine/similar to prevent sleep during long tasks.
+Your development machine must be:
+- **Running** (not sleeping, not shut down)
+- **Connected to the internet** (the connection between your machine and the remote device goes through Anthropic's relay)
+- **Running the Claude Code process** (if the terminal closes, the session dies)
 
-## Practical Tips
+**Pro tip**: If you plan to use Remote Control regularly for long-running tasks, install a tool like `caffeinate` (macOS) or `caffeine` (Linux) to prevent your machine from sleeping:
 
-### Mobile-Friendly Prompts
+```bash
+# macOS: prevent sleep while Claude Code runs
+caffeinate -i -w $(pgrep -f "claude") &
 
-When typing on a phone, keep instructions concise:
+# Or more simply, prevent sleep for 4 hours
+caffeinate -t 14400 &
+```
+
+On macOS, you can also go to System Settings > Energy > and disable "Put hard disks to sleep when possible" and set the screen saver timeout to something long. Your machine needs to stay awake for the remote session to persist.
+
+## Practical Tips for Mobile Use
+
+### Write Concise Prompts on Mobile
+
+Typing long paragraphs on a phone keyboard is painful. Adapt your prompting style:
 
 ```
-# Good for mobile
-"Status update?"
+# Good for mobile — short and clear
+"Status?"
 "Focus on auth first"
+"Skip that, move to tests"
 "Approve and continue"
+"Show me the diff for order-service.ts"
 
-# Too long for mobile
-"Please provide a detailed status update on the current progress 
-of the refactoring task across all modules including..."
+# Bad for mobile — you'll hate typing this
+"Please provide a comprehensive status update on the current 
+progress of each sub-task in the refactoring operation, 
+including test results and any blockers encountered..."
 ```
 
-### Quick Checks
+Claude understands terse instructions, especially in the context of an ongoing conversation. "Status?" in the middle of a refactoring task clearly means "how far along are you?"
 
-Set up a slash command for quick status checks:
+### Create a Quick Status Command
+
+Set up a slash command specifically for mobile check-ins:
 
 ```markdown
 # .claude/commands/status.md
 ---
-description: "Quick project status"
+description: "Quick project status for mobile check-ins"
 ---
 Give me a 3-line status update:
-1. What's done
-2. What's in progress
-3. Any blockers
+1. What's done since last check
+2. What's currently in progress
+3. Any blockers or decisions needed from me
+
+Be extremely concise — I'm reading this on my phone.
 ```
 
-Then from your phone: `/status`
+Then from your phone, just type: `/status`
 
-### Notification Integration
+Three lines. Exactly what you need. No scrolling through a wall of text on a tiny screen.
 
-Combine Remote Control with notification hooks:
+### Notification Integration for Proactive Alerts
+
+Instead of constantly checking Remote Control, set up notification hooks so Claude *tells you* when it needs attention:
 
 ```json
 {
@@ -217,15 +263,33 @@ Combine Remote Control with notification hooks:
         "url": "https://hooks.slack.com/services/xxx/yyy/zzz",
         "method": "POST",
         "headers": { "Content-Type": "application/json" },
-        "body": { "text": "Claude needs you! Check Remote Control" }
+        "body": { "text": "Claude needs your input! Check Remote Control." }
       }
     ]
   }
 }
 ```
 
-Slack notifies you, you open Remote Control on your phone, handle it.
+The flow becomes: Slack pings your phone, you open the Remote Control URL, handle whatever Claude needs, then go back to what you were doing. No babysitting, no polling.
+
+### Bookmark Pattern
+
+I keep a note on my phone with the Remote Control URL format. When I start a new session with /rc, I just update the session ID in my bookmark. Saves time versus scanning the QR code every time (though the QR code is convenient for the first time).
+
+## When Remote Control Really Shines
+
+These are the scenarios where /rc goes from "nice to have" to "game changer":
+
+1. **Long-running migrations**: You kicked off a /batch that's converting 30 files. It'll take 20 minutes. Go do something else, check from your phone.
+
+2. **Overnight tasks**: Start a comprehensive test suite rewrite at end of day. Check progress from your phone at home. Come in the next morning to finished work.
+
+3. **Meeting interruptions**: You're mid-task when a meeting starts. Open Remote Control under the table (we've all done it) and approve the file writes Claude's waiting on.
+
+4. **Pair programming, async**: You start a task, your colleague picks it up via Remote Control when you go to lunch, and hands it back when you return.
+
+5. **On-call response**: Your monitoring loop detects an issue at 2 AM. Your phone buzzes. You open Remote Control, tell Claude to roll back the deployment, go back to sleep.
 
 ## Key Takeaway
 
-Remote Control (`/rc`) generates a URL and QR code that lets you access your Claude Code session from any device. Your code stays on your machine — the remote device is just a window. Combine it with worktrees for isolated experiments you can monitor remotely, agent teams for multi-agent tasks you steer from your phone, and /loop for recurring monitoring you check throughout the day. The pattern is: start the task at your desk, monitor from anywhere.
+Remote Control (`/rc`) generates a URL and QR code that lets you access your Claude Code session from any device's browser. Your code stays on your machine — the remote device is just a window into the conversation. The three killer combinations are: worktree + remote (isolated experiments you steer from anywhere), agent teams + remote (multi-agent tasks you supervise from your phone), and loop + remote (recurring monitoring you check throughout the day). Set up notification hooks so Claude proactively tells you when it needs attention instead of you polling. Keep prompts short on mobile — Claude understands terse instructions in context. The pattern is: start the task at your desk, monitor and steer from anywhere.

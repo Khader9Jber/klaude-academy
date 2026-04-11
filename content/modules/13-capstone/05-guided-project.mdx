@@ -1,0 +1,372 @@
+---
+title: "Guided Capstone: Build a Full-Stack App with Claude"
+slug: "guided-project"
+order: 5
+difficulty: "expert"
+duration: 45
+tags: ["capstone", "full-stack", "project", "guided", "end-to-end"]
+objectives:
+  - "Build a complete full-stack application from scratch using Claude Code"
+  - "Apply CLAUDE.md, hooks, skills, and headless mode in a real project"
+  - "Make real architectural decisions with Claude as your pair programmer"
+  - "Experience the complete development lifecycle with Claude Code"
+quiz:
+  - id: "guided-cap-1"
+    question: "What's the FIRST thing you should set up before writing any code with Claude?"
+    type: "multiple-choice"
+    options:
+      - "The database schema"
+      - "A CLAUDE.md file with project conventions, tech stack, and architecture decisions"
+      - "The CI/CD pipeline"
+      - "The frontend UI"
+    correct: 1
+    explanation: "CLAUDE.md is the foundation for everything else. It tells Claude your tech stack, coding conventions, architecture patterns, and project-specific rules. Without it, Claude guesses at conventions and produces inconsistent code. Setting it up first makes every subsequent interaction more productive."
+  - id: "guided-cap-2"
+    question: "When building a new feature, what's the best order of operations with Claude?"
+    type: "multiple-choice"
+    options:
+      - "UI first, then backend, then database"
+      - "Database schema → service/business logic → API routes → UI → tests"
+      - "Tests first, then everything else"
+      - "Write everything in one prompt"
+    correct: 1
+    explanation: "Building bottom-up (database → service → API → UI) ensures each layer has a solid foundation. The database schema defines the data model, services implement business logic, routes expose the API, and the UI consumes it. Tests can be written alongside each layer. This prevents the common problem of building a UI that doesn't match the actual data model."
+  - id: "guided-cap-3"
+    question: "How should you handle a situation where Claude's architectural suggestion doesn't feel right?"
+    type: "multiple-choice"
+    options:
+      - "Accept it anyway — Claude knows best"
+      - "Reject it and do everything manually"
+      - "Discuss the trade-offs, explain your concerns, and ask Claude to compare alternatives"
+      - "Ignore Claude entirely"
+    correct: 2
+    explanation: "Claude is a collaborator, not an authority. When a suggestion doesn't feel right, explain your concerns and ask Claude to compare alternatives. 'I'm worried about X. What are the trade-offs between your approach and Y?' This leads to better decisions than either blind acceptance or rejection."
+  - id: "guided-cap-4"
+    question: "What separates a capstone project from a tutorial?"
+    type: "multiple-choice"
+    options:
+      - "Capstone projects are longer"
+      - "Real decisions, real trade-offs, and adapting to unexpected problems — not following a script"
+      - "Capstone projects use more advanced technology"
+      - "There's no difference"
+    correct: 1
+    explanation: "A capstone project involves making real decisions under real constraints. You'll encounter unexpected bugs, make trade-offs between simplicity and features, and adapt your plan as you learn more. This is fundamentally different from following a tutorial where every step is predetermined."
+---
+
+## The Project: TaskFlow
+
+We're building **TaskFlow** — a team task management API with real-time features. Not a toy todo app. A proper backend that handles authentication, authorization, real-time updates, and team collaboration.
+
+By the end of this capstone, you'll have used every major Claude Code feature: CLAUDE.md, hooks, skills, headless mode, sub-agents, and more. This is where everything comes together.
+
+### What We're Building
+
+- **REST API** with Express.js and TypeScript
+- **PostgreSQL** database with Prisma ORM
+- **JWT authentication** with refresh tokens
+- **Team workspaces** with role-based access (admin, member, viewer)
+- **Real-time task updates** via WebSocket
+- **Automated tests** — unit and integration
+- **CI/CD pipeline** with Claude-powered code review
+
+### What We're NOT Building
+
+- A frontend (API only — keeps focus on the Claude Code workflow)
+- Deployment infrastructure (we'll configure it but not deploy)
+- Payment/billing (out of scope)
+
+## Phase 1: Project Foundation (30 minutes)
+
+### Step 1: Initialize the Project
+
+Start Claude Code in an empty directory:
+
+```bash
+mkdir taskflow && cd taskflow
+claude
+```
+
+Your first prompt:
+
+```
+Initialize a TypeScript Express.js project with:
+- TypeScript strict mode
+- Express.js with proper types
+- Prisma ORM (PostgreSQL)
+- Vitest for testing
+- ESLint + Prettier
+- A src/ directory structure with routes/, services/, middleware/, lib/
+- A proper tsconfig.json and package.json
+
+Don't install yet — show me the package.json first so I can review.
+```
+
+Review what Claude proposes. Check the dependencies. Make sure there's nothing unexpected. Then approve the installation.
+
+### Step 2: Set Up CLAUDE.md
+
+This is the most important step. Before writing a single line of application code, establish your conventions:
+
+```
+Create a CLAUDE.md file for this project. Include:
+
+## Tech Stack
+- Runtime: Node.js 20, TypeScript 5
+- Framework: Express.js
+- ORM: Prisma with PostgreSQL
+- Auth: JWT (access + refresh tokens)
+- Testing: Vitest
+- Validation: Zod
+
+## Code Conventions  
+- All routes must validate input with Zod schemas before processing
+- All database access goes through service classes, never from routes
+- Error handling uses a custom AppError class with HTTP status codes
+- All async route handlers are wrapped with asyncHandler utility
+- Use dependency injection for services (constructor parameters, not imports)
+
+## File Patterns
+- Routes: src/routes/<resource>.ts (one file per resource)
+- Services: src/services/<Resource>Service.ts (class with methods)
+- Middleware: src/middleware/<name>.ts
+- Types: src/types/<resource>.ts
+- Tests: src/__tests__/<resource>.test.ts (mirrors source structure)
+
+## Git
+- Conventional commits: feat:, fix:, test:, chore:
+- Never commit .env files
+- Always run tests before committing
+```
+
+This CLAUDE.md will guide every future interaction. Claude will follow these patterns consistently because they're in its system context every time you start a session.
+
+### Step 3: Set Up Hooks
+
+Create your automation pipeline before writing application code:
+
+```
+Set up Claude Code hooks in .claude/settings.json:
+1. PostToolUse: Auto-format TypeScript files with Prettier on write
+2. PostToolUse: Run TypeScript type checker after writing .ts files
+3. PreToolUse: Block writes to .env files
+4. Notification: Desktop alert when Claude needs attention
+```
+
+Now every file Claude writes will be auto-formatted and type-checked. You'll catch issues immediately instead of discovering them later.
+
+## Phase 2: Database and Models (45 minutes)
+
+### Step 4: Design the Schema
+
+```
+Design the Prisma schema for TaskFlow. Entities:
+
+1. User: id, email, passwordHash, name, createdAt, updatedAt
+2. Workspace: id, name, slug, createdAt, ownerId
+3. WorkspaceMember: userId, workspaceId, role (ADMIN/MEMBER/VIEWER)
+4. Task: id, title, description, status (TODO/IN_PROGRESS/REVIEW/DONE), 
+   priority (1-4), assigneeId, workspaceId, createdById, dueDate, 
+   createdAt, updatedAt
+5. Comment: id, content, taskId, authorId, createdAt
+
+Use UUIDs for all IDs. Add appropriate indexes and relations.
+Show me the schema first — don't run the migration yet.
+```
+
+Review the schema. Check the relations, indexes, and constraints. Common things to verify:
+
+- Does `WorkspaceMember` have a composite unique constraint on `(userId, workspaceId)`?
+- Are cascade deletes set correctly? (Deleting a workspace should delete its tasks)
+- Are the indexes covering your expected query patterns?
+
+Once you're satisfied:
+
+```
+Looks good. Run the migration: npx prisma migrate dev --name initial_schema
+```
+
+### Step 5: Build the Service Layer
+
+Start with the auth service — it's foundational:
+
+```
+Build AuthService (src/services/AuthService.ts) with these methods:
+- register(email, password, name): Create user, hash password with bcrypt
+- login(email, password): Verify credentials, return JWT access + refresh tokens
+- refreshToken(refreshToken): Issue new token pair
+- Token config: access token 15min, refresh token 7 days
+
+Follow the service class pattern from CLAUDE.md. Use dependency injection 
+for the Prisma client.
+```
+
+Review the implementation. Then build the remaining services one at a time:
+
+```
+Now build WorkspaceService with: create, getById, getMembers, 
+addMember, removeMember, updateMemberRole. 
+
+A user can only access workspaces they're a member of.
+Only ADMIN role can add/remove members or change roles.
+```
+
+```
+Build TaskService with: create, getById, list (with filtering 
+and pagination), update, delete, changeStatus, assign.
+
+Tasks belong to a workspace. Only workspace members can 
+access tasks. Viewers can read but not modify.
+```
+
+### The Decision Moment
+
+At some point during service development, Claude might suggest a pattern that doesn't match your vision. For example, it might put validation logic in the service layer when you want it in the route layer (via Zod schemas).
+
+This is where the CLAUDE.md pays off. Point Claude back to the conventions:
+
+```
+The validation should be in the route layer with Zod, not in 
+the service. Check CLAUDE.md — "All routes must validate input 
+with Zod schemas before processing." The service should trust 
+that input is already validated.
+```
+
+This is a real trade-off with real arguments on both sides. In production code, you'd want to discuss it. For this project, stick with the CLAUDE.md conventions to demonstrate the value of documented decisions.
+
+## Phase 3: API Routes (30 minutes)
+
+### Step 6: Build Routes with Middleware
+
+```
+Build the auth routes (src/routes/auth.ts):
+- POST /auth/register — Zod validation, call AuthService
+- POST /auth/login — Zod validation, call AuthService  
+- POST /auth/refresh — Zod validation, call AuthService
+
+Create the auth middleware (src/middleware/auth.ts) that:
+- Extracts JWT from Authorization header
+- Verifies the token
+- Attaches the user to the request object
+- Returns 401 for missing/invalid tokens
+
+Also create the asyncHandler utility and AppError class 
+as specified in CLAUDE.md.
+```
+
+Notice how you're referencing CLAUDE.md conventions naturally. Claude reads them, follows them, and produces consistent code.
+
+### Step 7: Protected Routes
+
+```
+Build workspace routes (src/routes/workspaces.ts) — all protected 
+by auth middleware:
+- POST /workspaces — create workspace (user becomes ADMIN)
+- GET /workspaces — list user's workspaces
+- GET /workspaces/:id — get workspace details (members only)
+- POST /workspaces/:id/members — add member (ADMIN only)
+- DELETE /workspaces/:id/members/:userId — remove member (ADMIN only)
+
+Build task routes (src/routes/tasks.ts):
+- CRUD operations under /workspaces/:workspaceId/tasks/
+- Include filtering (status, priority, assignee) and pagination
+```
+
+## Phase 4: Testing (30 minutes)
+
+### Step 8: Write Tests
+
+This is where the `/test` skill (from the Skill Gallery) comes in handy. If you set it up:
+
+```
+/test @src/services/AuthService.ts — cover registration, login, 
+token refresh, and error cases (duplicate email, wrong password, 
+expired token)
+```
+
+Or manually:
+
+```
+Write integration tests for the auth routes. Test:
+1. Register with valid data → 201
+2. Register with duplicate email → 409
+3. Login with valid credentials → 200 + tokens
+4. Login with wrong password → 401
+5. Access protected route without token → 401
+6. Access protected route with expired token → 401
+7. Refresh token flow → new token pair
+
+Use Vitest and supertest. Follow the test patterns in CLAUDE.md.
+Set up a test database using Prisma's test utilities.
+```
+
+Run the tests:
+
+```
+Run all tests and show me the results.
+```
+
+Fix any failures. This is normal — first-pass tests often need adjustments for database setup, cleanup, or timing issues.
+
+## Phase 5: CI/CD and Review (20 minutes)
+
+### Step 9: Automated Pipeline
+
+```
+Create a GitHub Actions workflow (.github/workflows/ci.yml) that:
+1. Runs on push to main and on PRs
+2. Sets up PostgreSQL service container
+3. Runs: lint → type-check → tests
+4. Adds Claude-powered code review on PRs (using headless mode)
+
+Reference the CI/CD patterns from our earlier lessons.
+```
+
+### Step 10: Pre-Commit Review
+
+Set up a headless Claude review as a pre-push hook:
+
+```
+Create a git pre-push hook that runs Claude in headless mode 
+to do a quick security check on the diff. If it finds critical 
+issues, block the push and show the findings.
+
+Keep it fast — max 1 turn, text output, focus only on critical 
+security issues.
+```
+
+## Phase 6: Review and Reflect
+
+### Step 11: Full Project Review
+
+Ask Claude to review the entire project:
+
+```
+Review the complete TaskFlow project. Check:
+1. Are all CLAUDE.md conventions followed consistently?
+2. Any security issues in the auth flow?
+3. Any missing error handling?
+4. Are the tests comprehensive enough?
+5. What would you change if this were going to production?
+
+Be honest and critical.
+```
+
+This is the capstone moment. Claude reviews the project it helped build, and you evaluate both the code quality and Claude's ability to assess its own output.
+
+## What You Built and What You Learned
+
+Over the course of this capstone, you:
+
+1. **Set up CLAUDE.md** and saw how it creates consistent code across the entire project
+2. **Used hooks** to automate formatting and type-checking on every file write
+3. **Built incrementally** — schema first, then services, then routes, then tests
+4. **Made real decisions** — validation placement, authorization patterns, error handling
+5. **Used Claude's strengths** — code generation, test writing, CI/CD config
+6. **Verified Claude's output** — reviewed every major piece before moving on
+7. **Set up automation** — CI/CD pipeline with Claude-powered code review
+
+The project isn't perfect — no project is. But it demonstrates the full workflow of building with Claude Code as your pair programming partner.
+
+## Key Takeaway
+
+Building a real project with Claude Code is not about letting Claude write everything — it's about leveraging Claude for what it does best (code generation, test writing, config files) while you make the architectural decisions, review every significant piece, and maintain the vision. CLAUDE.md is the foundation that makes everything consistent. Hooks automate the tedious parts. Skills encode repeatable tasks. And the incremental approach — building one layer at a time, reviewing before moving on — produces far better results than asking Claude to generate an entire application in one shot. The best Claude Code users are not the ones who prompt the hardest. They're the ones who review the smartest.

@@ -260,7 +260,7 @@ describe('Progress Store — localStorage persistence', () => {
       useProgressStore.getState().markLessonComplete('mod/lesson')
     })
 
-    const stored = localStorage.getItem('claude-academy-progress')
+    const stored = localStorage.getItem('klaude-academy-progress')
     expect(stored).not.toBeNull()
 
     const parsed = JSON.parse(stored!)

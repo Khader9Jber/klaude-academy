@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Claude Academy are documented in this file.
+All notable changes to Klaude Academy are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
@@ -89,9 +89,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `deploy.yml`: CI gate then dual deploy to GitHub Pages + Vercel production with clean alias
   - `pr-preview.yml`: Vercel preview deploy on PRs with auto-comment
 - Dual deployment:
-  - GitHub Pages: `https://khader9jber.github.io/claude-academy/`
-  - Vercel Production: `https://claude-academy-course.vercel.app`
-- Vercel team (`claude-academy-org`) for clean URL aliasing
+  - GitHub Pages: `https://khader9jber.github.io/klaude-academy/`
+  - Vercel Production: `https://klaude-academy-course.vercel.app`
+- Vercel team (`klaude-academy-org`) for clean URL aliasing
 - Test coverage enforcement: 90% statements threshold, 70% branches threshold
 - Achieved coverage: 97% statements, 100% functions on `src/lib/` files
 - 74 MDX lesson files across 13 modules (4 arcs: Foundation, Practitioner, Power User, Expert)
@@ -105,7 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 8 pages: Landing, Curriculum, Module, Lesson, Prompt Lab, Cheatsheet, Templates, Progress
 - Dark-mode-first design system based on Claude brand colors (gold accent, green/blue/purple/gold arc colors)
 - Light mode with appropriate color inversions
-- Zustand progress store with localStorage persistence (`claude-academy-progress` key)
+- Zustand progress store with localStorage persistence (`klaude-academy-progress` key)
 - Next.js 16 static site with App Router (`output: 'export'`)
 - Searchable cheatsheet with 12 sections, 90+ items, real-time search, and 8 category tabs
 - Template library with 15 templates across 5 categories with copy-to-clipboard

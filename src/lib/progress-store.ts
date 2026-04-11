@@ -153,7 +153,7 @@ export const useProgressStore = create<ProgressStore>()(
       },
     }),
     {
-      name: "claude-academy-progress",
+      name: "klaude-academy-progress",
     }
   )
 );
