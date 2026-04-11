@@ -1,0 +1,372 @@
+---
+title: "Migration Strategies"
+slug: "migrations"
+order: 2
+difficulty: "expert"
+duration: 20
+tags: ["database", "migrations", "versioning", "safety"]
+objectives:
+  - "Generate migration files for Prisma, Drizzle, raw SQL, and Alembic"
+  - "Apply zero-downtime migration patterns for production databases"
+  - "Create rollback strategies for every migration"
+  - "Split tables and restructure schemas without downtime"
+quiz:
+  - id: "migrations-1"
+    question: "What's the most dangerous type of migration for a production database?"
+    type: "multiple-choice"
+    options:
+      - "Adding a new table"
+      - "Renaming or dropping a column that the application code still references"
+      - "Adding an index"
+      - "Adding a nullable column"
+    correct: 1
+    explanation: "Renaming or dropping a column while the app still references the old name causes immediate failures. Unlike adding a column (which is backward compatible), renaming requires coordinated deployment: add new column, deploy code that writes to both, backfill, deploy code that reads from new, drop old. Claude generates this entire migration sequence."
+  - id: "migrations-2"
+    question: "What's the correct sequence for a zero-downtime column rename?"
+    type: "multiple-choice"
+    options:
+      - "ALTER TABLE RENAME COLUMN"
+      - "1) Add new column, 2) Deploy code writing to both columns, 3) Backfill old data, 4) Deploy code reading from new column, 5) Drop old column"
+      - "Drop old column, add new column"
+      - "Use a view to alias the column"
+    correct: 1
+    explanation: "This expand-migrate-contract pattern ensures no deployment step breaks the running application. At every stage, the code and schema are compatible. Claude generates each migration step and tells you when to deploy the code changes between them."
+  - id: "migrations-3"
+    question: "Why should large table backfills be done in batches?"
+    type: "multiple-choice"
+    options:
+      - "They run faster in batches"
+      - "A single UPDATE on millions of rows locks the table, blocks other queries, and can overwhelm the transaction log — batching keeps locks short and the database responsive"
+      - "PostgreSQL requires batching"
+      - "For better monitoring"
+    correct: 1
+    explanation: "Updating 10M rows in one transaction acquires a lock for the entire operation, bloats the WAL, and can make the table unresponsive for minutes. Batching (UPDATE ... WHERE id IN (SELECT id ... LIMIT 10000)) keeps each transaction short, releases locks frequently, and lets normal traffic flow between batches."
+  - id: "migrations-4"
+    question: "What should every migration include besides the schema change?"
+    type: "multiple-choice"
+    options:
+      - "Comments"
+      - "A rollback script (down migration) that reverses the change, tested before the forward migration is applied"
+      - "Performance metrics"
+      - "A changelog entry"
+    correct: 1
+    explanation: "Every migration needs a tested rollback. 'I'll write the rollback if I need it' means you're writing a rollback under pressure at 3 AM during an outage. Claude generates both the up and down migrations together, and you should test the rollback in staging before applying the forward migration to production."
+---
+
+## Migrations Are Deployments
+
+A migration isn't just a SQL file. It's a deployment that happens at the database level. And unlike code deployments, you can't always roll back a database change by reverting a git commit. Claude helps you plan migrations that are safe, reversible, and won't page you at 3 AM.
+
+## Migration File Generation
+
+Claude generates migrations for whatever tool you use:
+
+### Prisma
+
+```bash
+claude "I need to add a 'tags' feature to my Prisma schema.
+Currently I have a Post model. I need:
+- A Tag model (id, name, color, org_id)
+- Many-to-many relation between Post and Tag
+- Tags should be unique per org
+- Include the migration SQL Prisma would generate
+
+Show me the schema.prisma changes and the migration."
+```
+
+```prisma
+// schema.prisma additions
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#6B7280")
+  orgId     String   @map("org_id")
+  org       Org      @relation(fields: [orgId], references: [id],
+                               onDelete: Cascade)
+  posts     Post[]   @relation("PostTags")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([orgId, name])
+  @@map("tags")
+}
+
+model Post {
+  // ... existing fields ...
+  tags Tag[] @relation("PostTags")
+}
+```
+
+```sql
+-- Migration: add_tags
+CREATE TABLE "tags" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "color" TEXT NOT NULL DEFAULT '#6B7280',
+    "org_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "tags_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "_PostTags" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX "tags_org_id_name_key" ON "tags"("org_id", "name");
+CREATE UNIQUE INDEX "_PostTags_AB_unique" ON "_PostTags"("A", "B");
+CREATE INDEX "_PostTags_B_index" ON "_PostTags"("B");
+
+ALTER TABLE "tags" ADD CONSTRAINT "tags_org_id_fkey"
+    FOREIGN KEY ("org_id") REFERENCES "orgs"("id")
+    ON DELETE CASCADE;
+ALTER TABLE "_PostTags" ADD CONSTRAINT "_PostTags_A_fkey"
+    FOREIGN KEY ("A") REFERENCES "posts"("id") ON DELETE CASCADE;
+ALTER TABLE "_PostTags" ADD CONSTRAINT "_PostTags_B_fkey"
+    FOREIGN KEY ("B") REFERENCES "tags"("id") ON DELETE CASCADE;
+```
+
+### Drizzle
+
+```bash
+claude "Generate a Drizzle migration for the same tags feature.
+I use Drizzle with PostgreSQL."
+```
+
+```typescript
+// drizzle/schema/tags.ts
+import { pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+import { orgs } from './orgs';
+import { posts } from './posts';
+
+export const tags = pgTable('tags', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#6B7280'),
+  orgId: text('org_id').notNull().references(() => orgs.id,
+    { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueOrgName: unique().on(table.orgId, table.name),
+}));
+
+export const postTags = pgTable('post_tags', {
+  postId: text('post_id').notNull().references(() => posts.id,
+    { onDelete: 'cascade' }),
+  tagId: text('tag_id').notNull().references(() => tags.id,
+    { onDelete: 'cascade' }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.postId, table.tagId] }),
+}));
+```
+
+### Raw SQL with Rollback
+
+```bash
+claude "Generate raw SQL migration files (up + down) for
+adding tags to my project. No ORM — just SQL.
+Include both forward and rollback."
+```
+
+```sql
+-- migrations/005_add_tags.up.sql
+BEGIN;
+
+CREATE TABLE tags (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        text NOT NULL,
+    color       text NOT NULL DEFAULT '#6B7280',
+    org_id      uuid NOT NULL REFERENCES organizations(id)
+                     ON DELETE CASCADE,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(org_id, name)
+);
+
+CREATE TABLE post_tags (
+    post_id     uuid NOT NULL REFERENCES posts(id)
+                     ON DELETE CASCADE,
+    tag_id      uuid NOT NULL REFERENCES tags(id)
+                     ON DELETE CASCADE,
+    PRIMARY KEY (post_id, tag_id)
+);
+
+CREATE INDEX idx_tags_org ON tags(org_id);
+CREATE INDEX idx_post_tags_tag ON post_tags(tag_id);
+
+COMMIT;
+```
+
+```sql
+-- migrations/005_add_tags.down.sql
+BEGIN;
+DROP TABLE IF EXISTS post_tags;
+DROP TABLE IF EXISTS tags;
+COMMIT;
+```
+
+## Zero-Downtime Migrations
+
+This is where experience matters. Claude knows the patterns:
+
+### Splitting a Table
+
+```bash
+claude "I need to split my 'users' table into 'users' (auth data)
+and 'profiles' (display data). The users table has 500K rows
+and the app gets 1000 req/s.
+
+Generate a zero-downtime migration plan.
+Show me each step and when to deploy code changes."
+```
+
+Claude generates a multi-step plan:
+
+```
+Step 1: Create the new profiles table (safe — no impact)
+Step 2: Deploy code that writes to BOTH tables on user update
+Step 3: Backfill profiles from existing users data (batched)
+Step 4: Deploy code that reads from profiles table
+Step 5: Deploy code that stops writing display data to users
+Step 6: Drop the old columns from users (after verification period)
+
+Total timeline: ~2 weeks with confidence checks at each step.
+```
+
+```sql
+-- Step 1: Create profiles table
+CREATE TABLE profiles (
+    user_id     uuid PRIMARY KEY REFERENCES users(id)
+                     ON DELETE CASCADE,
+    display_name text,
+    avatar_url  text,
+    bio         text,
+    location    text,
+    website     text,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Step 3: Batched backfill (run this as a script, not a migration)
+DO $$
+DECLARE
+    batch_size integer := 5000;
+    total_migrated integer := 0;
+BEGIN
+    LOOP
+        WITH batch AS (
+            SELECT id, display_name, avatar_url, bio,
+                   location, website
+            FROM users
+            WHERE id NOT IN (SELECT user_id FROM profiles)
+            LIMIT batch_size
+            FOR UPDATE SKIP LOCKED
+        )
+        INSERT INTO profiles (user_id, display_name, avatar_url,
+                              bio, location, website)
+        SELECT id, display_name, avatar_url, bio,
+               location, website
+        FROM batch;
+
+        GET DIAGNOSTICS total_migrated = ROW_COUNT;
+
+        IF total_migrated = 0 THEN
+            EXIT;
+        END IF;
+
+        RAISE NOTICE 'Migrated % rows', total_migrated;
+        PERFORM pg_sleep(0.1);  -- Brief pause between batches
+    END LOOP;
+END $$;
+
+-- Step 6: Drop old columns (after 2-week verification)
+ALTER TABLE users
+    DROP COLUMN display_name,
+    DROP COLUMN avatar_url,
+    DROP COLUMN bio,
+    DROP COLUMN location,
+    DROP COLUMN website;
+```
+
+The `FOR UPDATE SKIP LOCKED` prevents the backfill from blocking normal writes. The `pg_sleep(0.1)` gives the database breathing room between batches. These details matter in production.
+
+### Adding a NOT NULL Column
+
+You can't add a `NOT NULL` column without a default to a table with existing rows. Here's the safe way:
+
+```bash
+claude "I need to add a 'status' column (NOT NULL, enum)
+to my orders table (10M rows). The default should be 'active'.
+Generate a zero-downtime migration."
+```
+
+```sql
+-- Step 1: Add column as nullable with default
+ALTER TABLE orders ADD COLUMN status order_status DEFAULT 'active';
+-- On PostgreSQL 11+, this is instant (metadata-only change)
+
+-- Step 2: Backfill any nulls (shouldn't be any, but be safe)
+UPDATE orders SET status = 'active' WHERE status IS NULL;
+
+-- Step 3: Add NOT NULL constraint
+ALTER TABLE orders ALTER COLUMN status SET NOT NULL;
+```
+
+On PostgreSQL 11+, adding a column with a default is a metadata-only operation — it doesn't rewrite the table. Claude knows these version-specific behaviors.
+
+## Rollback Strategies
+
+Every migration needs a tested escape plan:
+
+```bash
+claude "For each migration step in the table split above,
+generate the rollback SQL. Also generate a verification
+query I can run to confirm each step succeeded."
+```
+
+```sql
+-- Rollback for Step 1 (if profiles table is empty)
+DROP TABLE IF EXISTS profiles;
+
+-- Rollback for Step 3 (backfill — reversible by truncating)
+TRUNCATE profiles;
+
+-- Verification queries:
+-- After Step 3: Confirm all users have profiles
+SELECT
+    (SELECT count(*) FROM users) as user_count,
+    (SELECT count(*) FROM profiles) as profile_count,
+    (SELECT count(*) FROM users
+     WHERE id NOT IN (SELECT user_id FROM profiles)) as missing;
+-- Expected: missing = 0, user_count = profile_count
+
+-- After Step 6: Confirm no data loss
+SELECT count(*) FROM profiles WHERE display_name IS NULL
+    AND EXISTS (
+        SELECT 1 FROM users WHERE users.id = profiles.user_id
+    );
+-- Expected: 0 (no profiles missing data that existed in users)
+```
+
+## Migration Safety Checklist
+
+Ask Claude for this on every migration:
+
+```bash
+claude "Review this migration for safety:
+[paste migration SQL]
+
+Check for:
+1. Will it lock the table? For how long?
+2. Is it backward compatible with the current code?
+3. Can it be rolled back?
+4. Does it need a backfill? If so, will the backfill block writes?
+5. Does it change any indexes on a large table?
+6. Does it alter columns that have foreign key references?
+7. What's the estimated execution time on 10M rows?"
+```
+
+Claude flags the specific risks and suggests mitigations for each one. This review should happen before every production migration.
+
+## Key Takeaway
+
+Database migrations in production require the same care as surgery — you need a plan, a rollback, and monitoring. Claude generates migration files for any tool (Prisma, Drizzle, Alembic, raw SQL) but its real value is in planning zero-downtime migrations: the multi-step expand-migrate-contract pattern for column renames, batched backfills that don't lock tables, and table splits that happen over days instead of a single risky deployment. Always generate the rollback alongside the forward migration, always test in staging, and always have verification queries that confirm each step succeeded before moving to the next.

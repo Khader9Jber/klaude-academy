@@ -1,0 +1,380 @@
+---
+title: "Advanced Data Modeling"
+slug: "data-modeling"
+order: 4
+difficulty: "expert"
+duration: 20
+tags: ["database", "modeling", "patterns", "architecture"]
+objectives:
+  - "Design event sourcing and CQRS schemas with Claude"
+  - "Model time-series data and hierarchical structures effectively"
+  - "Implement multi-tenant isolation patterns"
+  - "Leverage PostgreSQL-specific features: JSONB, partitioning, RLS"
+quiz:
+  - id: "data-modeling-1"
+    question: "When should you use event sourcing over a traditional CRUD schema?"
+    type: "multiple-choice"
+    options:
+      - "Always — event sourcing is better"
+      - "When you need a complete audit trail, support undo/redo, or need to derive multiple read models from the same write events"
+      - "When the schema is simple"
+      - "When you want faster queries"
+    correct: 1
+    explanation: "Event sourcing stores every state change as an immutable event. This naturally gives you an audit trail, the ability to replay events to rebuild state, and the flexibility to create new read models from historical events. But it adds complexity — for simple CRUD apps, it's overkill. Use it when the audit trail or multiple projections are actual requirements."
+  - id: "data-modeling-2"
+    question: "What's the best way to model hierarchical data (categories with subcategories) in PostgreSQL?"
+    type: "multiple-choice"
+    options:
+      - "Self-referencing foreign key (parent_id)"
+      - "It depends: adjacency list (parent_id) for simple trees with frequent writes, materialized path for read-heavy breadcrumb queries, ltree extension for complex tree queries with pattern matching"
+      - "Nested sets always"
+      - "Separate tables per level"
+    correct: 1
+    explanation: "There's no universal best approach. Adjacency lists are simplest and handle writes well. Materialized paths ('electronics/phones/iphone') make breadcrumb and ancestor queries trivial. PostgreSQL's ltree extension supports powerful tree queries like 'find all descendants matching a pattern.' Claude recommends based on your specific read/write patterns."
+  - id: "data-modeling-3"
+    question: "When should you use PostgreSQL JSONB columns instead of normalized tables?"
+    type: "multiple-choice"
+    options:
+      - "Always — JSON is flexible"
+      - "For truly schema-less data (user preferences, form responses, third-party API payloads) that varies per record and doesn't need to be joined or aggregated across records"
+      - "For all data to avoid migrations"
+      - "When you don't know the schema yet"
+    correct: 1
+    explanation: "JSONB is perfect for data that genuinely varies per record — a settings blob, a webhook payload from a third-party API, or dynamic form responses. It's wrong for data you'll filter, join, or aggregate (use real columns with indexes). The rule: if you'd write WHERE metadata->>'key' = value frequently, that key should probably be a real column."
+  - id: "data-modeling-4"
+    question: "What's table partitioning in PostgreSQL used for?"
+    type: "multiple-choice"
+    options:
+      - "Organizing tables into folders"
+      - "Splitting a large table into smaller physical segments by a partition key (usually date), enabling partition pruning that only scans relevant segments and making maintenance (archival, deletion) faster"
+      - "Creating backups"
+      - "Improving write speed"
+    correct: 1
+    explanation: "Partitioning splits a table like 'events' into physical segments (events_2024_q1, events_2024_q2, etc.). Queries with WHERE created_at > '2024-07-01' only scan the relevant partition instead of the full table. Dropping old data is instant (DROP PARTITION instead of DELETE + VACUUM). Essential for time-series and event data at scale."
+---
+
+## Beyond CRUD
+
+Most databases are simple: tables, columns, foreign keys, done. But some problems need advanced patterns that even experienced developers haven't used. Event sourcing. Time-series optimization. Hierarchical data. Multi-tenant isolation. Claude knows these patterns deeply.
+
+## Event Sourcing Schema
+
+Event sourcing stores facts about what happened, not the current state. The current state is derived by replaying events.
+
+```bash
+claude "Design an event sourcing schema for an e-commerce
+order system in PostgreSQL.
+
+Events to support:
+- OrderCreated
+- ItemAdded, ItemRemoved, ItemQuantityChanged
+- DiscountApplied, DiscountRemoved
+- ShippingAddressSet
+- OrderSubmitted, OrderCancelled
+- PaymentReceived, PaymentFailed
+- OrderShipped, OrderDelivered
+
+I also need:
+- A current-state projection table (for fast reads)
+- A trigger or function to update the projection on new events
+- Proper indexing for event replay and projection queries"
+```
+
+```sql
+-- Event store
+CREATE TABLE order_events (
+    id              bigserial PRIMARY KEY,
+    aggregate_id    uuid NOT NULL,  -- order ID
+    event_type      text NOT NULL,
+    event_data      jsonb NOT NULL,
+    metadata        jsonb DEFAULT '{}',
+    version         integer NOT NULL,  -- per-aggregate sequence
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    created_by      uuid,
+    UNIQUE(aggregate_id, version)  -- optimistic concurrency
+);
+
+-- Indexes for event store
+CREATE INDEX idx_events_aggregate
+    ON order_events(aggregate_id, version);
+CREATE INDEX idx_events_type
+    ON order_events(event_type, created_at);
+
+-- Current-state projection (read model)
+CREATE TABLE orders_projection (
+    id              uuid PRIMARY KEY,
+    customer_id     uuid NOT NULL,
+    status          text NOT NULL DEFAULT 'draft',
+    items           jsonb NOT NULL DEFAULT '[]',
+    subtotal        numeric(12,2) NOT NULL DEFAULT 0,
+    discount        numeric(12,2) NOT NULL DEFAULT 0,
+    total           numeric(12,2) NOT NULL DEFAULT 0,
+    shipping_address jsonb,
+    last_event_id   bigint NOT NULL,  -- track which events are applied
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- Projection update function
+CREATE OR REPLACE FUNCTION apply_order_event()
+RETURNS TRIGGER AS $$
+BEGIN
+    CASE NEW.event_type
+        WHEN 'OrderCreated' THEN
+            INSERT INTO orders_projection (id, customer_id, last_event_id)
+            VALUES (
+                NEW.aggregate_id,
+                (NEW.event_data->>'customer_id')::uuid,
+                NEW.id
+            );
+
+        WHEN 'ItemAdded' THEN
+            UPDATE orders_projection SET
+                items = items || jsonb_build_array(NEW.event_data->'item'),
+                subtotal = subtotal + (NEW.event_data->>'price')::numeric
+                           * (NEW.event_data->>'quantity')::integer,
+                total = subtotal + (NEW.event_data->>'price')::numeric
+                        * (NEW.event_data->>'quantity')::integer - discount,
+                last_event_id = NEW.id,
+                updated_at = now()
+            WHERE id = NEW.aggregate_id;
+
+        WHEN 'OrderSubmitted' THEN
+            UPDATE orders_projection SET
+                status = 'submitted',
+                last_event_id = NEW.id,
+                updated_at = now()
+            WHERE id = NEW.aggregate_id;
+
+        WHEN 'PaymentReceived' THEN
+            UPDATE orders_projection SET
+                status = 'paid',
+                last_event_id = NEW.id,
+                updated_at = now()
+            WHERE id = NEW.aggregate_id;
+
+        -- ... handle other event types ...
+    END CASE;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_apply_order_event
+    AFTER INSERT ON order_events
+    FOR EACH ROW
+    EXECUTE FUNCTION apply_order_event();
+```
+
+The `UNIQUE(aggregate_id, version)` constraint provides optimistic concurrency — two concurrent writes to the same order will conflict on the version, and only one will succeed.
+
+## CQRS: Separate Read and Write Models
+
+When one projection isn't enough:
+
+```bash
+claude "I need multiple read models from my order events:
+1. Order detail view (full order with items)
+2. Dashboard stats (orders per day, revenue, avg order value)
+3. Customer order history (orders per customer with totals)
+
+Design the projections and the event processing logic."
+```
+
+Claude generates separate projection tables, each optimized for its specific query pattern. The dashboard stats might be a materialized view refreshed every minute. The customer history might be a denormalized table updated by triggers. Each read model is independently optimized.
+
+## Time-Series Data Modeling
+
+```bash
+claude "I'm storing IoT sensor data. Expected volume:
+- 1000 sensors
+- Each sends a reading every 10 seconds
+- That's 8.6M rows per day, ~260M per month
+- Queries are always time-range based: 'last 24 hours for sensor X'
+- Data older than 90 days can be archived
+
+Design the schema with PostgreSQL partitioning."
+```
+
+```sql
+-- Partitioned table by month
+CREATE TABLE sensor_readings (
+    id          bigserial,
+    sensor_id   integer NOT NULL,
+    value       double precision NOT NULL,
+    unit        text NOT NULL,
+    quality     smallint DEFAULT 100,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (recorded_at, id)
+) PARTITION BY RANGE (recorded_at);
+
+-- Create partitions (automate with pg_partman or a script)
+CREATE TABLE sensor_readings_2024_01 PARTITION OF sensor_readings
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+CREATE TABLE sensor_readings_2024_02 PARTITION OF sensor_readings
+    FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+-- ... create ahead for the next 6 months
+
+-- Each partition gets its own index (automatic with partitioning)
+-- But we add a composite index for the common query pattern
+CREATE INDEX idx_readings_sensor_time
+    ON sensor_readings(sensor_id, recorded_at DESC);
+
+-- Archive old data by dropping partitions (instant!)
+-- DROP TABLE sensor_readings_2024_01;  -- vs DELETE which takes hours
+
+-- Pre-aggregated summaries for dashboard queries
+CREATE TABLE sensor_hourly_stats (
+    sensor_id   integer NOT NULL,
+    hour        timestamptz NOT NULL,
+    avg_value   double precision,
+    min_value   double precision,
+    max_value   double precision,
+    count       integer,
+    PRIMARY KEY (sensor_id, hour)
+);
+
+-- Continuous aggregation (run this every hour)
+INSERT INTO sensor_hourly_stats
+SELECT sensor_id,
+       date_trunc('hour', recorded_at) as hour,
+       avg(value), min(value), max(value), count(*)
+FROM sensor_readings
+WHERE recorded_at >= date_trunc('hour', now() - interval '1 hour')
+  AND recorded_at < date_trunc('hour', now())
+GROUP BY sensor_id, date_trunc('hour', recorded_at)
+ON CONFLICT (sensor_id, hour) DO UPDATE SET
+    avg_value = EXCLUDED.avg_value,
+    min_value = EXCLUDED.min_value,
+    max_value = EXCLUDED.max_value,
+    count = EXCLUDED.count;
+```
+
+The key insight: partition by time (fast archival), pre-aggregate for dashboards (fast reads), and keep raw data only for the retention window.
+
+## Hierarchical Data
+
+### Materialized Path
+
+Best for breadcrumb queries and ancestor lookups:
+
+```bash
+claude "Design a category hierarchy using materialized paths.
+I need:
+- Efficient breadcrumb generation (get all ancestors)
+- List all descendants of a category
+- Move a subtree to a different parent
+- Depth queries (get all categories at level 3)"
+```
+
+```sql
+CREATE TABLE categories (
+    id          serial PRIMARY KEY,
+    name        text NOT NULL,
+    path        text NOT NULL,  -- e.g., 'electronics.phones.iphone'
+    depth       integer NOT NULL,
+    parent_id   integer REFERENCES categories(id)
+);
+
+CREATE INDEX idx_categories_path ON categories
+    USING gist (path gist_trgm_ops);
+
+-- Or use ltree extension for powerful tree queries:
+CREATE EXTENSION IF NOT EXISTS ltree;
+
+ALTER TABLE categories ADD COLUMN ltree_path ltree;
+
+-- Find all descendants of 'electronics'
+SELECT * FROM categories
+WHERE ltree_path <@ 'electronics';
+
+-- Find all ancestors of 'electronics.phones.iphone'
+SELECT * FROM categories
+WHERE ltree_path @> 'electronics.phones.iphone';
+
+-- Get breadcrumb
+SELECT * FROM categories
+WHERE 'electronics.phones.iphone'::ltree <@ ltree_path
+ORDER BY depth;
+```
+
+## PostgreSQL-Specific Power Features
+
+### JSONB: When and How
+
+```bash
+claude "I have a SaaS where each tenant can define custom
+fields on their contacts. Tenant A has 'company_size',
+tenant B has 'favorite_color'.
+
+How should I model this? Separate tables? EAV? JSONB?"
+```
+
+```sql
+-- JSONB is the right answer here.
+-- Each tenant's custom fields are stored in a JSONB column.
+
+CREATE TABLE contacts (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id   uuid NOT NULL REFERENCES tenants(id),
+    email       text NOT NULL,
+    name        text NOT NULL,
+    -- Standard fields everyone has ^^
+    custom_fields jsonb NOT NULL DEFAULT '{}',
+    -- Tenant-specific fields ^^
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- GIN index for querying inside JSONB
+CREATE INDEX idx_contacts_custom
+    ON contacts USING GIN (custom_fields);
+
+-- Query: find contacts where company_size > 100
+SELECT * FROM contacts
+WHERE tenant_id = $1
+  AND (custom_fields->>'company_size')::int > 100;
+
+-- For frequently-queried JSONB keys, add a computed index:
+CREATE INDEX idx_contacts_company_size
+    ON contacts ((custom_fields->>'company_size'))
+    WHERE custom_fields ? 'company_size';
+```
+
+### Row-Level Security for Multi-Tenancy
+
+```bash
+claude "Design RLS policies for my multi-tenant SaaS.
+The app connects through Supabase using the user's JWT.
+The JWT contains the user's tenant_id in app_metadata.
+
+I need:
+- Users can only see their tenant's data
+- Admins can see and edit all data in their tenant
+- Super admins can see all tenants (for support)
+- Service role bypasses RLS (for migrations and jobs)"
+```
+
+Claude generates a complete RLS setup with helper functions, policies for each role level, and the configuration to make the service role bypass RLS automatically.
+
+## Modeling Patterns Decision Tree
+
+When you're not sure which pattern to use, ask Claude:
+
+```bash
+claude "I need to store [describe your data].
+It has these characteristics:
+- [write patterns: frequency, batch vs single]
+- [read patterns: what queries are common]
+- [scale: how much data, how fast it grows]
+- [retention: how long to keep it]
+- [compliance: audit trail needed?]
+
+What modeling pattern should I use? Options I'm considering:
+traditional normalized, event sourcing, JSONB columns,
+partitioned table, EAV, or materialized views."
+```
+
+Claude considers all factors and recommends the pattern with the best trade-offs for your specific situation.
+
+## Key Takeaway
+
+Advanced data modeling is about choosing the right pattern for your specific access patterns and scale requirements. Event sourcing gives you a complete audit trail and multiple read models but adds complexity — use it when those features are actual requirements, not just nice-to-haves. Time-series data should be partitioned by time for fast archival and pre-aggregated for fast dashboard queries. Hierarchical data has multiple valid approaches — adjacency list, materialized path, ltree — each optimized for different query patterns. PostgreSQL's JSONB columns are perfect for genuinely schema-less data but wrong for data you need to join or aggregate. Claude helps you navigate these trade-offs by analyzing your write patterns, read patterns, scale expectations, and compliance requirements.

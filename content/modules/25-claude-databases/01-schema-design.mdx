@@ -1,0 +1,442 @@
+---
+title: "Database Schema Design with Claude"
+slug: "schema-design"
+order: 1
+difficulty: "expert"
+duration: 22
+tags: ["database", "schema", "design", "modeling"]
+objectives:
+  - "Go from business requirements to ER diagrams to SQL schemas with Claude"
+  - "Make informed normalization decisions: when 3NF vs strategic denormalization"
+  - "Design multi-tenant SaaS schemas with proper isolation"
+  - "Derive index strategies from query patterns"
+quiz:
+  - id: "schema-design-1"
+    question: "What's the best way to start a schema design conversation with Claude?"
+    type: "multiple-choice"
+    options:
+      - "\"Create a database for my app\""
+      - "\"Here are my business entities and their relationships: [list]. Here are the key queries the app will run: [list]. Here are the scale expectations: [numbers]. Design a schema that optimizes for these access patterns.\""
+      - "\"Give me a users table\""
+      - "\"What tables do I need?\""
+    correct: 1
+    explanation: "Schema design is driven by access patterns, not just entities. Telling Claude your entities, relationships, key queries, and scale expectations lets it make informed decisions about normalization, indexing, and denormalization. 'Create a database' produces a generic schema that won't survive contact with real traffic."
+  - id: "schema-design-2"
+    question: "When should you denormalize instead of keeping strict 3NF?"
+    type: "multiple-choice"
+    options:
+      - "Never — normalization is always better"
+      - "When a frequently-run query requires joining 4+ tables, and the denormalized data changes infrequently relative to how often it's read"
+      - "When you have too many tables"
+      - "When the database is slow"
+    correct: 1
+    explanation: "Denormalization is a read-performance trade-off. If your product listing page joins products + categories + brands + ratings every request, storing category_name and brand_name directly on the product row eliminates those joins. The trade-off: updates to category names must now update multiple rows. This is worth it when reads vastly outnumber writes."
+  - id: "schema-design-3"
+    question: "What's the most important input for designing an index strategy?"
+    type: "multiple-choice"
+    options:
+      - "Table size"
+      - "The actual queries your application will run — especially WHERE clauses, JOIN conditions, and ORDER BY columns"
+      - "The number of columns"
+      - "The database engine"
+    correct: 1
+    explanation: "Indexes exist to serve queries. An index on a column nobody filters by is wasted space and slows writes. Claude designs indexes by analyzing your WHERE clauses, JOIN conditions, and ORDER BY clauses to create composite indexes that cover your actual access patterns."
+  - id: "schema-design-4"
+    question: "In a multi-tenant SaaS schema, what's the difference between shared schema and schema-per-tenant?"
+    type: "multiple-choice"
+    options:
+      - "They're the same"
+      - "Shared schema uses a tenant_id column on every table (simple, scalable, weaker isolation); schema-per-tenant gives each tenant their own schema or database (complex, stronger isolation, harder to manage at scale)"
+      - "Schema-per-tenant is always better"
+      - "Shared schema is only for small apps"
+    correct: 1
+    explanation: "Shared schema (tenant_id column + RLS) is simpler to manage and scales better but relies on application/RLS logic to prevent cross-tenant data leaks. Schema-per-tenant provides physical isolation (great for compliance) but makes migrations and management harder as you scale to hundreds of tenants. Claude helps you choose based on your compliance and scale requirements."
+---
+
+## The Schema Is the Product
+
+Get the schema right, and everything else flows. Get it wrong, and you'll spend the next two years working around it. Claude doesn't just write CREATE TABLE statements — it reasons about access patterns, scale, and the trade-offs you'll live with.
+
+## From Requirements to Schema
+
+Here's the real workflow. Not "generate tables." An actual design process.
+
+### Step 1: Describe the Business
+
+```bash
+claude "I'm building a project management SaaS (like a simplified Jira).
+
+Core entities:
+- Organizations (tenants)
+- Users (belong to orgs, can be in multiple)
+- Projects (belong to one org)
+- Tasks (belong to a project, assigned to users)
+- Comments (on tasks, by users)
+- Labels (per org, many-to-many with tasks)
+- Sprints (per project, tasks can be in a sprint)
+
+Key access patterns:
+1. List all tasks for a project, filtered by status/assignee/label
+2. Get a single task with all comments and labels
+3. Dashboard: task counts by status per project for an org
+4. User's tasks across all projects they're in
+5. Sprint board: tasks grouped by status within a sprint
+
+Scale: 500 orgs, 50K users, 2M tasks within 2 years.
+
+Design the schema. PostgreSQL. Include indexes."
+```
+
+### Step 2: Claude Thinks Through the Design
+
+Claude doesn't just dump SQL. It reasons:
+
+```
+Design decisions:
+
+1. Multi-tenancy: shared schema with org_id on all tables.
+   At 500 orgs, schema-per-tenant is overkill. RLS policies
+   will enforce isolation.
+
+2. Task status: enum type, not a separate table. Status values
+   are finite and rarely change (todo, in_progress, in_review,
+   done, cancelled).
+
+3. Labels: many-to-many via task_labels junction table.
+   Labels are org-scoped, so two orgs can have a "bug" label
+   without collision.
+
+4. Comments: simple parent table. No threading for v1 —
+   add parent_comment_id later if needed.
+
+5. User-Org relationship: membership table with role column.
+   Users can be in multiple orgs with different roles.
+
+6. Sprint-Task: tasks have a nullable sprint_id. A task
+   is in at most one sprint at a time.
+```
+
+### Step 3: The Schema
+
+```sql
+-- Enums
+CREATE TYPE task_status AS ENUM (
+    'todo', 'in_progress', 'in_review', 'done', 'cancelled'
+);
+
+CREATE TYPE membership_role AS ENUM (
+    'owner', 'admin', 'member', 'viewer'
+);
+
+-- Organizations
+CREATE TABLE organizations (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        text NOT NULL,
+    slug        text NOT NULL UNIQUE,
+    plan        text NOT NULL DEFAULT 'free',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Users
+CREATE TABLE users (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       text NOT NULL UNIQUE,
+    name        text NOT NULL,
+    avatar_url  text,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Organization membership
+CREATE TABLE org_memberships (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      uuid NOT NULL REFERENCES organizations(id)
+                     ON DELETE CASCADE,
+    user_id     uuid NOT NULL REFERENCES users(id)
+                     ON DELETE CASCADE,
+    role        membership_role NOT NULL DEFAULT 'member',
+    joined_at   timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(org_id, user_id)
+);
+
+-- Projects
+CREATE TABLE projects (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      uuid NOT NULL REFERENCES organizations(id)
+                     ON DELETE CASCADE,
+    name        text NOT NULL,
+    key         text NOT NULL,  -- e.g., 'PROJ' for PROJ-123
+    description text,
+    archived    boolean NOT NULL DEFAULT false,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(org_id, key)
+);
+
+-- Sprints
+CREATE TABLE sprints (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  uuid NOT NULL REFERENCES projects(id)
+                     ON DELETE CASCADE,
+    name        text NOT NULL,
+    goal        text,
+    start_date  date,
+    end_date    date,
+    is_active   boolean NOT NULL DEFAULT false,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Labels (org-scoped)
+CREATE TABLE labels (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      uuid NOT NULL REFERENCES organizations(id)
+                     ON DELETE CASCADE,
+    name        text NOT NULL,
+    color       text NOT NULL DEFAULT '#6B7280',
+    UNIQUE(org_id, name)
+);
+
+-- Tasks
+CREATE TABLE tasks (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  uuid NOT NULL REFERENCES projects(id)
+                     ON DELETE CASCADE,
+    sprint_id   uuid REFERENCES sprints(id)
+                     ON DELETE SET NULL,
+    assignee_id uuid REFERENCES users(id)
+                     ON DELETE SET NULL,
+    reporter_id uuid NOT NULL REFERENCES users(id),
+    number      integer NOT NULL,  -- auto-incremented per project
+    title       text NOT NULL,
+    description text,
+    status      task_status NOT NULL DEFAULT 'todo',
+    priority    smallint NOT NULL DEFAULT 3
+                CHECK (priority BETWEEN 1 AND 5),
+    due_date    date,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(project_id, number)
+);
+
+-- Task-Label junction
+CREATE TABLE task_labels (
+    task_id     uuid NOT NULL REFERENCES tasks(id)
+                     ON DELETE CASCADE,
+    label_id    uuid NOT NULL REFERENCES labels(id)
+                     ON DELETE CASCADE,
+    PRIMARY KEY (task_id, label_id)
+);
+
+-- Comments
+CREATE TABLE comments (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id     uuid NOT NULL REFERENCES tasks(id)
+                     ON DELETE CASCADE,
+    author_id   uuid NOT NULL REFERENCES users(id),
+    body        text NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================
+-- INDEXES (derived from access patterns)
+-- ============================================
+
+-- Pattern 1: List tasks for a project, filtered by status/assignee
+CREATE INDEX idx_tasks_project_status
+    ON tasks(project_id, status);
+CREATE INDEX idx_tasks_project_assignee
+    ON tasks(project_id, assignee_id);
+
+-- Pattern 2: Single task with comments (comments by task)
+CREATE INDEX idx_comments_task_created
+    ON comments(task_id, created_at);
+
+-- Pattern 3: Dashboard — task counts by status per org
+-- Need to join through projects to get org-level view
+CREATE INDEX idx_projects_org
+    ON projects(org_id) WHERE NOT archived;
+
+-- Pattern 4: User's tasks across projects
+CREATE INDEX idx_tasks_assignee_status
+    ON tasks(assignee_id, status)
+    WHERE status NOT IN ('done', 'cancelled');
+
+-- Pattern 5: Sprint board — tasks in a sprint by status
+CREATE INDEX idx_tasks_sprint_status
+    ON tasks(sprint_id, status)
+    WHERE sprint_id IS NOT NULL;
+
+-- Membership lookups
+CREATE INDEX idx_memberships_user
+    ON org_memberships(user_id);
+
+-- Labels by org
+CREATE INDEX idx_labels_org
+    ON labels(org_id);
+
+-- Task labels by label (for "show all tasks with label X")
+CREATE INDEX idx_task_labels_label
+    ON task_labels(label_id);
+```
+
+Notice the indexes. They aren't random — each one maps to a specific access pattern described in the requirements. The partial indexes (`WHERE status NOT IN ('done', 'cancelled')`, `WHERE sprint_id IS NOT NULL`) are smaller and faster because they skip rows you don't query.
+
+## Normalization Decisions
+
+Claude helps you reason about when to break the rules:
+
+```bash
+claude "In my project management schema, the dashboard query
+(task counts by status per org) requires joining tasks → projects
+→ organizations. This runs every time someone opens the app.
+
+Should I denormalize by adding org_id directly to the tasks table?"
+```
+
+Claude's analysis:
+
+```
+Yes, add org_id to tasks. Here's why:
+
+The join path tasks → projects → organizations adds one hop
+on every dashboard query. With 2M tasks, this join matters.
+
+Adding org_id to tasks:
+- Pro: Dashboard query becomes a single-table GROUP BY
+- Pro: RLS policies become simpler (filter by org_id directly)
+- Pro: Index on (org_id, status) covers the dashboard query
+- Con: 4 bytes of storage per row (2M * 4B = 8MB — negligible)
+- Con: Must ensure org_id stays consistent with project's org_id
+
+Mitigation for consistency:
+- Add a trigger that sets org_id from the project on INSERT
+- Add a CHECK constraint via a function
+- Or simply set it in the application layer (it never changes
+  because projects don't move between orgs)
+
+ALTER TABLE tasks ADD COLUMN org_id uuid
+    REFERENCES organizations(id);
+
+-- Backfill
+UPDATE tasks SET org_id = p.org_id
+FROM projects p WHERE tasks.project_id = p.id;
+
+ALTER TABLE tasks ALTER COLUMN org_id SET NOT NULL;
+
+CREATE INDEX idx_tasks_org_status ON tasks(org_id, status);
+```
+
+That's a trade-off analysis, not just a yes/no answer.
+
+## Real Example: Multi-Tenant SaaS
+
+Multi-tenancy is one of the hardest things to get right. Claude has seen all the patterns:
+
+```bash
+claude "Design multi-tenant isolation for my schema using
+PostgreSQL Row Level Security.
+
+Requirements:
+- Users can only see data from orgs they belong to
+- Org admins can see all data in their org
+- Users can only edit tasks assigned to them
+  (except admins who can edit any task in the org)
+- The app uses Supabase, so RLS is enforced at the DB level
+
+Generate RLS policies for the tasks and comments tables."
+```
+
+```sql
+-- Enable RLS
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+
+-- Helper function: get user's orgs
+CREATE OR REPLACE FUNCTION user_org_ids()
+RETURNS uuid[] AS $$
+  SELECT array_agg(org_id)
+  FROM org_memberships
+  WHERE user_id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Helper: is user admin of org?
+CREATE OR REPLACE FUNCTION is_org_admin(check_org_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM org_memberships
+    WHERE user_id = auth.uid()
+      AND org_id = check_org_id
+      AND role IN ('owner', 'admin')
+  )
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Tasks: SELECT — see tasks in your orgs
+CREATE POLICY tasks_select ON tasks FOR SELECT
+    USING (org_id = ANY(user_org_ids()));
+
+-- Tasks: INSERT — create in your orgs
+CREATE POLICY tasks_insert ON tasks FOR INSERT
+    WITH CHECK (org_id = ANY(user_org_ids()));
+
+-- Tasks: UPDATE — own tasks or admin
+CREATE POLICY tasks_update ON tasks FOR UPDATE
+    USING (
+        assignee_id = auth.uid()
+        OR is_org_admin(org_id)
+    );
+
+-- Tasks: DELETE — admin only
+CREATE POLICY tasks_delete ON tasks FOR DELETE
+    USING (is_org_admin(org_id));
+
+-- Comments: see comments on visible tasks
+CREATE POLICY comments_select ON comments FOR SELECT
+    USING (
+        EXISTS(
+            SELECT 1 FROM tasks
+            WHERE tasks.id = comments.task_id
+            AND tasks.org_id = ANY(user_org_ids())
+        )
+    );
+
+-- Comments: create on tasks in your orgs
+CREATE POLICY comments_insert ON comments FOR INSERT
+    WITH CHECK (
+        author_id = auth.uid()
+        AND EXISTS(
+            SELECT 1 FROM tasks
+            WHERE tasks.id = comments.task_id
+            AND tasks.org_id = ANY(user_org_ids())
+        )
+    );
+```
+
+## Index Strategy from Query Patterns
+
+Instead of guessing which indexes you need, tell Claude your queries:
+
+```bash
+claude "Here are my 5 slowest queries from pg_stat_statements.
+Suggest indexes for each one:
+
+1. SELECT * FROM tasks WHERE project_id = $1
+   AND status = $2 ORDER BY priority, created_at
+2. SELECT t.*, array_agg(l.name) FROM tasks t
+   LEFT JOIN task_labels tl ON t.id = tl.task_id
+   LEFT JOIN labels l ON tl.label_id = l.id
+   WHERE t.assignee_id = $1 AND t.status != 'done'
+   GROUP BY t.id
+3. SELECT status, count(*) FROM tasks
+   WHERE org_id = $1 GROUP BY status
+4. SELECT * FROM comments WHERE task_id = $1
+   ORDER BY created_at DESC LIMIT 50
+5. SELECT * FROM tasks WHERE org_id = $1
+   AND to_tsvector('english', title || ' ' || coalesce(description,''))
+   @@ plainto_tsquery('english', $2)"
+```
+
+Claude recommends specific composite indexes, partial indexes, and even a GIN index for the full-text search query — all derived from the actual query patterns rather than guesswork.
+
+## Key Takeaway
+
+Database schema design with Claude is a conversation, not a code dump. Start by describing your business entities, their relationships, and most critically your access patterns — the queries your app will actually run. Claude reasons about normalization trade-offs (when 3NF helps, when denormalization is worth it), designs indexes that map directly to your queries, and implements multi-tenant isolation with RLS policies. The resulting schema isn't just syntactically correct — it's designed for your specific workload, not a generic tutorial example. Always provide scale expectations so Claude can make informed decisions about when to denormalize and where partial indexes make sense.

@@ -1,0 +1,437 @@
+---
+title: "DBA Tasks with Claude"
+slug: "dba-tasks"
+order: 5
+difficulty: "expert"
+duration: 18
+tags: ["database", "dba", "administration", "maintenance"]
+objectives:
+  - "Generate backup and restore scripts for production databases"
+  - "Create monitoring queries for table bloat, connections, and locks"
+  - "Manage permissions and roles with principle of least privilege"
+  - "Build disaster recovery runbooks with Claude's help"
+quiz:
+  - id: "dba-tasks-1"
+    question: "What's the most important property of a backup strategy?"
+    type: "multiple-choice"
+    options:
+      - "Backup speed"
+      - "Regularly tested restores — a backup that can't be restored is not a backup"
+      - "Compression ratio"
+      - "Storage cost"
+    correct: 1
+    explanation: "The only backup that matters is one you've verified you can restore from. Teams discover their backups are corrupted or incomplete during the worst possible moment — an actual outage. Claude generates both the backup script AND the restore verification script, and recommends testing restores on a schedule."
+  - id: "dba-tasks-2"
+    question: "What does table bloat indicate in PostgreSQL?"
+    type: "multiple-choice"
+    options:
+      - "The table has too many columns"
+      - "Dead tuples from UPDATE/DELETE operations are consuming space because VACUUM hasn't reclaimed them — the table is larger than it needs to be, slowing sequential scans"
+      - "The table needs more indexes"
+      - "The table is too old"
+    correct: 1
+    explanation: "PostgreSQL's MVCC keeps old row versions (dead tuples) until VACUUM cleans them up. If autovacuum falls behind (common on high-write tables), dead tuples accumulate and the table becomes bloated — sometimes 5-10x its actual data size. This slows sequential scans and wastes disk space. Claude generates monitoring queries that detect bloat and scripts to address it."
+  - id: "dba-tasks-3"
+    question: "What's the principle of least privilege for database roles?"
+    type: "multiple-choice"
+    options:
+      - "Give everyone admin access for simplicity"
+      - "Each application or user gets only the minimum permissions needed to perform their function — read-only for analytics, read-write for the app, admin only for migrations"
+      - "Use one shared password"
+      - "Create a role for each table"
+    correct: 1
+    explanation: "Your analytics dashboard doesn't need DELETE permissions. Your app doesn't need CREATE TABLE. Your CI pipeline needs migration permissions but not data access. Separating roles limits the blast radius of a security breach or a bug. Claude generates the complete role hierarchy with exact GRANT statements."
+  - id: "dba-tasks-4"
+    question: "What should a disaster recovery runbook include?"
+    type: "multiple-choice"
+    options:
+      - "Just the restore command"
+      - "Step-by-step procedures for every failure scenario (data corruption, region outage, accidental deletion), with exact commands, estimated recovery times, escalation contacts, and post-recovery verification steps"
+      - "A link to the documentation"
+      - "The DBA's phone number"
+    correct: 1
+    explanation: "During a disaster, people are stressed and rushing. A runbook must be specific enough that someone who's never done this before can follow it step by step: exact commands to copy-paste, expected output at each step, verification checks, and escalation paths if something doesn't work as expected. Claude generates runbooks at this level of detail."
+---
+
+## The DBA You Didn't Hire
+
+Most teams don't have a dedicated DBA. The database is managed by developers who learned just enough PostgreSQL to be dangerous. Claude fills the gap — it knows the monitoring queries, the maintenance procedures, and the disaster recovery patterns that keep databases healthy.
+
+## Backup and Restore
+
+### Automated Backup Script
+
+```bash
+claude "Generate a production PostgreSQL backup script that:
+
+1. Uses pg_dump with custom format (for parallel restore)
+2. Compresses with gzip
+3. Names files with timestamp: db_YYYY-MM-DD_HH-MM.dump.gz
+4. Uploads to S3 (aws cli)
+5. Keeps local copies for 7 days, S3 copies for 90 days
+6. Sends a Slack notification on success/failure
+7. Logs everything to a file
+
+The database is on RDS, connection via DATABASE_URL env var.
+Include a cron schedule recommendation."
+```
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# Configuration
+DB_URL="${DATABASE_URL}"
+BACKUP_DIR="/var/backups/postgresql"
+S3_BUCKET="s3://myapp-backups/postgres"
+SLACK_WEBHOOK="${SLACK_WEBHOOK_URL}"
+RETENTION_LOCAL=7
+RETENTION_S3=90
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
+BACKUP_FILE="myapp_${TIMESTAMP}.dump"
+LOG_FILE="/var/log/backup-postgres.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
+}
+
+notify_slack() {
+    local status=$1
+    local message=$2
+    local color=$( [ "$status" = "success" ] && echo "#36a64f" || echo "#dc2626" )
+    curl -s -X POST "$SLACK_WEBHOOK" \
+        -H 'Content-type: application/json' \
+        -d "{\"attachments\":[{\"color\":\"${color}\",\"title\":\"DB Backup ${status}\",\"text\":\"${message}\",\"ts\":$(date +%s)}]}" \
+        >> /dev/null 2>&1
+}
+
+# Ensure backup directory exists
+mkdir -p "$BACKUP_DIR"
+
+log "Starting backup..."
+
+# Dump database
+if pg_dump "$DB_URL" \
+    --format=custom \
+    --verbose \
+    --file="${BACKUP_DIR}/${BACKUP_FILE}" \
+    2>> "$LOG_FILE"; then
+
+    # Compress
+    gzip "${BACKUP_DIR}/${BACKUP_FILE}"
+    BACKUP_SIZE=$(du -h "${BACKUP_DIR}/${BACKUP_FILE}.gz" | cut -f1)
+    log "Backup created: ${BACKUP_FILE}.gz (${BACKUP_SIZE})"
+
+    # Upload to S3
+    if aws s3 cp \
+        "${BACKUP_DIR}/${BACKUP_FILE}.gz" \
+        "${S3_BUCKET}/${BACKUP_FILE}.gz" \
+        --storage-class STANDARD_IA \
+        2>> "$LOG_FILE"; then
+        log "Uploaded to S3"
+    else
+        log "ERROR: S3 upload failed"
+        notify_slack "failure" "Backup created but S3 upload failed"
+        exit 1
+    fi
+
+    # Clean up old local backups
+    find "$BACKUP_DIR" -name "myapp_*.dump.gz" \
+        -mtime +${RETENTION_LOCAL} -delete
+    log "Cleaned local backups older than ${RETENTION_LOCAL} days"
+
+    # Clean up old S3 backups
+    aws s3 ls "${S3_BUCKET}/" | \
+        awk '{print $4}' | \
+        while read -r file; do
+            file_date=$(echo "$file" | grep -oP '\d{4}-\d{2}-\d{2}')
+            if [ -n "$file_date" ]; then
+                days_old=$(( ($(date +%s) - $(date -d "$file_date" +%s)) / 86400 ))
+                if [ "$days_old" -gt "$RETENTION_S3" ]; then
+                    aws s3 rm "${S3_BUCKET}/${file}"
+                    log "Deleted old S3 backup: $file"
+                fi
+            fi
+        done
+
+    notify_slack "success" "Backup completed: ${BACKUP_FILE}.gz (${BACKUP_SIZE})"
+    log "Backup complete"
+else
+    log "ERROR: pg_dump failed"
+    notify_slack "failure" "pg_dump failed — check logs"
+    exit 1
+fi
+```
+
+```bash
+# Cron schedule: daily at 2 AM, before peak traffic
+0 2 * * * /opt/scripts/backup-postgres.sh
+```
+
+### Restore Verification
+
+```bash
+claude "Generate a script that tests my backup restore monthly.
+It should:
+1. Download the latest backup from S3
+2. Restore it to a temporary database
+3. Run validation queries (row counts, checksum spot checks)
+4. Compare against the production database
+5. Drop the temporary database
+6. Report results"
+```
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+TEMP_DB="restore_test_$(date +%s)"
+LATEST_BACKUP=$(aws s3 ls s3://myapp-backups/postgres/ \
+    | sort | tail -1 | awk '{print $4}')
+
+echo "Testing restore of: $LATEST_BACKUP"
+
+# Download
+aws s3 cp "s3://myapp-backups/postgres/$LATEST_BACKUP" /tmp/
+
+# Create temp database
+createdb "$TEMP_DB"
+
+# Restore
+gunzip -c "/tmp/$LATEST_BACKUP" | pg_restore \
+    --dbname="$TEMP_DB" \
+    --jobs=4 \
+    --no-owner \
+    --verbose 2>&1
+
+# Validate
+echo "=== Validation ==="
+psql "$TEMP_DB" <<SQL
+SELECT 'users' as tbl, count(*) as rows FROM users
+UNION ALL
+SELECT 'orders', count(*) FROM orders
+UNION ALL
+SELECT 'products', count(*) FROM products;
+
+-- Check latest data timestamp
+SELECT max(created_at) as latest_record FROM orders;
+SQL
+
+# Cleanup
+dropdb "$TEMP_DB"
+rm "/tmp/$LATEST_BACKUP"
+
+echo "Restore test complete"
+```
+
+## Monitoring Queries
+
+### The Essential Dashboard
+
+```bash
+claude "Generate a set of PostgreSQL monitoring queries I can
+run daily or put in a Grafana dashboard:
+
+1. Table sizes and bloat estimation
+2. Active connections by state and application
+3. Long-running queries (> 5 seconds)
+4. Lock contention
+5. Cache hit ratio
+6. Replication lag (if applicable)
+7. Unused indexes (waste of write resources)
+8. Most frequently accessed tables"
+```
+
+```sql
+-- 1. Table sizes and estimated bloat
+SELECT
+    schemaname || '.' || tablename as table_name,
+    pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) as total_size,
+    pg_size_pretty(pg_relation_size(schemaname || '.' || tablename)) as table_size,
+    pg_size_pretty(pg_indexes_size(schemaname || '.' || tablename)) as index_size,
+    n_dead_tup as dead_tuples,
+    n_live_tup as live_tuples,
+    CASE WHEN n_live_tup > 0
+        THEN round(100.0 * n_dead_tup / n_live_tup, 1)
+        ELSE 0
+    END as dead_pct
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC
+LIMIT 20;
+
+-- 2. Active connections
+SELECT
+    state,
+    usename,
+    application_name,
+    count(*) as connections,
+    max(now() - state_change) as longest_duration
+FROM pg_stat_activity
+WHERE pid <> pg_backend_pid()
+GROUP BY state, usename, application_name
+ORDER BY connections DESC;
+
+-- 3. Long-running queries
+SELECT
+    pid,
+    now() - pg_stat_activity.query_start as duration,
+    usename,
+    application_name,
+    state,
+    left(query, 200) as query_preview
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND now() - pg_stat_activity.query_start > interval '5 seconds'
+ORDER BY duration DESC;
+
+-- 4. Lock contention
+SELECT
+    blocked_locks.pid as blocked_pid,
+    blocked_activity.usename as blocked_user,
+    left(blocked_activity.query, 100) as blocked_query,
+    blocking_locks.pid as blocking_pid,
+    blocking_activity.usename as blocking_user,
+    left(blocking_activity.query, 100) as blocking_query
+FROM pg_catalog.pg_locks blocked_locks
+JOIN pg_catalog.pg_stat_activity blocked_activity
+    ON blocked_activity.pid = blocked_locks.pid
+JOIN pg_catalog.pg_locks blocking_locks
+    ON blocking_locks.locktype = blocked_locks.locktype
+    AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+    AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+    AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+    AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+    AND blocking_locks.pid != blocked_locks.pid
+JOIN pg_catalog.pg_stat_activity blocking_activity
+    ON blocking_activity.pid = blocking_locks.pid
+WHERE NOT blocked_locks.granted;
+
+-- 5. Cache hit ratio (should be > 99%)
+SELECT
+    sum(heap_blks_read) as heap_read,
+    sum(heap_blks_hit) as heap_hit,
+    round(100.0 * sum(heap_blks_hit) /
+          nullif(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2)
+    as cache_hit_pct
+FROM pg_statio_user_tables;
+
+-- 7. Unused indexes (candidates for removal)
+SELECT
+    schemaname || '.' || relname as table_name,
+    indexrelname as index_name,
+    pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+    idx_scan as times_used
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+  AND indexrelname NOT LIKE '%_pkey'
+  AND indexrelname NOT LIKE '%_unique%'
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+These queries are the ones senior DBAs check every morning. Claude generates them pre-formatted for copy-paste into your monitoring tool.
+
+## Permission and Role Management
+
+```bash
+claude "Set up database roles for my application:
+
+1. app_readonly — for analytics dashboards and reporting
+2. app_readwrite — for the main application
+3. app_migrations — for schema changes during deployment
+4. app_admin — for manual intervention (emergency use)
+
+Each role should follow least privilege.
+Include the GRANT statements and a script to create users
+for each role."
+```
+
+```sql
+-- Create roles (no login — these are group roles)
+CREATE ROLE app_readonly;
+CREATE ROLE app_readwrite;
+CREATE ROLE app_migrations;
+CREATE ROLE app_admin;
+
+-- Readonly: SELECT on all existing and future tables
+GRANT USAGE ON SCHEMA public TO app_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT ON TABLES TO app_readonly;
+
+-- Readwrite: SELECT, INSERT, UPDATE, DELETE + sequences
+GRANT USAGE ON SCHEMA public TO app_readwrite;
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON ALL TABLES IN SCHEMA public TO app_readwrite;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public
+    TO app_readwrite;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_readwrite;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO app_readwrite;
+
+-- Migrations: readwrite + DDL
+GRANT app_readwrite TO app_migrations;
+GRANT CREATE ON SCHEMA public TO app_migrations;
+
+-- Admin: everything
+GRANT ALL PRIVILEGES ON SCHEMA public TO app_admin;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_admin;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_admin;
+
+-- Create login users for each role
+CREATE USER dashboard_user WITH PASSWORD 'CHANGE_ME_1';
+GRANT app_readonly TO dashboard_user;
+
+CREATE USER app_user WITH PASSWORD 'CHANGE_ME_2';
+GRANT app_readwrite TO app_user;
+
+CREATE USER deploy_user WITH PASSWORD 'CHANGE_ME_3';
+GRANT app_migrations TO deploy_user;
+
+CREATE USER dba_user WITH PASSWORD 'CHANGE_ME_4';
+GRANT app_admin TO dba_user;
+```
+
+## Disaster Recovery Runbook
+
+```bash
+claude "Generate a disaster recovery runbook for my PostgreSQL
+database on RDS. Cover these scenarios:
+
+1. Accidental table/data deletion
+2. Database corruption
+3. Region outage
+4. Performance degradation (sudden spike in latency)
+5. Connection pool exhaustion
+
+For each scenario, include:
+- Detection: how do we know it happened?
+- Immediate actions (first 5 minutes)
+- Recovery steps (exact commands)
+- Verification (how to confirm recovery)
+- Post-mortem checklist"
+```
+
+Claude generates a complete runbook with exact commands for each scenario. The accidental deletion section includes Point-in-Time Recovery (PITR) commands. The connection pool exhaustion section includes `pg_terminate_backend` queries to kill idle connections and the exact PgBouncer configuration to prevent recurrence.
+
+The key is that every step has the actual command to run — not "restore from backup" but the exact `aws rds restore-db-instance-to-point-in-time` command with all the flags.
+
+## Maintenance Tasks
+
+```bash
+claude "Generate a weekly PostgreSQL maintenance checklist
+with the actual SQL/commands for each task:
+
+1. Check and fix table bloat (VACUUM ANALYZE)
+2. Reindex bloated indexes
+3. Update table statistics
+4. Check for long-running transactions
+5. Review and terminate idle connections
+6. Check disk space projections"
+```
+
+Claude generates the runnable commands, not just a list. Each task includes the query to detect the problem and the command to fix it, with safety checks built in.
+
+## Key Takeaway
+
+DBA tasks with Claude cover the full lifecycle of database operations: backup scripts with S3 upload and retention policies, monitoring queries that detect bloat, locks, and performance issues before they become outages, role management following least privilege, and disaster recovery runbooks with exact commands for every failure scenario. The most important practice is testing your backups regularly — Claude generates both the backup and the restore verification scripts. For monitoring, the essential queries (table bloat, cache hit ratio, unused indexes, lock contention) are the same ones senior DBAs check daily, and Claude generates them pre-formatted for your monitoring stack. No DBA on the team? Claude fills the gap.
