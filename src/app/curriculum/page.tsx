@@ -87,6 +87,7 @@ function DifficultyBadge({ arc }: { arc: string }) {
     practitioner: "Intermediate",
     "power-user": "Advanced",
     expert: "Expert",
+    specialist: "Specialist",
   };
 
   const colors: Record<string, string> = {
@@ -94,6 +95,7 @@ function DifficultyBadge({ arc }: { arc: string }) {
     practitioner: "bg-blue/10 text-blue border-blue/20",
     "power-user": "bg-purple/10 text-purple border-purple/20",
     expert: "bg-accent/10 text-accent border-accent/20",
+    specialist: "bg-red/10 text-red border-red/20",
   };
 
   return (

@@ -13,6 +13,7 @@ import {
   Layers,
   Zap,
   Crown,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ARC_DEFINITIONS } from "@/lib/constants";
@@ -33,6 +34,7 @@ const arcIcons: Record<string, React.ReactNode> = {
   practitioner: <GraduationCap className="h-6 w-6" />,
   "power-user": <Zap className="h-6 w-6" />,
   expert: <Crown className="h-6 w-6" />,
+  specialist: <Compass className="h-6 w-6" />,
 };
 
 const arcModuleCounts: Record<string, number> = {
@@ -40,6 +42,7 @@ const arcModuleCounts: Record<string, number> = {
   practitioner: 4,
   "power-user": 3,
   expert: 2,
+  specialist: 8,
 };
 
 const features = [
