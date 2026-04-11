@@ -1,0 +1,12 @@
+{
+  "title": "Claude for Security",
+  "slug": "claude-security",
+  "description": "Apply Claude to security workflows: automated code review, vulnerability analysis, penetration testing assistance, and bug bounty hunting.",
+  "arc": "expert",
+  "order": 17,
+  "icon": "Shield",
+  "color": "#d4a053",
+  "estimatedHours": 5,
+  "prerequisites": ["enterprise-and-production"],
+  "lessonCount": 5
+}

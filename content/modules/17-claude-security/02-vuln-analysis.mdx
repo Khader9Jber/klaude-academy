@@ -1,0 +1,279 @@
+---
+title: "Vulnerability Analysis and Triage"
+slug: "vuln-analysis"
+order: 2
+difficulty: "expert"
+duration: 20
+tags: ["security", "vulnerability", "triage", "cve"]
+objectives:
+  - "Analyze CVE reports with Claude to understand real-world impact"
+  - "Triage dependency vulnerabilities from npm audit and pip audit"
+  - "Use CVSS scoring to prioritize remediation"
+  - "Evaluate whether patches fully address vulnerabilities"
+quiz:
+  - id: "vuln-analysis-1"
+    question: "What is the most effective way to use Claude for CVE analysis?"
+    type: "multiple-choice"
+    options:
+      - "Ask 'is this CVE dangerous?'"
+      - "Provide the CVE details, your specific codebase context, and ask Claude to assess exploitability in YOUR application"
+      - "Only look at the CVSS score"
+      - "Ignore CVEs below 9.0"
+    correct: 1
+    explanation: "A CVE's severity depends on context. A critical RCE vulnerability in a library you only use server-side with no user input might be unexploitable in your application. Claude can analyze whether the vulnerable code path is actually reachable in your specific codebase, which is far more useful than a generic CVSS score."
+  - id: "vuln-analysis-2"
+    question: "What should you do when npm audit reports 47 vulnerabilities?"
+    type: "multiple-choice"
+    options:
+      - "Run npm audit fix --force immediately"
+      - "Have Claude triage them by exploitability in your context — many are in dev dependencies or unreachable code paths"
+      - "Ignore them all"
+      - "Rewrite the project without dependencies"
+    correct: 1
+    explanation: "Most npm audit findings are in transitive dependencies of dev tools (webpack plugins, testing libraries) that never run in production. Claude can quickly categorize which are in production deps, which affect reachable code paths, and which are genuinely exploitable. This prevents you from wasting days on non-issues while missing the real risks."
+  - id: "vuln-analysis-3"
+    question: "What does a CVSS score of 9.8 with vector AV:N/AC:L/PR:N/UI:N tell you?"
+    type: "multiple-choice"
+    options:
+      - "The vulnerability is minor"
+      - "Network-exploitable, low complexity, no privileges or user interaction needed — critical severity"
+      - "Only exploitable locally"
+      - "Requires admin access to exploit"
+    correct: 1
+    explanation: "This CVSS vector means: Attack Vector is Network (exploitable remotely), Attack Complexity is Low (easy to exploit), Privileges Required is None (unauthenticated), User Interaction is None (no phishing needed). This is about as bad as it gets — anyone on the internet can potentially exploit it with a simple request."
+  - id: "vuln-analysis-4"
+    question: "How can Claude help evaluate whether a security patch is complete?"
+    type: "multiple-choice"
+    options:
+      - "It can't — only humans can review patches"
+      - "By analyzing the patch diff against the original vulnerability to check if all attack vectors are addressed and no new issues are introduced"
+      - "By running the exploit"
+      - "By checking the version number"
+    correct: 1
+    explanation: "Claude can compare the vulnerability description with the patch diff to assess: Does the fix address the root cause or just one symptom? Are there variant attack vectors the patch doesn't cover? Does the fix introduce any new issues (like a denial of service from overly strict validation)? This is exactly the kind of reasoning-heavy analysis Claude excels at."
+---
+
+## The Vulnerability Flood
+
+Run `npm audit` on any real project and you'll see something like this:
+
+```
+found 47 vulnerabilities (12 moderate, 28 high, 7 critical)
+```
+
+Your stomach drops. Then you realize 40 of those are in `nth-check` via `postcss` via `webpack` — a dev dependency that never runs in production. But 3 of them are in `express-session` which absolutely does run in production.
+
+The challenge isn't finding vulnerabilities — scanners do that. The challenge is **triaging** them: which ones actually matter for your application?
+
+## Analyzing CVEs with Claude
+
+When a new CVE drops, Claude can break it down:
+
+```
+Analyze this CVE for our application:
+
+CVE-2024-21538 — Regular Expression Denial of Service in cross-spawn
+CVSS: 7.5 (High)
+Affected: cross-spawn < 7.0.5
+
+Our usage:
+- cross-spawn is a transitive dependency of our build tooling (jest, webpack)
+- It is NOT used in our production runtime code
+- Our build runs in CI, not on user-facing servers
+
+Questions:
+1. Is this exploitable in our context?
+2. What's the actual risk?
+3. What's the recommended action?
+```
+
+Claude's analysis:
+
+```
+**Assessment: Low risk in your context**
+
+1. **Exploitability:** Low. cross-spawn is used for spawning child
+   processes. The ReDoS vulnerability requires an attacker to control
+   the input string passed to cross-spawn's argument parser. In your
+   case, this only runs during build time in CI — there's no user
+   input path.
+
+2. **Actual risk:** A malicious actor would need to compromise your
+   build scripts or CI configuration to trigger this. The impact would
+   be CI build hangs, not production downtime.
+
+3. **Recommended action:** Update when convenient (next dependency
+   update cycle). This is NOT an emergency patch. Priority: Low.
+   
+   npm update cross-spawn
+   # or if it's deeply nested:
+   npm audit fix
+```
+
+Compare that with just looking at "CVSS 7.5 HIGH" and panicking.
+
+## Triaging npm audit Results
+
+Here's a prompt that turns 47 scary vulnerabilities into an actionable list:
+
+```
+I ran npm audit on our Next.js production application. Here are the results:
+
+[paste full npm audit output]
+
+Our stack:
+- Next.js 14, deployed on Vercel
+- PostgreSQL via Prisma ORM
+- No server-side file uploads
+- Auth via NextAuth.js with JWT sessions
+
+Please triage these vulnerabilities:
+
+1. **Critical (fix now):** Vulnerabilities in production runtime 
+   dependencies that are exploitable in our context
+2. **Important (fix this week):** Production dependencies with 
+   plausible attack vectors
+3. **Low priority (fix when convenient):** Dev-only dependencies, 
+   build tools, or vulnerabilities with no realistic attack path
+4. **Won't fix:** False positives or irrelevant findings
+
+For each critical/important finding, explain:
+- The actual attack scenario against our app
+- Whether it's exploitable given our architecture
+- Exact fix command
+```
+
+Claude will categorize all 47 findings, and you'll typically find 2-5 that actually matter. That's the value — going from 47 to 5 in minutes instead of hours.
+
+## CVSS Scoring Breakdown
+
+Understanding CVSS vectors helps you evaluate severity independently:
+
+```
+Explain this CVSS vector in plain language and assess whether it
+applies to our application:
+
+CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
+Our application is an internal tool behind VPN, requiring
+authentication, with no public-facing endpoints.
+```
+
+Claude's breakdown:
+
+```
+**CVSS Vector Decoded:**
+- AV:N (Attack Vector: Network) — exploitable over the network
+- AC:L (Attack Complexity: Low) — no special conditions needed
+- PR:N (Privileges Required: None) — no authentication needed
+- UI:N (User Interaction: None) — no phishing needed
+- S:U (Scope: Unchanged) — impact limited to the vulnerable component
+- C:H (Confidentiality: High) — full data exposure possible
+- I:H (Integrity: High) — data can be modified
+- A:H (Availability: High) — service can be taken down
+
+**Base Score: 9.8 Critical**
+
+**In YOUR context:** The base score assumes network-accessible with no
+auth. Your app is behind VPN (reduces AV to Adjacent) and requires
+auth (PR:L minimum). Adjusted environmental score: ~6.5 Medium.
+
+**Recommendation:** Still fix it — VPNs and auth are defense-in-depth,
+not reasons to ignore vulns. But this isn't a 2am emergency.
+```
+
+## Dependency Vulnerability Workflow
+
+Here's a complete workflow for ongoing dependency security:
+
+```bash
+# Step 1: Generate audit report
+npm audit --json > audit-report.json
+
+# Step 2: Ask Claude to triage
+claude -p "Triage these npm vulnerabilities for our production Next.js app. 
+Categorize as: fix-now, fix-this-week, low-priority, ignore.
+For fix-now items, provide exact commands.
+
+$(cat audit-report.json)"
+
+# Step 3: For Python projects
+pip audit --format json > pip-audit.json
+
+claude -p "Triage these Python dependency vulnerabilities for our 
+Django REST API. Same categories.
+
+$(cat pip-audit.json)"
+```
+
+## Patch Analysis
+
+When a patch is released for a vulnerability, Claude can assess its completeness:
+
+```
+Here's the vulnerability:
+CVE-2024-XXXXX: Server-Side Request Forgery in image-proxy library.
+The library fetches user-provided URLs without validating the scheme
+or destination, allowing access to internal services via 
+http://169.254.169.254 (AWS metadata) or file:// protocol.
+
+Here's the patch (diff):
+[paste the git diff of the fix]
+
+Questions:
+1. Does the patch fully address the vulnerability?
+2. Are there bypass techniques the patch doesn't cover?
+3. Does the patch introduce any new issues?
+```
+
+I used this approach when evaluating a patch for a URL parsing library. Claude identified that the patch blocked `http://169.254.169.254` but not `http://[::ffff:169.254.169.254]` (IPv6-mapped IPv4) or DNS rebinding attacks. The maintainers released a v2 of the patch three days later addressing exactly those bypasses.
+
+## Building a Vulnerability Dashboard Prompt
+
+For ongoing monitoring, create a reusable prompt:
+
+```
+You are a security analyst. I'll provide dependency audit results 
+from our [stack description] application.
+
+For each vulnerability, provide:
+
+| Package | CVE | CVSS | In Prod? | Exploitable? | Action | Fix |
+|---------|-----|------|----------|------------|--------|-----|
+
+Rules:
+- "In Prod?" = is this a production runtime dependency or dev/build only?
+- "Exploitable?" = given our stack, can an attacker actually reach this code path?
+- "Action" = fix-now / fix-this-sprint / monitor / ignore
+- "Fix" = exact command or "no fix available — use alternative X"
+
+After the table, list the top 3 actions in priority order.
+```
+
+## Automated Weekly Scan
+
+Set up a weekly security triage:
+
+```bash
+#!/bin/bash
+# weekly-security-triage.sh
+
+echo "=== Security Triage $(date +%Y-%m-%d) ===" > triage.md
+
+# npm audit
+npm audit --json 2>/dev/null | claude -p "
+Triage these npm vulnerabilities. Output a markdown table with:
+Package | Severity | In Production? | Exploitable? | Action
+Only include findings that need action (skip 'ignore' items)." >> triage.md
+
+# Check for outdated packages with known issues  
+npm outdated --json 2>/dev/null | claude -p "
+Flag any packages that are more than 2 major versions behind.
+Check if the current version has known CVEs." >> triage.md
+
+echo "Triage complete. Review triage.md"
+```
+
+## Key Takeaway
+
+Vulnerability scanners find issues; Claude triages them. The critical skill is contextual analysis — a CVSS 9.8 vulnerability in a dev dependency behind a VPN is less urgent than a CVSS 6.5 in your public-facing auth endpoint. Use Claude to categorize audit results by real-world exploitability in your specific application, evaluate whether patches fully address vulnerabilities, and break down CVSS vectors into plain language. Go from 47 panic-inducing findings to 5 actionable items in minutes. The scanner finds the needles; Claude tells you which ones are actually sharp.

