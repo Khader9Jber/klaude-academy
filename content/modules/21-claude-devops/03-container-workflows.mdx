@@ -1,0 +1,369 @@
+---
+title: "Docker and Kubernetes with Claude"
+slug: "container-workflows"
+order: 3
+difficulty: "expert"
+duration: 22
+tags: ["devops", "docker", "kubernetes", "containers"]
+objectives:
+  - "Generate optimized Dockerfiles with multi-stage builds"
+  - "Create Kubernetes manifests for deployments, services, and ingress"
+  - "Generate Helm charts from plain English descriptions"
+  - "Debug container issues including crash loops and networking"
+quiz:
+  - id: "container-workflows-1"
+    question: "Why should you use multi-stage Docker builds?"
+    type: "multiple-choice"
+    options:
+      - "They make builds faster"
+      - "They produce smaller final images by separating build dependencies from runtime, reducing attack surface and deployment size"
+      - "Docker requires them for production"
+      - "They allow running multiple containers"
+    correct: 1
+    explanation: "Multi-stage builds use one stage with build tools (compilers, dev dependencies) and copy only the compiled output into a minimal runtime stage. A Node.js app might have a 1.5GB build stage (with node_modules and build tools) but a 150MB final image (with only the production server and compiled code). Smaller images deploy faster and have fewer vulnerabilities."
+  - id: "container-workflows-2"
+    question: "What Kubernetes resources do you need for a basic web application deployment?"
+    type: "multiple-choice"
+    options:
+      - "Just a Pod"
+      - "A Deployment (manages pods), a Service (internal networking), and an Ingress (external access)"
+      - "Only a ConfigMap"
+      - "A StatefulSet and a DaemonSet"
+    correct: 1
+    explanation: "A Deployment manages pod replicas and rolling updates. A Service provides stable internal networking (ClusterIP) or load balancing between pods. An Ingress exposes the service externally with routing rules, TLS termination, and host-based routing. These three resources form the minimal set for serving a web application."
+  - id: "container-workflows-3"
+    question: "What information should you give Claude when debugging a crashing container?"
+    type: "multiple-choice"
+    options:
+      - "The container name"
+      - "The Dockerfile, the error logs (kubectl logs), the pod status (kubectl describe pod), and any recent changes to the configuration"
+      - "The Kubernetes version"
+      - "The cloud provider name"
+    correct: 1
+    explanation: "The Dockerfile shows what the container should do. The logs show what it actually did before crashing. The pod description shows resource limits, health check status, and restart counts. Recent changes narrow down what introduced the issue. Together, these let Claude determine if the crash is from a missing env var, an OOM kill, a failed health check, or a code error."
+  - id: "container-workflows-4"
+    question: "When should you use Helm charts instead of raw Kubernetes manifests?"
+    type: "multiple-choice"
+    options:
+      - "Always — raw manifests are deprecated"
+      - "When you need to deploy the same application across multiple environments with different configurations, or when the manifest set is complex enough to benefit from templating"
+      - "Only for third-party applications"
+      - "Helm is only for production"
+    correct: 1
+    explanation: "Helm charts add value when you need templating (different values per environment), versioning (rollback to a previous chart version), and packaging (bundle 10+ manifests into one deployable unit). For a simple single-environment deployment with 3-4 manifests, raw YAML is simpler. Helm's overhead pays off when complexity grows."
+---
+
+## Containers Without the Headache
+
+Docker and Kubernetes have steep learning curves. The YAML is verbose, the networking is confusing, and debugging a crashing container at 2 AM is nobody's idea of fun. Claude does not eliminate the learning, but it eliminates the syntax tax.
+
+## Dockerfile Generation
+
+### Basic Dockerfile
+
+```
+Create a Dockerfile for a Node.js Express API:
+- Node 20 Alpine base
+- Multi-stage build (build stage + production stage)
+- Copy package.json first for layer caching
+- Install production dependencies only in the final stage
+- Run as non-root user
+- Expose port 3000
+- Health check on /health endpoint
+```
+
+Claude generates:
+
+```dockerfile
+# Build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS production
+WORKDIR /app
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+COPY package.json package-lock.json ./
+RUN npm ci --production && npm cache clean --force
+
+COPY --from=builder /app/dist ./dist
+
+USER appuser
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "dist/index.js"]
+```
+
+Every line is intentional. The non-root user is a security best practice. The health check ensures orchestrators know when the container is ready. The `npm ci` with `--production` skips dev dependencies. The build stage is discarded, keeping the final image small.
+
+### Multi-Stage for Frontend Apps
+
+```
+Create a Dockerfile for a Next.js 15 app:
+- Multi-stage: deps, build, production
+- Use standalone output mode for minimal image
+- Sharp for image optimization
+- Non-root user
+- Production image should be under 200MB
+```
+
+Claude generates a three-stage Dockerfile that leverages Next.js standalone output, producing a final image with only the server and minimal dependencies.
+
+### Optimizing Image Size
+
+```
+My Docker image is 1.2GB. Here's my Dockerfile: [paste]
+Help me get it under 300MB.
+```
+
+Claude typically identifies:
+
+- Missing `.dockerignore` (including `node_modules`, `.git`, `.next`)
+- Using `node:20` instead of `node:20-alpine`
+- Not using multi-stage builds
+- Installing dev dependencies in the production stage
+- Not pruning package manager caches
+
+## Kubernetes Manifests
+
+### Basic Deployment
+
+```
+Create Kubernetes manifests for a Node.js API:
+
+Deployment:
+- 3 replicas
+- Rolling update strategy (maxSurge: 1, maxUnavailable: 0)
+- Resource limits: 256Mi memory, 250m CPU
+- Resource requests: 128Mi memory, 100m CPU
+- Liveness probe: GET /health, every 10s, after 15s
+- Readiness probe: GET /ready, every 5s, after 5s
+- Environment variables from ConfigMap and Secrets
+
+Service:
+- ClusterIP, port 80 targeting container port 3000
+
+Ingress:
+- nginx ingress controller
+- Host: api.myapp.com
+- TLS with cert-manager (letsencrypt-prod issuer)
+- Rate limiting: 10 requests/second
+
+ConfigMap:
+- NODE_ENV: production
+- LOG_LEVEL: info
+- API_VERSION: v2
+
+Secret:
+- DATABASE_URL
+- JWT_SECRET
+- REDIS_URL
+```
+
+Claude generates separate YAML files for each resource, or a single file with `---` separators based on your preference. The manifests include proper labels, annotations, and selectors.
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+        version: v1
+    spec:
+      containers:
+        - name: api
+          image: registry.example.com/api:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          envFrom:
+            - configMapRef:
+                name: api-config
+            - secretRef:
+                name: api-secrets
+```
+
+### Horizontal Pod Autoscaler
+
+```
+Add an HPA for the API deployment:
+- Scale between 3 and 10 replicas
+- Target 70% CPU utilization
+- Target 80% memory utilization
+- Scale up quickly (stabilization: 30s), scale down slowly (300s)
+```
+
+Claude generates the HPA manifest with proper `behavior` configuration for asymmetric scaling.
+
+## Helm Charts
+
+For complex applications, Helm charts add templating and versioning:
+
+```
+Create a Helm chart for the API application:
+- Chart name: api
+- Templates: deployment, service, ingress, configmap, secret, hpa
+- Values.yaml with sensible defaults
+- Support for multiple environments via values overrides:
+  - values-dev.yaml (1 replica, no HPA, no TLS)
+  - values-staging.yaml (2 replicas, HPA 2-4, self-signed TLS)
+  - values-production.yaml (3 replicas, HPA 3-10, letsencrypt TLS)
+- NOTES.txt with post-install instructions
+- _helpers.tpl with name and label templates
+```
+
+Claude creates the full chart directory structure:
+
+```
+api/
+  Chart.yaml
+  values.yaml
+  values-dev.yaml
+  values-staging.yaml
+  values-production.yaml
+  templates/
+    _helpers.tpl
+    deployment.yaml
+    service.yaml
+    ingress.yaml
+    configmap.yaml
+    secret.yaml
+    hpa.yaml
+    NOTES.txt
+```
+
+Each template uses Go templating with proper conditionals:
+
+```yaml
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "api.fullname" . }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "api.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+```
+
+## Debugging Containers
+
+### "My Pod Keeps Crashing"
+
+```
+My pod is in CrashLoopBackOff. Here's the output:
+
+kubectl describe pod api-7d9f8b6c4-x2kp9:
+  State: Waiting (CrashLoopBackOff)
+  Last State: Terminated (Error, exit code 1)
+  Restart Count: 5
+
+kubectl logs api-7d9f8b6c4-x2kp9 --previous:
+  Error: connect ECONNREFUSED 10.0.0.42:5432
+  at TCPConnectWrap.afterConnect
+
+The database is running in the same namespace.
+```
+
+Claude identifies that the pod is crashing because it cannot connect to the database. Common causes: the database service name is wrong, the pod is starting before the database is ready, or a network policy is blocking the connection. Claude suggests solutions for each scenario.
+
+### "OOMKilled"
+
+```
+My pod keeps getting OOMKilled:
+  Last State: Terminated (OOMKilled)
+  Resources: limits.memory=256Mi
+
+How do I figure out the right memory limit?
+```
+
+Claude explains how to use `kubectl top pod` for current usage, suggests running load tests to find peak memory, and recommends setting requests at the P50 and limits at the P99 with a buffer.
+
+### Networking Issues
+
+```
+My frontend pod can't reach the API pod. Both are in the same namespace.
+Frontend uses: fetch('http://api:3000/health')
+API service is ClusterIP on port 80, targetPort 3000.
+The error is: getaddrinfo ENOTFOUND api
+```
+
+Claude identifies the mismatch: the frontend is connecting to port 3000, but the service exposes port 80. The URL should be `http://api:80/health` or just `http://api/health`. Or the service name does not match.
+
+## Key Takeaway
+
+Docker and Kubernetes configuration is verbose and error-prone, but follows predictable patterns that Claude handles well. Always use multi-stage Docker builds, run containers as non-root, and include health checks. For Kubernetes, start with the Deployment-Service-Ingress trio and add complexity (HPA, PDBs, network policies) as needed. Use Helm when you need to manage the same application across multiple environments. When debugging containers, give Claude the full picture: Dockerfile, logs, pod description, and recent changes.

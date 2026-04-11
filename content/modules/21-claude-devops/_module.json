@@ -1,0 +1,12 @@
+{
+  "title": "Claude for DevOps",
+  "slug": "claude-devops",
+  "description": "Apply Claude to DevOps workflows: infrastructure as code, CI/CD pipelines, container orchestration, monitoring, and incident response.",
+  "arc": "expert",
+  "order": 21,
+  "icon": "Server",
+  "color": "#d4a053",
+  "estimatedHours": 5,
+  "prerequisites": ["hooks-and-automation"],
+  "lessonCount": 5
+}

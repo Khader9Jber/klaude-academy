@@ -1,0 +1,309 @@
+---
+title: "Incident Response with Claude"
+slug: "incident-response"
+order: 5
+difficulty: "expert"
+duration: 20
+tags: ["devops", "incident", "debugging", "postmortem"]
+objectives:
+  - "Use Claude during production incidents for rapid log analysis and root cause hypotheses"
+  - "Generate rollback procedures and recovery plans"
+  - "Write post-mortem reports from incident timelines"
+  - "Build incident response playbooks with Claude"
+quiz:
+  - id: "incident-response-1"
+    question: "What is the most effective way to use Claude during a production incident?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to fix the problem directly on the server"
+      - "Feed Claude the symptoms, metrics, and logs to generate root cause hypotheses and suggest diagnostic commands"
+      - "Wait for Claude to detect the incident"
+      - "Ask Claude to write a post-mortem before fixing the issue"
+    correct: 1
+    explanation: "During an active incident, Claude's value is as a diagnostic partner. Feed it the observable symptoms (errors, metrics), relevant logs, and what changed recently. Claude generates hypotheses ranked by likelihood and suggests specific commands to confirm or rule out each one. This structured approach is faster than random troubleshooting."
+  - id: "incident-response-2"
+    question: "What should a rollback procedure include?"
+    type: "multiple-choice"
+    options:
+      - "Just 'git revert'"
+      - "Pre-rollback checks, the rollback steps for each component (application, database, configuration), verification that the rollback succeeded, and communication steps"
+      - "Only the deployment command"
+      - "A link to the CI/CD pipeline"
+    correct: 1
+    explanation: "A rollback is not just reverting code. You need to check if database migrations are backward-compatible (some aren't safely reversible). You need to roll back configuration changes. You need to verify the rollback worked (health checks, error rates). And you need to communicate status to stakeholders. Claude generates comprehensive procedures covering all of these."
+  - id: "incident-response-3"
+    question: "What makes a good post-mortem report?"
+    type: "multiple-choice"
+    options:
+      - "Blaming the person who made the mistake"
+      - "A blameless analysis covering timeline, impact, root cause, contributing factors, and actionable follow-up items with owners and deadlines"
+      - "A summary of the fix"
+      - "A list of all alerts that fired"
+    correct: 1
+    explanation: "Good post-mortems are blameless — they focus on systems and processes, not individuals. They include a detailed timeline, quantified impact, root cause analysis, contributing factors (why the root cause was possible), and specific action items with owners and deadlines. Claude generates this structure effectively from incident notes."
+  - id: "incident-response-4"
+    question: "How should you build an incident response playbook with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Write it during an active incident"
+      - "Feed Claude your past incidents, common failure modes, and system architecture, then generate playbooks for each known scenario with diagnostic and remediation steps"
+      - "Copy one from the internet"
+      - "Ask Claude to predict all possible failures"
+    correct: 1
+    explanation: "Playbooks should be based on real failure modes your system has experienced or is likely to experience. Past incidents provide the best material — they tell you what actually breaks, how it manifests, and what fixed it. Claude turns this historical data into structured, actionable playbooks that any on-call engineer can follow."
+---
+
+## When Production Is on Fire
+
+It is 3 AM. Your phone is buzzing. The error rate dashboard is spiking. Customers are emailing support. You are half-awake and need to figure out what broke, why, and how to fix it.
+
+This is where Claude becomes your most valuable teammate. Not because it can fix your servers directly, but because it can think clearly when you are running on adrenaline and caffeine.
+
+## Using Claude During an Active Incident
+
+### The Diagnostic Prompt
+
+When the alert fires, give Claude everything you see:
+
+```
+Production incident in progress. Here's what I know:
+
+Symptoms:
+- API error rate jumped from 0.1% to 35% at 03:12 UTC
+- P99 latency increased from 200ms to 8s
+- 60% of errors are 504 Gateway Timeout
+- Customer-facing dashboard is partially loading
+
+Recent changes (last 24 hours):
+- Deployed v2.14.0 at 18:00 UTC yesterday (new search feature)
+- No infrastructure changes
+- No database migrations
+
+Metrics:
+- CPU: normal (30%)
+- Memory: normal (55%)
+- Database connections: 18/20 (higher than usual baseline of 8)
+- Redis: connection refused errors in logs
+
+Relevant logs (last 15 minutes):
+[paste 20-30 relevant log lines]
+
+What are the most likely root causes? What should I check first?
+```
+
+Claude responds with prioritized hypotheses:
+
+1. **Redis connection failure** (highest probability) — connection refused errors suggest Redis is down or unreachable. Check: `redis-cli ping`, check Redis instance status in cloud console.
+2. **Database connection saturation** — 18/20 connections is near the limit. Could be caused by the new search feature holding connections longer. Check: `SELECT * FROM pg_stat_activity;`
+3. **New deployment regression** — the v2.14.0 search feature might have a query that holds connections or does not use connection pooling properly. Check: review the search endpoint code.
+
+Each hypothesis comes with a specific diagnostic command. You work through them in order, confirming or ruling out each one.
+
+### Iterative Diagnosis
+
+As you gather data, feed it back:
+
+```
+Update: Redis is running fine (ping returns PONG). But I checked
+database connections:
+
+pg_stat_activity shows 15 connections in "idle in transaction" state,
+all from the search endpoint. The query is:
+SELECT * FROM products WHERE search_vector @@ to_tsquery($1)
+AND category_id IN (SELECT id FROM categories WHERE ...)
+
+The subquery looks like it's running long. Is this the root cause?
+```
+
+Claude confirms: the subquery is likely scanning the full categories table on every search request, holding the connection in a transaction until it completes. Under load, this exhausts the pool. It suggests an immediate fix (add a timeout to the query) and a permanent fix (optimize the subquery with an index or rewrite as a JOIN).
+
+## Generating Rollback Procedures
+
+When the fix is not obvious, rolling back is the fastest path to recovery:
+
+```
+I need to roll back the v2.14.0 deployment. Our setup:
+- ECS Fargate with rolling deployments
+- PostgreSQL with 2 migrations in v2.14.0:
+  - Added search_vector column to products
+  - Created GIN index on search_vector
+- Environment variables: added SEARCH_ENABLED=true
+
+Generate a rollback procedure. Can the database migrations be
+safely reverted?
+```
+
+Claude generates:
+
+```markdown
+## Rollback Procedure: v2.14.0 → v2.13.0
+
+### Pre-Rollback Assessment
+- [ ] Confirm v2.13.0 code does not reference search_vector column
+- [ ] Confirm no other services depend on the search_vector column
+- [ ] Confirm v2.13.0 container image exists in registry
+
+### Step 1: Application Rollback
+1. Update ECS task definition to use v2.13.0 image
+2. Remove SEARCH_ENABLED environment variable
+3. Deploy with rolling update (zero-downtime)
+   aws ecs update-service --cluster prod --service api \
+     --task-definition api:v2.13.0 --force-new-deployment
+
+### Step 2: Database Migration Assessment
+The migrations ADD a column and an index. They do NOT:
+- Drop columns
+- Rename columns
+- Change data types
+- Modify existing data
+
+SAFE TO LEAVE IN PLACE. The search_vector column and index
+will not affect v2.13.0 operation. Revert these in the next
+planned deployment, not during incident response.
+
+### Step 3: Verification
+- [ ] Error rate returns to baseline (<0.5%)
+- [ ] P99 latency returns to baseline (<300ms)
+- [ ] Database connections return to baseline (~8)
+- [ ] Dashboard loads completely for test accounts
+- [ ] Check /health endpoint returns 200
+
+### Step 4: Communication
+- Update status page: "Issue mitigated, monitoring"
+- Notify #engineering Slack channel
+- Email affected customers if outage exceeded SLA
+```
+
+The key insight: Claude correctly identifies that additive migrations (new columns, new indexes) are safe to leave during a rollback. It only flags destructive migrations (drops, renames) as blocking a rollback.
+
+## Post-Mortem Reports
+
+After the dust settles, generate the post-mortem:
+
+```
+Write a post-mortem report for this incident:
+
+Incident: API degradation due to database connection exhaustion
+Date: 2024-03-20, 03:12-04:30 UTC
+Duration: 78 minutes
+Severity: SEV-2
+Impact: 35% of API requests failed, customer dashboard partially
+unavailable for ~2,500 active users
+
+Timeline:
+- 03:12: Alert fired — API error rate >5%
+- 03:15: On-call acknowledged, began investigation
+- 03:20: Identified Redis as working, database connections at 18/20
+- 03:30: Found 15 "idle in transaction" connections from search endpoint
+- 03:40: Identified unoptimized subquery in new search feature
+- 03:50: Decision to roll back v2.14.0
+- 04:00: Rollback deployment started
+- 04:15: Rollback complete, error rate dropping
+- 04:30: All metrics at baseline, incident resolved
+
+Root cause: New search feature (v2.14.0) used a subquery that performed
+a sequential scan on the categories table. Under production load, each
+search request held a database connection for 3-5 seconds instead of
+<50ms, exhausting the connection pool.
+
+Contributing factors:
+- No load testing on the search feature before deploy
+- Connection pool size (20) was adequate for normal traffic but had
+  no headroom for slow queries
+- No query timeout configured
+- Deployment at 18:00 (off-hours), issue only manifested during
+  next day's peak traffic
+```
+
+Claude produces a comprehensive blameless post-mortem with:
+
+- Executive summary
+- Detailed timeline
+- Impact quantification
+- Root cause analysis
+- Contributing factors
+- Action items with owners and deadlines
+- Lessons learned
+
+The action items are specific and actionable:
+
+```markdown
+## Action Items
+
+| # | Action | Owner | Priority | Due |
+|---|--------|-------|----------|-----|
+| 1 | Add query timeout (5s) to all database connections | Backend team | P0 | 2024-03-22 |
+| 2 | Optimize search query (JOIN instead of subquery, add index) | Backend team | P0 | 2024-03-25 |
+| 3 | Increase connection pool to 50, add pool exhaustion alert | Platform team | P1 | 2024-03-27 |
+| 4 | Add load testing step to CI/CD for new features | Platform team | P1 | 2024-04-05 |
+| 5 | Implement slow query logging (>1s) with alerting | Platform team | P2 | 2024-04-10 |
+| 6 | Review deployment timing policy (avoid Friday/off-hours) | Engineering mgr | P2 | 2024-04-10 |
+```
+
+## Building Incident Response Playbooks
+
+Do not wait for incidents to build playbooks. Generate them proactively:
+
+```
+Based on our architecture (Node.js API, PostgreSQL, Redis, ECS Fargate,
+ALB), generate incident response playbooks for these common failure
+scenarios:
+
+1. High API error rate (>5%)
+2. Database connection exhaustion
+3. Redis unavailable
+4. ECS task crashes (CrashLoopBackOff equivalent)
+5. ALB returning 503s
+6. Memory leak (gradually increasing memory usage)
+7. Certificate expiration
+8. DNS resolution failure
+
+For each playbook, include:
+- Alert that triggers it
+- Severity classification criteria
+- Diagnostic steps (specific commands)
+- Remediation steps
+- Escalation criteria
+- Post-resolution verification
+```
+
+Claude generates a playbook for each scenario. These are not generic templates — they reference your specific infrastructure (ECS, RDS, ElastiCache) and include the exact CLI commands to run.
+
+### Keeping Playbooks Updated
+
+After every incident:
+
+```
+Update the "Database Connection Exhaustion" playbook based on
+today's incident. We learned:
+- The pg_stat_activity query should filter for 'idle in transaction'
+  specifically, not just count total connections
+- We should check application logs for slow queries before looking
+  at database metrics
+- Adding a "Quick Mitigation" section: restart ECS tasks to drop
+  connections immediately while investigating
+```
+
+Claude updates the playbook with the new knowledge, improving it incrementally from real experience.
+
+## Incident Communication Templates
+
+During incidents, communication is as important as diagnosis:
+
+```
+Generate incident communication templates for:
+
+1. Initial notification (internal Slack + status page)
+2. Updates every 30 minutes
+3. Resolution notification
+4. Customer-facing email for SLA-impacting incidents
+
+Include placeholders for: incident title, severity, impact description,
+current status, ETA, and affected services.
+```
+
+Claude produces templates that you can fill in under pressure without having to think about phrasing. The status page template is professional, the Slack message is concise, and the customer email is empathetic without overpromising.
+
+## Key Takeaway
+
+Claude is most valuable during incidents as a diagnostic thinking partner, not a fix-it tool. Feed it symptoms, metrics, logs, and recent changes to get prioritized root cause hypotheses with specific diagnostic commands. Use Claude to generate rollback procedures that account for database migrations and configuration changes. After resolution, generate blameless post-mortem reports with specific, owned action items. Build incident playbooks proactively from your architecture's known failure modes, and update them after every incident with lessons learned.
