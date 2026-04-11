@@ -1,0 +1,12 @@
+{
+  "title": "Claude for Web Development",
+  "slug": "claude-web-dev",
+  "description": "Apply Claude to frontend and full-stack web development: scaffolding projects, generating components, designing APIs, styling with CSS/Tailwind, and full-stack workflows.",
+  "arc": "practitioner",
+  "order": 20,
+  "icon": "Globe",
+  "color": "#5e9ed6",
+  "estimatedHours": 5,
+  "prerequisites": ["mcp-fundamentals"],
+  "lessonCount": 5
+}

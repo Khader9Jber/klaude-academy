@@ -1,0 +1,259 @@
+---
+title: "Scaffolding Frontend Projects"
+slug: "frontend-scaffolding"
+order: 1
+difficulty: "intermediate"
+duration: 22
+tags: ["web", "react", "vue", "scaffolding", "project"]
+objectives:
+  - "Scaffold complete frontend projects using Claude Code"
+  - "Write effective prompts for Next.js, React, Vue, and Svelte setups"
+  - "Configure CLAUDE.md for web development projects"
+  - "Go from empty folder to working app in under 5 minutes"
+quiz:
+  - id: "frontend-scaffolding-1"
+    question: "What is the most effective way to scaffold a new frontend project with Claude Code?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to 'make a website'"
+      - "Provide specific framework, version, tooling, and directory structure requirements in one prompt"
+      - "Let Claude decide everything automatically"
+      - "Copy-paste from a tutorial"
+    correct: 1
+    explanation: "Specific prompts produce specific results. Telling Claude exactly which framework, version, styling solution, directory structure, and router you want eliminates back-and-forth and gives you a working project on the first try. Vague prompts like 'make a website' force Claude to guess at dozens of decisions."
+  - id: "frontend-scaffolding-2"
+    question: "Why should you set up a CLAUDE.md file for web projects?"
+    type: "multiple-choice"
+    options:
+      - "It's required for Claude Code to work"
+      - "It gives Claude persistent context about your project's stack, conventions, and file structure"
+      - "It replaces package.json"
+      - "It speeds up TypeScript compilation"
+    correct: 1
+    explanation: "CLAUDE.md gives Claude persistent context that survives across sessions. For web projects, this means Claude always knows your framework, component patterns, styling approach, and coding conventions without you having to re-explain them every time."
+  - id: "frontend-scaffolding-3"
+    question: "What should you do immediately after Claude scaffolds a project?"
+    type: "multiple-choice"
+    options:
+      - "Deploy it to production"
+      - "Run the dev server and verify it compiles and renders correctly"
+      - "Delete the README"
+      - "Add more dependencies"
+    correct: 1
+    explanation: "Always verify the scaffolded project actually works before building on top of it. Run the dev server, check for compilation errors, and confirm the page renders. Catching issues at this stage is much easier than debugging them after you've built 20 components on top of a broken foundation."
+  - id: "frontend-scaffolding-4"
+    question: "Which detail is LEAST important to include in a scaffolding prompt?"
+    type: "multiple-choice"
+    options:
+      - "Framework and version (e.g., Next.js 15)"
+      - "Directory structure preference (e.g., src/ directory)"
+      - "The color of the default heading"
+      - "Routing approach (e.g., app router vs pages router)"
+    correct: 2
+    explanation: "The color of a heading is a cosmetic detail you can change in seconds. Framework version, directory structure, and routing approach are architectural decisions that are painful to change later. Front-load the structural decisions in your scaffolding prompt and handle cosmetics during development."
+---
+
+## The 5-Minute Project
+
+I used to spend 30 minutes on every new project. Create the folder, run the CLI, configure TypeScript, set up Tailwind, organize directories, add ESLint, set up path aliases. Every single time.
+
+Now I open Claude Code in an empty directory and type one prompt. Five minutes later, the dev server is running.
+
+## The Scaffolding Prompt Formula
+
+A good scaffolding prompt has four parts: framework, tooling, structure, and configuration.
+
+Here is the prompt I use for most new projects:
+
+```
+Create a Next.js 15 app with:
+- TypeScript (strict mode)
+- Tailwind CSS 4
+- src/ directory structure
+- App Router
+- Path alias @/ pointing to src/
+- ESLint + Prettier
+- A clean home page with a heading and a brief description
+
+Use `npx create-next-app@latest` with the appropriate flags, then adjust
+the config as needed.
+```
+
+Claude runs the CLI, answers the interactive prompts, and then modifies the generated files to match your specifications exactly.
+
+### Framework-Specific Prompts
+
+For **React + Vite**:
+
+```
+Create a React 19 project with Vite:
+- TypeScript
+- Tailwind CSS 4
+- React Router v7
+- src/ directory with components/, hooks/, lib/, pages/ subdirectories
+- Path alias @/ pointing to src/
+- A basic layout component with a header and main content area
+```
+
+For **Vue 3**:
+
+```
+Create a Vue 3 project with Vite:
+- TypeScript with <script setup> syntax
+- Pinia for state management
+- Vue Router 4
+- Tailwind CSS 4
+- src/ directory with components/, composables/, stores/, views/
+- Auto-imports for Vue and Vue Router APIs
+```
+
+For **Svelte**:
+
+```
+Create a SvelteKit project:
+- TypeScript
+- Tailwind CSS 4
+- src/routes/ for pages
+- src/lib/ for shared components and utilities
+- Adapter-auto for deployment flexibility
+- A basic layout with header navigation
+```
+
+Each of these produces a working project. Not a skeleton with TODO comments — a project with real files, proper configuration, and a dev server that starts without errors.
+
+## What Claude Does Behind the Scenes
+
+When you give Claude a scaffolding prompt, it runs the actual CLI tools. For Next.js:
+
+```bash
+npx create-next-app@latest my-app --typescript --tailwind --eslint \
+  --app --src-dir --import-alias "@/*"
+```
+
+But it goes further than the CLI. After the initial scaffold, Claude:
+
+1. **Adjusts the directory structure** — creates subdirectories that the CLI does not generate
+2. **Configures path aliases** — updates `tsconfig.json` with proper paths
+3. **Sets up Tailwind** — ensures the config covers all file paths
+4. **Cleans boilerplate** — removes default Next.js content that nobody keeps
+5. **Creates a real home page** — not the spinning logo, but a clean starting point
+
+You can watch it happen in real time. Each file write shows up in your terminal.
+
+## Setting Up CLAUDE.md for Web Projects
+
+After scaffolding, the first thing I do is create a `CLAUDE.md`. This is the single most impactful thing you can do for a web project.
+
+```markdown
+# Project: My Dashboard App
+
+## Stack
+- Next.js 15 (App Router)
+- TypeScript (strict)
+- Tailwind CSS 4
+- Zustand for state management
+- Supabase for backend
+
+## Directory Structure
+- src/app/ — Pages and layouts (App Router)
+- src/components/ — Reusable UI components
+- src/components/ui/ — Base UI primitives (Button, Card, Input, etc.)
+- src/lib/ — Utilities, constants, types
+- src/hooks/ — Custom React hooks
+- src/stores/ — Zustand stores
+
+## Conventions
+- Components: PascalCase, one component per file
+- Hooks: camelCase, prefixed with "use"
+- All components are client components unless explicitly marked "use server"
+- Tailwind for all styling — no CSS modules, no styled-components
+- Always use path alias @/ instead of relative imports
+
+## Commands
+- `npm run dev` — Start dev server (port 3000)
+- `npm run build` — Production build
+- `npm run lint` — ESLint check
+```
+
+Now every future Claude session knows the project inside and out. Ask Claude to create a component, and it will use Tailwind, put it in the right directory, and follow your naming conventions without being told.
+
+## Real Scaffold: From Nothing to Dashboard
+
+Here is an actual session I ran when starting a client dashboard:
+
+```
+> Create a Next.js 15 app for an analytics dashboard:
+> - TypeScript strict, Tailwind CSS 4, App Router, src/ directory
+> - Directory structure: components/ui, components/dashboard,
+>   lib/, hooks/, types/
+> - Path alias @/
+> - A dashboard layout with sidebar navigation and main content area
+> - Navigation items: Overview, Analytics, Users, Settings
+> - Use Lucide React for icons
+> - Dark mode support via Tailwind's dark: prefix
+```
+
+Claude created 12 files in about 90 seconds:
+
+- `src/app/layout.tsx` — root layout with dark mode class
+- `src/app/page.tsx` — redirect to dashboard
+- `src/app/dashboard/layout.tsx` — sidebar + main area
+- `src/app/dashboard/page.tsx` — overview page
+- `src/components/ui/sidebar.tsx` — navigation sidebar
+- `src/components/ui/nav-item.tsx` — individual nav link
+- `src/types/navigation.ts` — type definitions
+- Plus Tailwind config, tsconfig paths, and package installs
+
+The dev server started. The sidebar rendered. The navigation worked. Forty-five minutes of manual setup compressed into a minute and a half.
+
+## Scaffolding Beyond the Basics
+
+Once the base project exists, scaffold additional layers:
+
+```
+Add authentication to this project:
+- Supabase Auth with email/password
+- src/lib/supabase/client.ts and server.ts
+- A middleware.ts that protects /dashboard/* routes
+- Login and signup pages at /auth/login and /auth/signup
+- A useAuth hook in src/hooks/useAuth.ts
+```
+
+Or add a component library foundation:
+
+```
+Create these base UI components in src/components/ui/:
+- Button (variants: primary, secondary, ghost, danger; sizes: sm, md, lg)
+- Card (with CardHeader, CardContent, CardFooter subcomponents)
+- Input (with label, error state, helper text)
+- Badge (variants: default, success, warning, error)
+- All components should use Tailwind, accept className prop,
+  and forward refs
+```
+
+Each prompt builds on the project Claude already understands from CLAUDE.md and the existing codebase.
+
+## Common Scaffolding Mistakes
+
+**Too vague**: "Make me a React app" gives Claude too many decisions. You will get something, but it probably will not match your preferences.
+
+**Too detailed on cosmetics**: "Use Inter font at 16px with #1a1a2e background and 24px border radius on all cards" — save this for later. Scaffold structure first, style second.
+
+**Forgetting to verify**: Always run the dev server after scaffolding. I have seen scaffolds that look perfect in the file tree but have a missing dependency or a TypeScript error. Catch it early.
+
+**Not setting up CLAUDE.md**: Without it, your next Claude session starts from zero context. Two minutes of writing CLAUDE.md saves you from re-explaining your stack in every conversation.
+
+## Scaffolding Checklist
+
+Before calling a scaffold complete, verify:
+
+1. **Dev server starts** — `npm run dev` works without errors
+2. **TypeScript compiles** — `npx tsc --noEmit` passes
+3. **Linting passes** — `npm run lint` shows no errors
+4. **Directory structure matches your plan** — check `src/` layout
+5. **Path aliases work** — imports using `@/` resolve correctly
+6. **CLAUDE.md exists** — project context is documented
+
+## Key Takeaway
+
+Scaffolding with Claude Code replaces the tedious first hour of any project. The key is writing specific prompts that include framework, version, tooling, and structure — not vague requests. Set up CLAUDE.md immediately after scaffolding so every future session inherits your project context. Verify the scaffold by running the dev server and TypeScript compiler before building on top of it. A solid scaffold is the foundation that makes every subsequent Claude interaction more productive.

@@ -1,0 +1,378 @@
+---
+title: "API Design and Implementation"
+slug: "api-design"
+order: 3
+difficulty: "intermediate"
+duration: 22
+tags: ["web", "api", "rest", "graphql", "design"]
+objectives:
+  - "Design REST API endpoint structures using Claude Code"
+  - "Generate route handlers from OpenAPI specs or database models"
+  - "Implement error handling and validation middleware"
+  - "Create consistent API patterns across your application"
+quiz:
+  - id: "api-design-1"
+    question: "What is the best starting point when asking Claude to design a REST API?"
+    type: "multiple-choice"
+    options:
+      - "Ask Claude to create all endpoints at once"
+      - "Start with your data models and resource relationships, then generate endpoints from those"
+      - "Copy an API from a competitor"
+      - "Start with the frontend and work backwards"
+    correct: 1
+    explanation: "Starting with data models and resource relationships gives Claude the structural understanding it needs to generate consistent, well-organized endpoints. The models define what resources exist, how they relate, and what operations make sense — which directly maps to RESTful endpoint design."
+  - id: "api-design-2"
+    question: "Why should you include error handling patterns in your API generation prompts?"
+    type: "multiple-choice"
+    options:
+      - "Claude forgets to add error handling otherwise"
+      - "Consistent error response formats across endpoints make the API predictable for frontend consumers and easier to debug"
+      - "Error handling is optional for APIs"
+      - "It makes the code longer and more impressive"
+    correct: 1
+    explanation: "A consistent error format (status code, error code, message, optional details) across all endpoints means the frontend can write one error handler instead of special-casing each endpoint. It also makes debugging faster because you know exactly what to look for in logs and responses."
+  - id: "api-design-3"
+    question: "What should you provide when asking Claude to generate route handlers from a database model?"
+    type: "multiple-choice"
+    options:
+      - "Just the table name"
+      - "The model schema, relationships, which CRUD operations to support, and any business rules or constraints"
+      - "A working database connection"
+      - "The frontend code that will call the API"
+    correct: 1
+    explanation: "The model schema tells Claude what fields exist and their types. Relationships show how resources connect (belongs-to, has-many). CRUD operations scope the work. Business rules and constraints (like 'users can only update their own posts') inform the validation and authorization logic Claude needs to include."
+  - id: "api-design-4"
+    question: "What is the role of validation middleware in an API?"
+    type: "multiple-choice"
+    options:
+      - "It makes the API slower to add security theater"
+      - "It validates request bodies, query params, and path params before the handler runs, rejecting malformed requests early with clear error messages"
+      - "It's only needed for GraphQL APIs"
+      - "It replaces database constraints"
+    correct: 1
+    explanation: "Validation middleware checks that incoming data matches expected schemas before your handler executes. This catches malformed requests early, provides clear error messages to API consumers, and prevents invalid data from reaching your business logic or database. It complements — not replaces — database constraints."
+---
+
+## APIs Are Claude's Sweet Spot
+
+API design is repetitive by nature. You define resources, write CRUD endpoints, add validation, handle errors, and repeat for every model. Claude Code handles this repetition without getting sloppy about it.
+
+I built the entire backend for a project management app in an afternoon. Fourteen endpoints, input validation, error handling, and database queries — all generated from my Prisma models.
+
+## Starting With Data Models
+
+The best API designs start with the data. Give Claude your models, and it will derive the endpoints:
+
+```
+Here are my Prisma models:
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(MEMBER)
+  projects  Project[] @relation("ProjectMembers")
+  tasks     Task[]   @relation("TaskAssignee")
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  members     User[]   @relation("ProjectMembers")
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  assigneeId  String?
+  project     Project    @relation(fields: [projectId], references: [id])
+  projectId   String
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+Design a REST API for these models. Include:
+- All CRUD endpoints with proper HTTP methods
+- Nested routes where it makes sense (e.g., /projects/:id/tasks)
+- Query params for filtering and pagination
+- Request body schemas for POST/PUT
+- Response schemas including relationships
+```
+
+Claude produces a complete API design document, then you can say:
+
+```
+Now implement these endpoints using Hono.js in src/api/routes/.
+Create separate route files for users, projects, and tasks.
+Use Zod for request validation.
+```
+
+## Generating Route Handlers
+
+Here is how Claude generates a real route handler. This is from an Express project:
+
+```typescript
+// src/routes/projects.ts
+import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { validate } from '@/middleware/validate';
+import { authenticate } from '@/middleware/auth';
+import { AppError } from '@/lib/errors';
+
+const router = Router();
+
+// Schemas
+const createProjectSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+});
+
+const updateProjectSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  status: z.enum(['ACTIVE', 'ARCHIVED', 'COMPLETED']).optional(),
+});
+
+const listQuerySchema = z.object({
+  status: z.enum(['ACTIVE', 'ARCHIVED', 'COMPLETED']).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+  search: z.string().optional(),
+});
+
+// GET /projects
+router.get('/',
+  authenticate,
+  validate({ query: listQuerySchema }),
+  async (req, res) => {
+    const { status, page, limit, search } = req.query;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      members: { some: { id: req.user.id } },
+      ...(status && { status }),
+      ...(search && {
+        name: { contains: search, mode: 'insensitive' as const },
+      }),
+    };
+
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where,
+        include: {
+          members: { select: { id: true, name: true, email: true } },
+          _count: { select: { tasks: true } },
+        },
+        skip,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.project.count({ where }),
+    ]);
+
+    res.json({
+      data: projects,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  }
+);
+
+// POST /projects
+router.post('/',
+  authenticate,
+  validate({ body: createProjectSchema }),
+  async (req, res) => {
+    const project = await prisma.project.create({
+      data: {
+        ...req.body,
+        members: { connect: { id: req.user.id } },
+      },
+      include: {
+        members: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.status(201).json({ data: project });
+  }
+);
+
+// GET /projects/:id
+router.get('/:id',
+  authenticate,
+  async (req, res) => {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      include: {
+        members: { select: { id: true, name: true, email: true } },
+        tasks: {
+          include: {
+            assignee: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new AppError(404, 'PROJECT_NOT_FOUND', 'Project not found');
+    }
+
+    res.json({ data: project });
+  }
+);
+
+export default router;
+```
+
+This is what Claude produces when you give it models, tell it which framework to use, and specify validation and error handling patterns. Production-quality code, not a tutorial example.
+
+## Error Handling Patterns
+
+Tell Claude your error format once, and it will use it everywhere:
+
+```
+All API errors should follow this format:
+
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "Human-readable description",
+    "details": {} // optional, for validation errors
+  }
+}
+
+Create an AppError class in src/lib/errors.ts and an error handling
+middleware in src/middleware/error-handler.ts. Use these patterns:
+- 400: validation errors (include field-level details)
+- 401: unauthenticated
+- 403: unauthorized (user lacks permission)
+- 404: resource not found
+- 409: conflict (duplicate resource)
+- 500: internal server error (log full error, return generic message)
+```
+
+Claude generates the error class, the middleware, and then uses them consistently across all route handlers. This is where Claude outperforms manual coding — humans get sloppy with error handling on the 15th endpoint. Claude does not.
+
+## Validation Middleware
+
+I ask Claude to create reusable validation middleware:
+
+```
+Create a validation middleware in src/middleware/validate.ts that:
+- Accepts Zod schemas for body, query, and params
+- Validates the request against those schemas
+- On success: attaches parsed data to the request
+- On failure: returns 400 with field-level error details
+- Works with Express
+```
+
+The result:
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { ZodSchema, ZodError } from 'zod';
+import { AppError } from '@/lib/errors';
+
+interface ValidationSchemas {
+  body?: ZodSchema;
+  query?: ZodSchema;
+  params?: ZodSchema;
+}
+
+export function validate(schemas: ValidationSchemas) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const errors: Record<string, string[]> = {};
+
+    for (const [key, schema] of Object.entries(schemas)) {
+      if (!schema) continue;
+      try {
+        const parsed = schema.parse(req[key as keyof Request]);
+        (req as any)[key] = parsed;
+      } catch (err) {
+        if (err instanceof ZodError) {
+          errors[key] = err.errors.map(
+            (e) => `${e.path.join('.')}: ${e.message}`
+          );
+        }
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid request data', errors);
+    }
+
+    next();
+  };
+}
+```
+
+Now every route handler just adds `validate({ body: mySchema })` and gets consistent validation behavior for free.
+
+## From OpenAPI Spec to Implementation
+
+If you already have an OpenAPI specification, Claude can generate the implementation directly:
+
+```
+Here is my OpenAPI spec for the tasks API [paste spec or file path].
+Generate Express route handlers that implement every endpoint exactly
+as specified. Use Prisma for database queries, Zod schemas derived
+from the OpenAPI schemas, and the error handling patterns from
+src/lib/errors.ts.
+```
+
+Claude reads the spec, understands the schemas, and generates handlers that match the contract. This is especially useful when the API was designed in a tool like Swagger Editor and you need an implementation that matches exactly.
+
+## Database Model to Full API Pipeline
+
+Here is the fastest workflow I have found for generating a complete API:
+
+1. **Define your Prisma schema** (or SQL schema, or TypeORM entities)
+2. **Ask Claude to design the endpoints** from those models
+3. **Review the endpoint design** — remove what you do not need, add what is missing
+4. **Ask Claude to implement** — specify framework, validation, error handling
+5. **Ask Claude to add tests** — unit tests for handlers, integration tests for the full flow
+
+```
+Now write tests for the projects API using Vitest and supertest:
+- Test each endpoint (GET list, GET by id, POST, PUT, DELETE)
+- Include tests for: success cases, validation errors, not found,
+  unauthorized access
+- Use a test database with seed data
+- Create test helpers for authentication tokens
+```
+
+In one session, you go from a data model to a tested API. The generated tests actually catch bugs — I have seen Claude's own route handlers fail Claude's own tests because of edge cases in pagination logic. That is exactly what you want.
+
+## API Design Principles Claude Follows Well
+
+When prompted correctly, Claude consistently applies:
+
+- **Consistent naming**: plural nouns for collections (`/projects`), singular with ID for resources (`/projects/:id`)
+- **Proper HTTP methods**: GET for reads, POST for creates, PUT/PATCH for updates, DELETE for deletes
+- **Pagination**: page-based or cursor-based, with total counts
+- **Filtering**: query parameters for common filters
+- **Nested resources**: `/projects/:id/tasks` when the relationship is strong
+- **Partial responses**: `?fields=id,name,status` for performance
+
+You do not need to explain REST principles. You need to tell Claude which specific conventions your project follows.
+
+## Key Takeaway
+
+API design and implementation is one of Claude Code's strongest areas. Start with your data models and let Claude derive endpoints, then implement them with your chosen framework. Specify your error format and validation patterns once, and Claude applies them consistently across every endpoint. The model-to-endpoints-to-tests pipeline lets you build a complete, tested API in a single session. Focus your prompts on business rules and constraints rather than REST basics — Claude already knows the fundamentals.

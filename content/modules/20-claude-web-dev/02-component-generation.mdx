@@ -1,0 +1,270 @@
+---
+title: "Component Generation and Iteration"
+slug: "component-generation"
+order: 2
+difficulty: "intermediate"
+duration: 20
+tags: ["web", "components", "react", "iteration"]
+objectives:
+  - "Generate production-quality components from descriptions"
+  - "Iterate on components through progressive refinement prompts"
+  - "Build a component library efficiently using Claude Code"
+  - "Write accessibility-first component prompts"
+quiz:
+  - id: "component-generation-1"
+    question: "What is the most effective way to describe a component to Claude?"
+    type: "multiple-choice"
+    options:
+      - "Just give the component name and let Claude decide"
+      - "Describe the visual layout, data it displays, interactions, and variants"
+      - "Write the full HTML first and ask Claude to convert it"
+      - "Send a screenshot with no text description"
+    correct: 1
+    explanation: "Describing layout, data, interactions, and variants gives Claude the complete picture. A name alone leads to assumptions. Full HTML defeats the purpose. Screenshots help but need text context to specify behavior and variants that aren't visible in a single image."
+  - id: "component-generation-2"
+    question: "What does 'progressive refinement' mean in component iteration?"
+    type: "multiple-choice"
+    options:
+      - "Rewriting the component from scratch each time"
+      - "Making small, targeted changes in sequence: layout first, then responsive, then dark mode, then accessibility"
+      - "Asking Claude to add every feature in one prompt"
+      - "Using multiple AI tools to generate the same component"
+    correct: 1
+    explanation: "Progressive refinement means building up a component through targeted iterations. Get the layout right first, then add responsive behavior, then dark mode, then accessibility, then loading states. Each step is small enough that you can verify it works before moving on."
+  - id: "component-generation-3"
+    question: "Why should accessibility be considered from the start of component generation?"
+    type: "multiple-choice"
+    options:
+      - "It's a legal requirement in all countries"
+      - "Retrofitting accessibility is harder than building it in — semantic HTML, ARIA attributes, and keyboard navigation should be part of the initial structure"
+      - "Accessible components are faster"
+      - "Claude cannot add accessibility after a component is created"
+    correct: 1
+    explanation: "Retrofitting accessibility onto a component built with divs and click handlers is significantly harder than building with semantic HTML, proper ARIA attributes, and keyboard navigation from the start. The structure of accessible components differs from inaccessible ones, so baking it in early avoids painful rewrites."
+  - id: "component-generation-4"
+    question: "How many components can you realistically generate in a focused 30-minute session?"
+    type: "multiple-choice"
+    options:
+      - "1-2 components"
+      - "5-8 components if you use batch prompting and have clear specifications"
+      - "50+ components"
+      - "It depends entirely on Claude's speed"
+    correct: 1
+    explanation: "With clear specifications and batch prompting, generating 5-8 polished components in 30 minutes is realistic. Each component takes 3-5 minutes including generation, review, and one or two refinement passes. Going faster than that usually means skipping review, which leads to inconsistencies."
+---
+
+## Components Are Where Claude Shines
+
+I have generated hundreds of components with Claude Code. Not placeholder skeletons — real components with proper TypeScript types, responsive layouts, dark mode support, loading states, and accessibility attributes.
+
+The trick is knowing how to describe what you want and how to iterate when the first version is not quite right.
+
+## Describing Components Effectively
+
+A component description needs four things: structure, data, interactions, and variants.
+
+**Weak prompt:**
+```
+Create a user card component.
+```
+
+**Strong prompt:**
+```
+Create a UserCard component in src/components/ui/user-card.tsx:
+- Displays: avatar (image with fallback initials), full name, role/title,
+  email, and a status badge (online/offline/away)
+- Layout: avatar on the left, text details stacked on the right
+- Click the card to navigate (accepts an href prop)
+- Variants: default (white bg), highlighted (subtle blue bg)
+- Include hover state with slight elevation
+- Use Tailwind, accept className prop, forward ref
+```
+
+The difference is night and day. The strong prompt gives Claude enough information to produce a component that is immediately usable.
+
+## The Component Generation Workflow
+
+### Step 1: Generate the Base
+
+Start with structure and data:
+
+```
+Create a PricingCard component in src/components/ui/pricing-card.tsx:
+- Props: plan name, price (monthly/yearly), feature list, CTA button text,
+  isPopular boolean
+- Layout: vertical stack — plan name at top, price below, feature list
+  with checkmarks, CTA button at bottom
+- When isPopular is true, add a "Most Popular" badge and a subtle
+  border highlight
+- TypeScript interface for all props
+- Use Tailwind for styling
+```
+
+### Step 2: Add Responsiveness
+
+```
+Make the PricingCard responsive:
+- On mobile: full width, stack naturally
+- On tablet and up: fixed width of 320px
+- The feature list should not cause the card to grow taller than its
+  siblings when used in a grid — use a min-height or flex-grow approach
+```
+
+### Step 3: Add Dark Mode
+
+```
+Add dark mode support to PricingCard:
+- Dark mode: dark bg (gray-900), lighter text, border color adjustment
+- The "Most Popular" badge should remain visible in both modes
+- Use Tailwind's dark: prefix, no JavaScript toggling
+```
+
+### Step 4: Add Loading State
+
+```
+Add a loading skeleton to PricingCard:
+- Accept an isLoading prop
+- When loading, show animated pulse placeholders for each content area
+- Match the exact layout dimensions of the loaded state
+- The skeleton should feel like the content is about to appear
+```
+
+Each step builds on the previous one. You verify after each step. If something is wrong, you fix it before moving on.
+
+## Generating from Screenshots
+
+When you have a design — from Figma, Dribbble, or a competitor — screenshots are powerful context.
+
+```
+Look at this screenshot [paste or describe the image]. Create a React
+component that matches this layout:
+- It's a notification panel with a list of notification items
+- Each item has an icon, title, description, and timestamp
+- There's a "Mark all as read" button at the top
+- Unread items have a blue dot indicator
+- Use Tailwind to match the spacing and typography as closely as possible
+```
+
+Claude can interpret visual layouts remarkably well. It will not get the exact pixel values, but it nails the structure and proportions. You can fine-tune spacing in one iteration.
+
+## Iterating Like a Designer
+
+The best component generation sessions feel like working with a junior developer. You give direction, review the output, and give focused feedback.
+
+**Good iteration prompts:**
+
+```
+The spacing between the avatar and the text is too tight. Add gap-3
+instead of gap-2.
+```
+
+```
+The button looks too big on mobile. Make it h-9 text-sm on mobile,
+h-10 text-base on desktop.
+```
+
+```
+This card needs a focus ring for keyboard navigation. Add
+focus-visible:ring-2 focus-visible:ring-blue-500 with focus-visible:outline-none.
+```
+
+**Bad iteration prompts:**
+
+```
+Make it look better.
+```
+
+```
+I don't like it, try again.
+```
+
+Specific feedback produces specific fixes. Vague feedback produces a different component that may also not match what you want.
+
+## Accessibility-First Components
+
+I learned this the hard way: adding accessibility after building a component is painful. Now I include accessibility requirements in the initial prompt.
+
+```
+Create an accessible Dropdown component in src/components/ui/dropdown.tsx:
+- Trigger button that opens a dropdown menu
+- Keyboard: Enter/Space to open, Escape to close, Arrow keys to navigate
+  items, Enter to select
+- ARIA: role="menu" on the list, role="menuitem" on items,
+  aria-expanded on trigger, aria-haspopup="true"
+- Focus management: focus first item on open, return focus to trigger
+  on close
+- Support for disabled items
+- Props: items array, onSelect callback, trigger content (ReactNode)
+```
+
+The resulting component works with screen readers and keyboard navigation from the start. No retrofit needed.
+
+### Accessibility Prompt Patterns
+
+For any interactive component, include:
+
+```
+Accessibility requirements:
+- Semantic HTML (use <button> for actions, <a> for navigation,
+  <input> for form fields)
+- Keyboard navigation (specify which keys do what)
+- ARIA attributes (roles, states, properties)
+- Focus management (where does focus go on open/close/navigate?)
+- Color contrast (WCAG AA minimum)
+- Screen reader text for icons and visual-only elements
+```
+
+## Batch Component Generation
+
+When starting a project, you often need 8-10 base components at once. Here is how to batch them efficiently:
+
+```
+Create these base UI components in src/components/ui/. Each should:
+- Accept className prop and forward ref
+- Support dark mode via Tailwind dark: prefix
+- Have proper TypeScript types exported
+- Use Tailwind for all styling
+
+Components:
+1. Button — variants: primary, secondary, outline, ghost, danger.
+   Sizes: sm, md, lg. Loading state with spinner.
+2. Input — with label, error message, helper text. Disabled state.
+3. Textarea — same pattern as Input but multi-line.
+4. Select — native select with same styling as Input.
+5. Badge — variants: default, success, warning, error, info.
+6. Avatar — image with fallback initials. Sizes: sm, md, lg.
+7. Card — with CardHeader, CardContent, CardFooter compound components.
+8. Separator — horizontal and vertical variants.
+```
+
+Claude generates all eight in sequence. I review each one as it appears, and if something needs adjustment, I note it and fix everything at the end in a single pass.
+
+This approach produced a complete component library for a client project in under 30 minutes. Not polished to design-system perfection, but fully functional and consistent enough to build features on top of immediately.
+
+## Component Patterns Claude Handles Well
+
+Some component patterns Claude generates particularly well:
+
+**Data display components**: tables, cards, lists, stats grids. Claude understands layout and data mapping intuitively.
+
+**Form components**: inputs, selects, checkboxes, radio groups. Especially good when you specify validation states.
+
+**Navigation components**: sidebars, tabs, breadcrumbs, pagination. Claude handles the active/inactive state logic cleanly.
+
+**Feedback components**: toasts, alerts, progress bars, skeletons. These are straightforward enough that the first generation is usually 90% correct.
+
+## Patterns That Need More Guidance
+
+Some patterns require more detailed prompts:
+
+**Complex modals**: specify focus trapping, scroll locking, animation, and nested content handling explicitly.
+
+**Drag-and-drop**: Claude can scaffold the structure, but you will likely need to integrate a library like `dnd-kit` yourself for production quality.
+
+**Rich text editing**: too many edge cases. Use Claude to set up the integration with Tiptap or Slate, but do not ask it to build a rich text editor from scratch.
+
+**Complex animations**: describe the animation timeline step by step. "Make it animate smoothly" produces generic transitions. "Fade in over 200ms, then slide up 8px over 150ms with ease-out" produces exactly what you want.
+
+## Key Takeaway
+
+Component generation with Claude Code works best when you describe structure, data, interactions, and variants explicitly. Use progressive refinement — get the layout right first, then add responsive behavior, dark mode, and accessibility in focused steps. Include accessibility requirements in your initial prompt rather than retrofitting them. For new projects, batch-generate your base component library in one session. The components will not be pixel-perfect design-system quality, but they will be functional, typed, and consistent enough to build features on immediately.

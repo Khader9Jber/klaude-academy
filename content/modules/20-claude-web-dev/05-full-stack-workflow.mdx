@@ -1,0 +1,282 @@
+---
+title: "Full-Stack Development Workflow"
+slug: "full-stack-workflow"
+order: 5
+difficulty: "intermediate"
+duration: 25
+tags: ["web", "full-stack", "workflow", "project"]
+objectives:
+  - "Build an end-to-end application with Claude Code across all layers"
+  - "Follow a structured workflow from database to deployment"
+  - "Know when to use Claude for each layer and when to write manually"
+  - "Debug across the full stack using Claude"
+quiz:
+  - id: "full-stack-workflow-1"
+    question: "What is the recommended order for building a full-stack app with Claude?"
+    type: "multiple-choice"
+    options:
+      - "Frontend first, then backend, then database"
+      - "Database schema first, then API layer, then frontend, then deployment"
+      - "Deploy first, then build features"
+      - "Build everything simultaneously in one prompt"
+    correct: 1
+    explanation: "Starting with the database schema establishes your data model. The API layer builds on those models. The frontend consumes the API. Deployment comes last. Each layer depends on the one before it, so building bottom-up means Claude always has context about the foundation when generating the next layer."
+  - id: "full-stack-workflow-2"
+    question: "When should you write code manually instead of using Claude?"
+    type: "multiple-choice"
+    options:
+      - "Never — Claude should write everything"
+      - "For complex business logic, security-sensitive code, and performance-critical sections where you need to understand every line"
+      - "Only for HTML and CSS"
+      - "When Claude is too slow"
+    correct: 1
+    explanation: "Claude excels at boilerplate, CRUD, and well-defined patterns. But complex business logic with subtle edge cases, security-sensitive code (authentication, authorization, encryption), and performance-critical paths deserve manual attention. You need to understand these sections deeply, and writing them yourself ensures that understanding."
+  - id: "full-stack-workflow-3"
+    question: "How should you debug a full-stack issue where the frontend shows an error but the API logs look normal?"
+    type: "multiple-choice"
+    options:
+      - "Rewrite the frontend from scratch"
+      - "Give Claude the frontend error, the API request/response, and the network tab output to help identify the disconnect between layers"
+      - "Ignore it and deploy anyway"
+      - "Only look at the database"
+    correct: 1
+    explanation: "Full-stack bugs often live in the gap between layers — a mismatched field name, a different date format, or a missing CORS header. Giving Claude the error message, the actual request and response, and the network tab output lets it compare what the frontend expects vs what the API returns and find the mismatch."
+  - id: "full-stack-workflow-4"
+    question: "Why should you build features in vertical slices rather than horizontal layers?"
+    type: "multiple-choice"
+    options:
+      - "It's faster to write code that way"
+      - "Building one complete feature (database + API + frontend + tests) before starting the next lets you verify the full flow works, catch integration issues early, and ship incrementally"
+      - "Horizontal layers are deprecated"
+      - "Claude can only work on one file at a time"
+    correct: 1
+    explanation: "Vertical slices mean you have a working feature end-to-end before building the next one. This catches integration issues (mismatched types, missing endpoints, wrong query params) immediately instead of discovering them after you've built 10 API endpoints and 10 frontend pages that don't connect properly."
+---
+
+## Building a Real App, End to End
+
+This lesson walks through building a complete task management app with Claude Code. Not a theoretical exercise — I built this for a freelance client and delivered it in two days.
+
+The workflow follows a specific order: database, API, frontend, polish, deploy. Each layer builds on the previous one, and Claude has context about everything that came before.
+
+## Phase 1: Database Schema
+
+Start with the foundation:
+
+```
+Create a Prisma schema for a task management app:
+
+Models needed:
+- User: id, email, name, password hash, avatar URL, created/updated
+- Workspace: id, name, slug, created/updated
+- WorkspaceMember: user + workspace link, role (owner/admin/member)
+- Project: id, name, color, workspace, created/updated
+- Task: id, title, description, status (todo/in-progress/review/done),
+  priority (low/medium/high/urgent), assignee, project, due date,
+  position (for ordering), created/updated
+- Comment: id, content, task, author, created/updated
+
+Relations:
+- A workspace has many members and projects
+- A project belongs to a workspace and has many tasks
+- A task belongs to a project, has an optional assignee, and has many comments
+- A user can be in many workspaces
+
+Include indexes for common queries: tasks by status, tasks by assignee,
+tasks by project.
+```
+
+Claude generates the complete Prisma schema. Run `npx prisma migrate dev` to verify it works.
+
+Then seed the database:
+
+```
+Create a seed script at prisma/seed.ts:
+- 3 users (use bcrypt for password hashing)
+- 1 workspace with all 3 users
+- 2 projects in that workspace
+- 10 tasks spread across projects with varying statuses and priorities
+- 5 comments across different tasks
+- Use realistic names and descriptions, not "Test User 1"
+```
+
+## Phase 2: API Layer
+
+With the schema in place, build the API:
+
+```
+Create an Express API in src/api/:
+- src/api/index.ts — app setup with middleware (cors, json, error handler)
+- src/api/routes/auth.ts — POST /auth/register, POST /auth/login,
+  GET /auth/me (JWT-based)
+- src/api/routes/workspaces.ts — CRUD for workspaces
+- src/api/routes/projects.ts — CRUD for projects (scoped to workspace)
+- src/api/routes/tasks.ts — CRUD for tasks with:
+  - GET /tasks?status=&assignee=&project= (filtering)
+  - PATCH /tasks/:id/status (quick status update)
+  - PATCH /tasks/:id/position (for drag-and-drop reordering)
+- src/api/routes/comments.ts — CRUD for comments (scoped to task)
+
+Use:
+- Zod for validation
+- JWT for auth (access token, 1-hour expiry)
+- Prisma for database
+- AppError class for consistent error handling
+- Rate limiting on auth endpoints
+```
+
+Claude generates the entire API. I run the dev server and test a few endpoints with curl or a REST client to verify.
+
+```bash
+# Quick smoke test
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","name":"Test","password":"secure123"}'
+```
+
+If something is off, I tell Claude:
+
+```
+The POST /tasks endpoint is not including the assignee details in the
+response. It returns assigneeId but not the assignee's name and avatar.
+Update the Prisma query to include the assignee relation.
+```
+
+Targeted fixes, not rewrites.
+
+## Phase 3: Frontend
+
+Now the frontend, which consumes the API:
+
+```
+Create the frontend for this task management app using Next.js 15:
+
+Pages needed:
+- /login and /register — auth forms
+- /dashboard — workspace overview (list of projects with task counts)
+- /projects/:id — Kanban board with columns for each status
+- /projects/:id/list — list view of tasks with filtering
+
+Components needed:
+- TaskCard — displays title, priority badge, assignee avatar, due date
+- KanbanColumn — a status column that contains TaskCards
+- KanbanBoard — the full board with all columns
+- TaskDetail — slide-over panel showing full task details and comments
+- ProjectSidebar — navigation between projects
+
+Use:
+- React Query (TanStack Query) for data fetching
+- An API client module at src/lib/api.ts with typed fetch functions
+- Zustand for UI state (selected task, sidebar open/closed)
+- Tailwind for styling, dark mode support
+```
+
+This is a big prompt, and Claude works through it systematically. It creates the API client first (since all pages depend on it), then the shared components, then the pages.
+
+### Building Features in Vertical Slices
+
+For large apps, break the frontend into feature slices:
+
+```
+Build the Kanban board feature:
+1. API client functions for tasks (list, create, update status)
+2. TaskCard component
+3. KanbanColumn component
+4. KanbanBoard component that fetches tasks and groups by status
+5. Drag-and-drop reordering between columns (use @dnd-kit/core)
+6. Optimistic updates when moving a card
+```
+
+Each slice is testable independently. You can verify the Kanban board works completely before moving to the list view or the task detail panel.
+
+## Phase 4: Integration and Debugging
+
+This is where full-stack bugs surface. The frontend sends a request, the API processes it, but something does not match.
+
+### Common Full-Stack Bugs Claude Fixes
+
+**Type mismatches between frontend and API:**
+
+```
+The frontend expects task.assignee.name but the API returns
+task.assignee as null when no one is assigned. This causes a
+"Cannot read property 'name' of null" error. Fix the TaskCard
+component to handle null assignee, and also update the API type
+definitions.
+```
+
+**Date handling inconsistencies:**
+
+```
+The API returns dueDate as an ISO string, but the frontend date
+picker expects a Date object. The dates are showing as "Invalid Date"
+in the task list. Fix the API client to parse date strings into Date
+objects, and update the TaskCard to format dates properly.
+```
+
+**CORS issues:**
+
+```
+The frontend running on port 3000 is getting CORS errors when calling
+the API on port 3001. The error is: "Access-Control-Allow-Origin
+header is missing." Fix the CORS configuration in the API.
+```
+
+For each of these, Claude fixes the issue across the relevant layers. It does not just fix the frontend — it ensures the API and frontend agree on types, formats, and contracts.
+
+## Phase 5: Polish
+
+After the core features work, polish the experience:
+
+```
+Add these polish items:
+1. Loading skeletons for the Kanban board (pulse animation matching
+   the card layout)
+2. Empty states for projects with no tasks ("No tasks yet. Create
+   your first task.")
+3. Toast notifications for CRUD operations (created, updated, deleted)
+4. Keyboard shortcuts: N for new task, / for search, Esc to close panels
+5. Responsive: on mobile, the Kanban board should scroll horizontally
+   with snap scrolling
+```
+
+Polish prompts are small and focused. Claude applies each one without disrupting existing functionality.
+
+## When to Write Code Manually
+
+Claude handles 80% of a full-stack project efficiently. But some parts deserve manual attention:
+
+**Authentication and authorization logic**: Claude can scaffold it, but you should review every line. Understand how tokens are generated, validated, and refreshed. Audit the middleware that checks permissions.
+
+**Complex business rules**: if a task status change triggers notifications, updates project metrics, and checks workspace plan limits, write that logic yourself so you understand every edge case.
+
+**Performance-critical queries**: Claude will generate working queries, but for complex aggregations or queries that run on every page load, review the query plan and optimize manually.
+
+**Third-party integrations**: Claude can set up the boilerplate, but API keys, webhook handling, and error recovery need your careful attention.
+
+The rule I follow: if a bug in this code could cause data loss, a security vulnerability, or a production outage, I write it myself and use Claude to review it.
+
+## Full-Stack Debugging Strategy
+
+When something breaks across the stack:
+
+```
+I'm seeing a 500 error when creating a task. Here's what I have:
+
+Frontend error: "Request failed with status 500"
+Network tab: POST /api/tasks — Request body: { "title": "New task",
+"projectId": "abc123" } — Response: 500 Internal Server Error
+API logs: "PrismaClientKnownRequestError: Foreign key constraint
+failed on the field: projectId"
+
+The project with ID "abc123" exists in the database. Why is the
+foreign key constraint failing?
+```
+
+Claude identifies that the issue is likely a UUID vs CUID mismatch, or the project exists in a different workspace than the authenticated user has access to, or the projectId field in the Prisma schema references a different column than expected.
+
+The key is giving Claude information from each layer: frontend error, network request/response, and backend logs. Three data points let Claude triangulate the issue.
+
+## Key Takeaway
+
+Full-stack development with Claude Code works best when you follow a bottom-up approach: database schema, then API, then frontend, then polish. Build in vertical feature slices so you can verify end-to-end integration after each feature. Use Claude for boilerplate, CRUD, and well-defined patterns, but write security-sensitive and complex business logic yourself. When debugging across the stack, give Claude data from every layer — the bug usually lives in the gap between them.
