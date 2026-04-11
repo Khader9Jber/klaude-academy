@@ -73,10 +73,10 @@ const features = [
 ];
 
 const stats = [
-  { value: "13", label: "Modules" },
-  { value: "70+", label: "Lessons" },
-  { value: "200+", label: "Exercises" },
-  { value: "4", label: "Skill Arcs" },
+  { value: "25", label: "Modules" },
+  { value: "162", label: "Lessons" },
+  { value: "600+", label: "Exercises" },
+  { value: "5", label: "Skill Arcs" },
 ];
 
 export default function HomePage() {
@@ -126,7 +126,7 @@ export default function HomePage() {
               className="mt-6 text-lg sm:text-xl text-muted max-w-2xl leading-relaxed"
             >
               A comprehensive, free learning path that takes you from AI
-              beginner to Claude Code expert. 13 modules, 70+ lessons, and
+              beginner to Claude Code expert. 25 modules, 162 lessons, and
               hundreds of hands-on exercises.
             </motion.p>
 
