@@ -28,7 +28,7 @@ export const ARC_DEFINITIONS: ArcDefinition[] = [
     color: "#5e9ed6",
     description:
       "Level up your workflow. Master configuration, context management, Git integration, and the Model Context Protocol.",
-    range: "Modules 5-8",
+    range: "Modules 5-8, 14",
   },
   {
     id: "power-user",
@@ -36,7 +36,7 @@ export const ARC_DEFINITIONS: ArcDefinition[] = [
     color: "#a07ed6",
     description:
       "Automate and extend. Build custom hooks, work with agents and skills, and design advanced multi-step workflows.",
-    range: "Modules 9-11",
+    range: "Modules 9-11, 15",
   },
   {
     id: "expert",
@@ -62,6 +62,8 @@ export const MODULE_ORDER: string[] = [
   "advanced-workflows",
   "enterprise-and-production",
   "capstone",
+  "real-world-projects",
+  "claude-for-teams",
 ];
 
 export const ACHIEVEMENTS: Achievement[] = [

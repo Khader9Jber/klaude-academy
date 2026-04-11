@@ -43,13 +43,13 @@ describe('ARC_DEFINITIONS', () => {
 })
 
 describe('MODULE_ORDER', () => {
-  it('has 13 modules', () => {
-    expect(MODULE_ORDER).toHaveLength(13)
+  it('has 15 modules', () => {
+    expect(MODULE_ORDER).toHaveLength(15)
   })
 
-  it('starts with claude-fundamentals and ends with capstone', () => {
+  it('starts with claude-fundamentals and ends with claude-for-teams', () => {
     expect(MODULE_ORDER[0]).toBe('claude-fundamentals')
-    expect(MODULE_ORDER[MODULE_ORDER.length - 1]).toBe('capstone')
+    expect(MODULE_ORDER[MODULE_ORDER.length - 1]).toBe('claude-for-teams')
   })
 
   it('all entries are non-empty strings', () => {
