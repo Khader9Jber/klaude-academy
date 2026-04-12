@@ -86,7 +86,7 @@ client = anthropic.Anthropic(
 )
 def call_claude(messages: list) -> str:
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=2048,
         messages=messages
     )
@@ -103,7 +103,7 @@ def robust_call(messages: list, max_attempts: int = 3) -> str:
     for attempt in range(max_attempts):
         try:
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=2048,
                 messages=messages
             )
@@ -141,7 +141,7 @@ Prompt caching fixes this:
 
 ```python
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     system=[
         {
@@ -224,7 +224,7 @@ batch = client.messages.batches.create(
         {
             "custom_id": f"review-{i}",
             "params": {
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 1024,
                 "messages": [
                     {"role": "user", "content": f"Review this code:\n\n{code}"}
@@ -271,7 +271,7 @@ async def process_with_semaphore(items: list, max_concurrent: int = 10):
     async def process_one(item):
         async with semaphore:
             response = await client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": item}]
             )
@@ -344,7 +344,7 @@ def tracked_call(messages, **kwargs):
     start = time.time()
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             messages=messages,
             **kwargs
         )
@@ -373,7 +373,7 @@ client_slow = anthropic.Anthropic(timeout=300.0)
 
 # Per-request timeout
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=4096,
     messages=messages,
     timeout=60.0  # override for this request

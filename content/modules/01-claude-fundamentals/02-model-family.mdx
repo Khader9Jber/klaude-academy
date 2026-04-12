@@ -61,9 +61,11 @@ Here's the lineup as of Claude 4.6:
 
 | Model | Strengths | API Cost (Input / Output per 1M tokens) | Speed |
 |-------|-----------|------------------------------------------|-------|
-| **Opus 4.6** | Deepest reasoning, architecture, debugging | $5 / $25 | Slowest |
-| **Sonnet 4.6** | Balanced daily driver, fast + smart | $3 / $15 | Fast |
-| **Haiku 4.5** | Lightning fast, instant responses | $1 / $5 | Fastest |
+| **Opus 4.6** | Deepest reasoning, architecture, debugging | ~$15 / ~$75 | Slowest |
+| **Sonnet 4.6** | Balanced daily driver, fast + smart | ~$3 / ~$15 | Fast |
+| **Haiku 4.5** | Lightning fast, instant responses | ~$1 / ~$5 | Fastest |
+
+Pricing is approximate — see current rates at [console.anthropic.com](https://console.anthropic.com).
 
 These aren't just speed tiers. Each model has genuinely different capabilities. Let's break them down.
 
@@ -79,7 +81,7 @@ What Opus excels at:
 - **Security analysis** — finding vulnerabilities that require understanding how multiple components interact
 - **Extended thinking** — Opus can think for longer and deeper before responding
 
-The tradeoff is speed and cost. Opus takes noticeably longer to respond than Sonnet, and at $5/$25 per million tokens, it burns through your budget faster. On a Max subscription, Opus also consumes roughly 1.7x the tokens compared to Sonnet for the same task because of its deeper reasoning process.
+The tradeoff is speed and cost. Opus takes noticeably longer to respond than Sonnet, and at roughly $15/$75 per million tokens, it burns through your budget faster. On a Max subscription, Opus also consumes roughly 1.7x the tokens compared to Sonnet for the same task because of its deeper reasoning process.
 
 **Use Opus when the cost of being wrong is high.** A 30-second wait for a correct architectural decision saves you days of refactoring later.
 
@@ -101,7 +103,7 @@ Sonnet is the model you'll use 70-80% of the time. It's not the smartest in the 
 
 ## Haiku: The Triage Nurse
 
-**Claude Haiku 4.5** is the speed demon. At $1/$5 per million tokens, it's five times cheaper than Opus on input and five times cheaper on output. Responses come back almost instantly.
+**Claude Haiku 4.5** is the speed demon. At roughly $1/$5 per million tokens, it's dramatically cheaper than Opus on both input and output. Responses come back almost instantly.
 
 What Haiku is perfect for:
 
@@ -195,9 +197,9 @@ On the API side, the math is straightforward. Processing 100K tokens (a medium c
 
 | Model | Input Cost | Output Cost (10K tokens) | Total |
 |-------|-----------|-------------------------|-------|
-| Opus | $0.50 | $0.25 | $0.75 |
-| Sonnet | $0.30 | $0.15 | $0.45 |
-| Haiku | $0.10 | $0.05 | $0.15 |
+| Opus | ~$1.50 | ~$0.75 | ~$2.25 |
+| Sonnet | ~$0.30 | ~$0.15 | ~$0.45 |
+| Haiku | ~$0.10 | ~$0.05 | ~$0.15 |
 
 Over a full workday of heavy usage, the difference between always-Opus and smart model switching can be 3-5x in cost or usage consumption.
 

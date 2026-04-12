@@ -83,7 +83,7 @@ curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-6",
     "max_tokens": 1024,
     "messages": [
       {"role": "user", "content": "What is the capital of France?"}
@@ -104,7 +104,7 @@ The response:
       "text": "The capital of France is Paris."
     }
   ],
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-sonnet-4-6",
   "stop_reason": "end_turn",
   "stop_sequence": null,
   "usage": {
@@ -130,7 +130,7 @@ import anthropic
 client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
 
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[
         {"role": "user", "content": "Explain quicksort in 3 sentences."}
@@ -158,7 +158,7 @@ import Anthropic from "@anthropic-ai/sdk";
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
 const message = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   max_tokens: 1024,
   messages: [
     { role: "user", content: "Explain quicksort in 3 sentences." }
@@ -177,7 +177,7 @@ The system prompt sets Claude's behavior for the entire conversation. It's separ
 
 ```python
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     system="You are a senior Python developer. Respond only with code, no explanations. Include type hints and docstrings.",
     messages=[
@@ -194,9 +194,11 @@ Every request specifies a model. Here's what's available and what each costs:
 
 | Model ID | Cost (Input / Output per 1M tokens) | Best For |
 |----------|--------------------------------------|----------|
-| `claude-opus-4-20250514` | $15 / $75 | Complex reasoning, architecture |
-| `claude-sonnet-4-20250514` | $3 / $15 | General purpose, daily driver |
-| `claude-haiku-3-5-20241022` | $0.80 / $4 | High volume, simple tasks |
+| `claude-opus-4-6` | ~$15 / ~$75 | Complex reasoning, architecture |
+| `claude-sonnet-4-6` | ~$3 / ~$15 | General purpose, daily driver |
+| `claude-haiku-4-5-20251001` | ~$1 / ~$5 | High volume, simple tasks |
+
+Pricing is approximate — see current rates at [console.anthropic.com](https://console.anthropic.com).
 
 For most applications, start with Sonnet. Escalate to Opus only for tasks that genuinely need deeper reasoning. Use Haiku for classification, extraction, and high-volume pipelines where cost matters.
 
@@ -205,7 +207,7 @@ For most applications, start with Sonnet. Escalate to Opus only for tasks that g
 ```python
 # Deterministic — same input always gives same output
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     temperature=0,
     messages=[{"role": "user", "content": "What is 2+2?"}]
@@ -213,7 +215,7 @@ message = client.messages.create(
 
 # Creative — varied outputs each time
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     temperature=0.8,
     messages=[{"role": "user", "content": "Write a haiku about debugging."}]
@@ -236,7 +238,7 @@ def chat(user_message: str) -> str:
     conversation.append({"role": "user", "content": user_message})
     
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=2048,
         system="You are a helpful coding assistant.",
         messages=conversation
@@ -265,7 +267,7 @@ import anthropic
 
 try:
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello"}]
     )
@@ -317,10 +319,11 @@ class UsageTracker:
         self.request_count += 1
     
     def cost_usd(self, model: str = "sonnet") -> float:
+        # Approximate rates per 1M tokens (input, output). Verify at console.anthropic.com.
         rates = {
             "sonnet": (3.0, 15.0),
             "opus": (15.0, 75.0),
-            "haiku": (0.80, 4.0),
+            "haiku": (1.0, 5.0),
         }
         input_rate, output_rate = rates[model]
         return (self.total_input_tokens * input_rate + 
@@ -329,7 +332,7 @@ class UsageTracker:
 tracker = UsageTracker()
 
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[{"role": "user", "content": "Hello"}]
 )

@@ -76,7 +76,7 @@ const MODELS: ModelSpec[] = [
   },
   {
     id: "sonnet",
-    name: "Claude Sonnet 4.5",
+    name: "Claude Sonnet 4.6",
     tagline: "The daily driver. The default. 90% of your work runs here.",
     color: "#5cb870",
     icon: <Sparkles className="h-5 w-5" />,
@@ -108,14 +108,14 @@ const MODELS: ModelSpec[] = [
   },
   {
     id: "haiku",
-    name: "Claude Haiku 4",
+    name: "Claude Haiku 4.5",
     tagline: "The sprinter. Cheap, fast, perfect for bulk simple tasks.",
     color: "#5e9ed6",
     icon: <Zap className="h-5 w-5" />,
     reasoning: "Good (for simple tasks)",
     speed: "Blazing (~160 tok/sec)",
-    inputCost: "$0.80 / 1M tokens",
-    outputCost: "$4 / 1M tokens",
+    inputCost: "~$1 / 1M tokens",
+    outputCost: "~$5 / 1M tokens",
     tokensPerSec: "~160",
     useFor: [
       "Bulk rename across many files",

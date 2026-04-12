@@ -132,23 +132,10 @@ Shows Claude Code's internal understanding of your project — what it knows abo
 
 ## Planning and Model Commands
 
-### /plan
-Asks Claude to create a plan before taking action. Instead of jumping into implementation, Claude outlines the steps first and waits for your approval.
+### Plan mode
+Asks Claude to create a plan before taking action. Instead of jumping into implementation, Claude outlines the steps first and waits for your approval. In modern Claude Code, plan mode is usually entered via `claude --permission-mode plan`, via Shift+Tab in the REPL, or by asking Claude to draft a plan. Some builds expose a `/plan` shortcut — check `/help` for what's available in yours.
 
-```
-/plan "add real-time notifications using WebSockets"
-```
-
-Claude will output a detailed plan — files to modify, the approach, potential risks — before writing any code.
-
-### /execute
-Tells Claude to execute the plan that was previously created with /plan.
-
-```
-/execute
-```
-
-Used after reviewing and approving a /plan output.
+Claude will output a detailed plan — files to modify, the approach, potential risks — before writing any code. Use Ctrl+G to open the plan in your editor, and approve to let Claude execute it.
 
 ### /model [name]
 Switch the active model. Takes effect on the next message.
@@ -360,8 +347,8 @@ If you only memorize 15 commands, make it these:
 | `/context` | Show token usage | When sessions feel expensive |
 | `/cost` | Show session cost | Budget monitoring |
 | `/model` | Switch model | Need different capability level |
-| `/plan` | Create a plan first | Before complex implementations |
-| `/execute` | Execute the plan | After reviewing a /plan |
+| Plan mode (Shift+Tab or `--permission-mode plan`) | Create a plan first | Before complex implementations |
+| `/review` | Review recent changes | Before commit |
 | `/fork` | Branch conversation | Trying an experimental approach |
 | `/rewind` | Undo messages | Claude went wrong, want to go back |
 | `/resume` | Pick a session | Resuming previous work |

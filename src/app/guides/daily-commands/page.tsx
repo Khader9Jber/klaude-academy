@@ -326,12 +326,12 @@ const COMMANDS: Command[] = [
     example: {
       input: "/model opus",
       output: `● Switched to claude-opus-4-6
-  Previous: claude-sonnet-4-5
+  Previous: claude-sonnet-4-6
   Context preserved (28k tokens)
 
-  Costs per 1M tokens:
-    Sonnet: $3 in / $15 out
-    Opus:   $15 in / $75 out (5x more)
+  Costs per 1M tokens (approximate):
+    Sonnet: ~$3 in / ~$15 out
+    Opus:   ~$15 in / ~$75 out (5x more)
 
   Switch back with: /model sonnet`,
     },

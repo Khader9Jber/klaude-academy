@@ -112,7 +112,7 @@ file_agent = Agent(
     Always confirm before writing or overwriting files.
     When listing directories, explain what you see.""",
     tools=[read_file, list_directory, write_file],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 
 # Run it
@@ -170,7 +170,7 @@ code_reviewer = Agent(
     Be specific about line numbers and provide fix suggestions.
     Rate severity: critical, warning, info.""",
     tools=[read_file, list_directory],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 
 # Specialist: test writer
@@ -180,7 +180,7 @@ test_writer = Agent(
     Use pytest. Cover happy path, edge cases, and error conditions.
     Match the project's existing test patterns.""",
     tools=[read_file, write_file, list_directory],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 
 # Orchestrator that delegates to specialists
@@ -191,7 +191,7 @@ orchestrator = Agent(
     For test writing requests, hand off to the Test Writer.
     For tasks that need both, run review first, then write tests.""",
     handoffs=[code_reviewer, test_writer],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 
 result = await Runner.run(
@@ -227,7 +227,7 @@ safe_agent = Agent(
     instructions="You help with file operations.",
     tools=[read_file, write_file, list_directory],
     guardrails=[no_destructive_ops],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 ```
 
@@ -321,7 +321,7 @@ doc_agent = Agent(
     4. Include: purpose, public API, usage examples, and dependencies
     Do NOT document test files or config files.""",
     tools=[read_file, find_files, write_file],
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 
 result = await Runner.run(

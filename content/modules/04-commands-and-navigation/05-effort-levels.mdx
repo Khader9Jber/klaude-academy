@@ -232,9 +232,13 @@ After Claude responds, the effort level returns to whatever it was before. You d
 
 This is perfect for moments in an otherwise routine session where one specific question needs deeper reasoning.
 
-## Extended Thinking
+## Adaptive Thinking (formerly Extended Thinking)
 
-Extended thinking is a separate but related feature. While effort levels control how many tokens Claude spends on the visible response, **extended thinking** controls whether Claude does *internal* reasoning before the response.
+Thinking is a separate but related feature. While effort levels control how many tokens Claude spends on the visible response, **thinking** controls whether Claude does *internal* reasoning before the response.
+
+On Claude 4.6 models the thinking API is **adaptive** — the model decides how deeply to think based on the problem and the `effort` parameter (low, medium, high, max). The older API pattern of requesting extended thinking with an explicit `budget_tokens` value is deprecated on 4.6 (it still works for now but will be removed). If you're calling the API directly, use `thinking: {type: "adaptive"}` with `output_config: {effort: "high"}` instead.
+
+Inside Claude Code, Alt+T still toggles thinking on and off — the model adapts the depth to match your current effort level.
 
 ### What Extended Thinking Does
 

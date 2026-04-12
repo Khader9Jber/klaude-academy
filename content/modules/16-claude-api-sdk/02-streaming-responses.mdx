@@ -80,7 +80,7 @@ curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-6",
     "max_tokens": 256,
     "stream": true,
     "messages": [{"role": "user", "content": "Count from 1 to 5."}]
@@ -91,7 +91,7 @@ The response is a series of SSE events:
 
 ```
 event: message_start
-data: {"type":"message_start","message":{"id":"msg_01...","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","usage":{"input_tokens":14,"output_tokens":0}}}
+data: {"type":"message_start","message":{"id":"msg_01...","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","usage":{"input_tokens":14,"output_tokens":0}}}
 
 event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
@@ -137,7 +137,7 @@ client = anthropic.Anthropic()
 
 # Basic streaming — print tokens as they arrive
 with client.messages.stream(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[{"role": "user", "content": "Explain how HTTPS works."}]
 ) as stream:
@@ -155,7 +155,7 @@ Often you need both the streaming display and the complete message object:
 
 ```python
 with client.messages.stream(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[{"role": "user", "content": "Write a Python fibonacci function."}]
 ) as stream:
@@ -175,7 +175,7 @@ For more control, handle individual events:
 
 ```python
 with client.messages.stream(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[{"role": "user", "content": "List 3 sorting algorithms."}]
 ) as stream:
@@ -197,7 +197,7 @@ const client = new Anthropic();
 
 // Basic streaming
 const stream = client.messages.stream({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   max_tokens: 1024,
   messages: [{ role: "user", content: "Explain how HTTPS works." }],
 });
@@ -214,7 +214,7 @@ console.log(`\nTokens: ${finalMessage.usage.input_tokens} in, ${finalMessage.usa
 
 ```typescript
 const stream = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   max_tokens: 1024,
   stream: true,
   messages: [{ role: "user", content: "Explain recursion." }],
@@ -243,7 +243,7 @@ def stream_chat(user_input: str) -> str:
     full_response = ""
     
     with client.messages.stream(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=2048,
         system="You are a helpful assistant. Be concise.",
         messages=conversation
@@ -286,7 +286,7 @@ app.post("/api/chat", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   const stream = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 2048,
     stream: true,
     messages: req.body.messages,
@@ -339,7 +339,7 @@ Streams can fail mid-generation. Handle it:
 ```python
 try:
     with client.messages.stream(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=4096,
         messages=[{"role": "user", "content": "Write a long essay."}]
     ) as stream:
@@ -365,7 +365,7 @@ Streaming adds complexity. Skip it when:
 ```python
 # For batch/structured work, use the non-streaming API
 result = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     messages=[{"role": "user", "content": "Return a JSON object with fields: name, age, city"}]
 )

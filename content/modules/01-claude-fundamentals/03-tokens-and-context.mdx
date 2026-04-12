@@ -89,12 +89,13 @@ Everything Claude reads and writes is measured in tokens. Your prompts, Claude's
 
 The **context window** is the total number of tokens Claude can "see" at once. Think of it as Claude's working memory — everything that needs to be in the conversation must fit inside this window.
 
-| Plan | Context Window |
+| Model / Plan | Context Window |
 |------|---------------|
-| Pro ($20/mo) | 200K tokens |
-| Max 5x ($100/mo) | 1M tokens |
-| Max 20x ($200/mo) | 1M tokens |
-| API (direct) | 200K tokens (default) |
+| Sonnet 4.6, Haiku 4.5 | 200K tokens |
+| Opus 4.6 | 1M tokens |
+| Pro ($20/mo) | matches the model (200K for Sonnet/Haiku) |
+| Max 5x / 20x | matches the model (1M when using Opus 4.6) |
+| API (direct) | matches the model you call |
 
 ### What Fits in These Windows?
 

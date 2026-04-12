@@ -78,7 +78,7 @@ const SECTIONS: CheatsheetSection[] = [
     icon: <Command className="h-4 w-4" />,
     tab: "CLI",
     items: [
-      { command: "--model <name>", description: "Override the default model (e.g. claude-sonnet-4-20250514)" },
+      { command: "--model <name>", description: "Override the default model (e.g. claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001)" },
       { command: "--effort <level>", description: "Set reasoning effort: low, medium, high, or max" },
       { command: "--continue", description: "Continue the most recent conversation" },
       { command: "--resume <id>", description: "Resume a specific conversation by session ID" },

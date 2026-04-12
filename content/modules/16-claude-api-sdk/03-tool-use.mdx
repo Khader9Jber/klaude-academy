@@ -92,7 +92,7 @@ tools = [
 ]
 
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     tools=tools,
     messages=[
@@ -137,7 +137,7 @@ def run_tool_conversation(user_message: str) -> str:
     
     while True:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=4096,
             tools=tools,
             messages=messages
@@ -374,7 +374,7 @@ Sometimes you want Claude to always use a specific tool:
 
 ```python
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     tools=tools,
     tool_choice={"type": "tool", "name": "calculate"},  # force this tool
@@ -383,7 +383,7 @@ message = client.messages.create(
 
 # Or force ANY tool (Claude must use at least one)
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-6",
     max_tokens=1024,
     tools=tools,
     tool_choice={"type": "any"},

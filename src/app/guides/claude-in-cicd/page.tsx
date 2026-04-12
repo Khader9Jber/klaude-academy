@@ -712,7 +712,7 @@ export default function ClaudeInCicdPage() {
                   Haiku/Sonnet for first-pass review; escalate to Opus only if
                   the PR is complex or the first pass flagged something. Pass{" "}
                   <code className="bg-surface-2 px-1 rounded">
-                    model: claude-haiku-4-6
+                    model: claude-haiku-4-5-20251001
                   </code>{" "}
                   (or whichever tier fits) to the action.
                 </p>

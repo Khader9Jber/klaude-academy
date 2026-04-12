@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
   // Create streaming response
   const stream = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 4096,
     system: system || "You are a helpful assistant.",
     messages,
@@ -399,7 +399,7 @@ async function summarizeAndTrim(
   if (oldMessages.length === 0) return messages;
 
   const summary = await client.messages.create({
-    model: "claude-haiku-3-5-20241022", // cheap model for summaries
+    model: "claude-haiku-4-5-20251001", // cheap model for summaries
     max_tokens: 500,
     messages: [
       {
@@ -431,7 +431,7 @@ For a chat app with a long system prompt, cache it:
 ```typescript
 // In your API route
 const stream = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   max_tokens: 4096,
   system: [
     {

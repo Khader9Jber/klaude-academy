@@ -72,10 +72,17 @@ This installs Claude Code globally, making the `claude` command available in any
 If you prefer a one-line install that handles dependencies:
 
 ```bash
-curl -sL https://install.anthropic.com | sh
+# macOS / Linux / WSL
+curl -fsSL https://claude.ai/install.sh | bash
+
+# macOS via Homebrew
+brew install --cask claude-code
+
+# Windows via winget
+winget install Anthropic.ClaudeCode
 ```
 
-This script detects your platform (macOS, Linux, WSL), installs Node.js if needed, and sets up Claude Code.
+These installers detect your platform, install Node.js if needed, and set up Claude Code.
 
 ### Requirements
 

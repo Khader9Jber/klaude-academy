@@ -101,7 +101,7 @@ Pro is the entry point for serious Claude usage:
 Max 5x is where Claude transforms from a useful tool into a genuine development partner:
 
 - **~225 Sonnet messages per 5-hour rolling window** (5x Pro)
-- **1M token context window** — this is the game-changer
+- **1M token context window when using Opus 4.6** (Sonnet 4.6 and Haiku 4.5 remain 200K) — this is the game-changer
 - **Full Opus access** — no separate Opus rate limits beyond your overall budget
 - **Agent teams** — Claude can spawn sub-agents that work in parallel
 - **Remote control** — connect to Claude Code sessions remotely
@@ -187,12 +187,12 @@ When you hit your rolling window limit, you have two options:
 1. **Wait** — old usage will roll off within the next few hours
 2. **Enable extra usage** — continue working at standard API rates
 
-Extra usage bills at Anthropic's API pricing:
+Extra usage bills at Anthropic's API pricing (approximate — verify at [console.anthropic.com](https://console.anthropic.com)):
 
 ```
-Sonnet: $3 / $15 per 1M tokens (input/output)
-Opus:   $5 / $25 per 1M tokens (input/output)
-Haiku:  $1 / $5  per 1M tokens (input/output)
+Sonnet 4.6: ~$3 / ~$15 per 1M tokens (input/output)
+Opus 4.6:   ~$15 / ~$75 per 1M tokens (input/output)
+Haiku 4.5:  ~$1 / ~$5   per 1M tokens (input/output)
 ```
 
 This is metered billing on top of your subscription. It's there as a safety net for heavy days, not as a primary usage mode.
@@ -207,14 +207,14 @@ A heavy Claude Code day might involve:
 - 100K output tokens (Claude's responses, code generation)
 - Mix of 60% Sonnet, 30% Opus, 10% Haiku
 
-**API cost for one heavy day:**
-- Sonnet: 300K in × $3/1M + 60K out × $15/1M = $0.90 + $0.90 = $1.80
-- Opus: 150K in × $5/1M + 30K out × $25/1M = $0.75 + $0.75 = $1.50
-- Haiku: 50K in × $1/1M + 10K out × $5/1M = $0.05 + $0.05 = $0.10
+**API cost for one heavy day (approximate):**
+- Sonnet: 300K in × ~$3/1M + 60K out × ~$15/1M ≈ $0.90 + $0.90 = $1.80
+- Opus: 150K in × ~$15/1M + 30K out × ~$75/1M ≈ $2.25 + $2.25 = $4.50
+- Haiku: 50K in × ~$1/1M + 10K out × ~$5/1M ≈ $0.05 + $0.05 = $0.10
 
-**Daily API cost: ~$3.40**
+**Daily API cost: ~$6.40**
 
-Over 22 working days: **~$74.80/month** for moderate usage.
+Over 22 working days: **~$140/month** for moderate usage.
 
 But heavy users who keep Claude running all day, use agent teams, and do extended thinking sessions can easily hit $15-25/day on the API. That's **$330-550/month** — making the $200 Max 20x plan a significant discount.
 
