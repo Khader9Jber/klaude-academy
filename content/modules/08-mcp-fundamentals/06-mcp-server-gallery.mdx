@@ -15,10 +15,10 @@ quiz:
     question: "Which MCP server lets Claude read and write files on your local filesystem?"
     type: "multiple-choice"
     options:
-      - "@anthropic/mcp-server-slack"
-      - "@anthropic/mcp-server-filesystem"
-      - "@anthropic/mcp-server-github"
-      - "@anthropic/mcp-server-memory"
+      - "@modelcontextprotocol/server-slack"
+      - "@modelcontextprotocol/server-filesystem"
+      - "@modelcontextprotocol/server-github"
+      - "@modelcontextprotocol/server-memory"
     correct: 1
     explanation: "The filesystem MCP server gives Claude controlled access to your local filesystem. You specify which directories it can access, and Claude can read, write, search, and manage files within those boundaries."
   - id: "mcp-gallery-2"
@@ -90,7 +90,7 @@ These are the servers most developers should install immediately.
 
 **Install:**
 ```bash
-claude mcp add filesystem -- npx @anthropic-ai/mcp-server-filesystem /path/to/allowed/directory
+claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem /path/to/allowed/directory
 ```
 
 **Use cases:**
@@ -106,7 +106,7 @@ claude mcp add filesystem -- npx @anthropic-ai/mcp-server-filesystem /path/to/al
 
 **Install:**
 ```bash
-claude mcp add github -- npx @anthropic-ai/mcp-server-github
+claude mcp add github -- npx -y @modelcontextprotocol/server-github
 # Requires GITHUB_TOKEN environment variable
 ```
 
@@ -123,7 +123,7 @@ claude mcp add github -- npx @anthropic-ai/mcp-server-github
 
 **Install:**
 ```bash
-claude mcp add memory -- npx @anthropic-ai/mcp-server-memory
+claude mcp add memory -- npx -y @modelcontextprotocol/server-memory
 ```
 
 **Use cases:**
@@ -141,7 +141,7 @@ claude mcp add memory -- npx @anthropic-ai/mcp-server-memory
 
 **Install:**
 ```bash
-claude mcp add postgres -- npx @anthropic-ai/mcp-server-postgres "postgresql://readonly_user:password@host:5432/dbname"
+claude mcp add postgres -- npx -y @modelcontextprotocol/server-postgres "postgresql://readonly_user:password@host:5432/dbname"
 ```
 
 **Use cases:**
@@ -164,7 +164,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO claude_readonly;
 
 **Install:**
 ```bash
-claude mcp add sqlite -- npx @anthropic-ai/mcp-server-sqlite /path/to/database.db
+claude mcp add sqlite -- npx -y @modelcontextprotocol/server-sqlite /path/to/database.db
 ```
 
 **Use cases:**
@@ -182,7 +182,7 @@ claude mcp add sqlite -- npx @anthropic-ai/mcp-server-sqlite /path/to/database.d
 
 **Install:**
 ```bash
-claude mcp add slack -- npx @anthropic-ai/mcp-server-slack
+claude mcp add slack -- npx -y @modelcontextprotocol/server-slack
 # Requires SLACK_BOT_TOKEN and SLACK_TEAM_ID
 ```
 
@@ -199,7 +199,7 @@ claude mcp add slack -- npx @anthropic-ai/mcp-server-slack
 
 **Install:**
 ```bash
-claude mcp add linear -- npx @anthropic-ai/mcp-server-linear
+claude mcp add linear -- npx -y @modelcontextprotocol/server-linear
 # Requires LINEAR_API_KEY
 ```
 
@@ -216,7 +216,7 @@ claude mcp add linear -- npx @anthropic-ai/mcp-server-linear
 
 **Install:**
 ```bash
-claude mcp add puppeteer -- npx @anthropic-ai/mcp-server-puppeteer
+claude mcp add puppeteer -- npx -y @modelcontextprotocol/server-puppeteer
 ```
 
 **Use cases:**
@@ -232,7 +232,7 @@ claude mcp add puppeteer -- npx @anthropic-ai/mcp-server-puppeteer
 
 **Install:**
 ```bash
-claude mcp add fetch -- npx @anthropic-ai/mcp-server-fetch
+claude mcp add fetch -- npx -y @modelcontextprotocol/server-fetch
 ```
 
 **Use cases:**
@@ -279,7 +279,7 @@ claude mcp add fetch -- npx @anthropic-ai/mcp-server-fetch
 
 **Install:**
 ```bash
-claude mcp add brave-search -- npx @anthropic-ai/mcp-server-brave-search
+claude mcp add brave-search -- npx -y @modelcontextprotocol/server-brave-search
 # Requires BRAVE_API_KEY
 ```
 
@@ -292,8 +292,8 @@ claude mcp add brave-search -- npx @anthropic-ai/mcp-server-brave-search
 
 The MCP ecosystem is growing fast. Here's where to find new servers:
 
-1. **Official Anthropic servers:** Check the [@anthropic-ai npm scope](https://www.npmjs.com/org/anthropic-ai) for first-party servers
-2. **Community directories:** Sites like mcpservers.org aggregate community-built servers
+1. **Official reference registry:** [modelcontextprotocol.io/examples](https://modelcontextprotocol.io/examples) and [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) list the first-party servers
+2. **Community directories:** [mcpservers.org](https://mcpservers.org) aggregates community-built servers
 3. **GitHub search:** Search for "mcp-server" on GitHub — new ones appear weekly
 4. **npm search:** `npm search mcp-server` shows published packages
 
@@ -315,20 +315,20 @@ When you have several MCP servers configured, your `.claude/settings.json` might
   "mcpServers": {
     "github": {
       "command": "npx",
-      "args": ["@anthropic-ai/mcp-server-github"]
+      "args": ["-y", "@modelcontextprotocol/server-github"]
     },
     "postgres": {
       "command": "npx",
-      "args": ["@anthropic-ai/mcp-server-postgres", 
+      "args": ["-y", "@modelcontextprotocol/server-postgres",
                "postgresql://readonly:pass@localhost:5432/mydb"]
     },
     "memory": {
-      "command": "npx", 
-      "args": ["@anthropic-ai/mcp-server-memory"]
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
     },
     "filesystem": {
       "command": "npx",
-      "args": ["@anthropic-ai/mcp-server-filesystem", "/home/user/projects"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
     }
   }
 }

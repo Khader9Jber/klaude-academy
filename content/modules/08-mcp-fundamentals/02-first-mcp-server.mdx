@@ -16,11 +16,11 @@ quiz:
     type: "multiple-choice"
     options:
       - "claude install github"
-      - "claude mcp add github -e GITHUB_TOKEN=ghp_... --transport stdio npx -y @modelcontextprotocol/server-github"
+      - "claude mcp add github -e GITHUB_TOKEN=ghp_... -- npx -y @modelcontextprotocol/server-github"
       - "mcp install github"
       - "npm install mcp-github"
     correct: 1
-    explanation: "The full command is: claude mcp add github -e GITHUB_TOKEN=ghp_... --transport stdio npx -y @modelcontextprotocol/server-github. This adds a server named 'github', passes your token as an environment variable, uses stdio transport, and runs the GitHub MCP server package."
+    explanation: "The full command is: claude mcp add github -e GITHUB_TOKEN=ghp_... -- npx -y @modelcontextprotocol/server-github. This adds a server named 'github', passes your token as an env var, and after the -- separator runs the GitHub MCP server package via npx. stdio is the default transport."
   - id: "first-mcp-2"
     question: "How do you list all connected MCP servers?"
     type: "multiple-choice"
@@ -73,8 +73,7 @@ You need a **GitHub Personal Access Token** (classic or fine-grained):
 ```bash
 claude mcp add github \
   -e GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-github
+  -- npx -y @modelcontextprotocol/server-github
 ```
 
 Let's break this down:
@@ -83,9 +82,11 @@ Let's break this down:
 |---|---|
 | `claude mcp add` | Add a new MCP server |
 | `github` | Name for this server (you choose) |
-| `-e GITHUB_TOKEN=ghp_...` | Pass your token to the server |
-| `--transport stdio` | Use stdio transport (local process) |
+| `-e GITHUB_TOKEN=ghp_...` | Pass the token as an env var |
+| `--` | End of options; everything after is the command |
 | `npx -y @modelcontextprotocol/server-github` | The server package to run |
+
+stdio is the default transport, so you don't need to specify it. Use `--transport http` only when connecting to a remote MCP endpoint (covered in lesson 4).
 
 ### Verify It's Working
 
@@ -159,7 +160,7 @@ Here's a complete workflow using GitHub MCP:
 
 ```bash
 # Start a session focused on code review
-claude -n "code-review-sprint"
+claude
 
 # Get an overview of what needs review
 "List all open PRs that need review. Sort by oldest first."

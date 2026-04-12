@@ -1,15 +1,15 @@
 ---
-title: "All 11 Hook Events Explained"
+title: "Hook Events: The Five You Need to Know"
 slug: "hook-events"
 order: 1
 difficulty: "advanced"
 duration: 18
 tags: ["hooks", "events", "automation", "configuration"]
 objectives:
-  - "Understand all hook events and when they fire"
+  - "Understand the five canonical hook events and when each fires"
   - "Know the difference between command and HTTP hook types"
   - "Use exit codes to control Claude's behavior from hooks"
-  - "Choose the right event for each automation need"
+  - "Know that Claude can write hooks for you"
 quiz:
   - id: "hooks-1"
     question: "What does exit code 2 do in a PreToolUse hook?"
@@ -22,35 +22,35 @@ quiz:
     correct: 1
     explanation: "In a PreToolUse hook, exit code 2 blocks the tool use entirely. Claude receives a message that the action was blocked by a hook and must find an alternative approach. Exit 0 allows the tool use to proceed. This is the mechanism for creating safety gates."
   - id: "hooks-2"
-    question: "When does the PostToolUse event fire?"
+    question: "Which five hook events does Claude Code officially expose?"
     type: "multiple-choice"
     options:
-      - "Before Claude uses a tool"
-      - "After Claude successfully uses a tool — ideal for running formatters on written files"
-      - "When the session ends"
-      - "When you type a command"
+      - "PreTool, PostTool, Start, Stop, Alert"
+      - "PreToolUse, PostToolUse, SessionStart, SessionEnd, Notification"
+      - "Read, Write, Execute, Notify, Clean"
+      - "Any event you define in settings.json"
     correct: 1
-    explanation: "PostToolUse fires immediately after Claude completes a tool use. The most common use is running formatters (Prettier, Black) on files Claude just wrote. The hook receives information about which tool was used and what file was affected."
+    explanation: "The five canonical hook events are PreToolUse (before a tool runs), PostToolUse (after a tool runs), SessionStart (session begins), SessionEnd (session ends), and Notification (Claude needs your attention). These cover the full lifecycle you need for automation."
   - id: "hooks-3"
-    question: "What is the difference between command and http hook types?"
+    question: "What is the difference between command and HTTP hooks?"
     type: "multiple-choice"
     options:
       - "Command hooks are faster"
-      - "Command hooks run a shell command; HTTP hooks send a webhook to a URL"
+      - "Command hooks run a shell command locally; HTTP hooks POST to a URL"
       - "HTTP hooks are more secure"
       - "They're the same"
     correct: 1
-    explanation: "Command hooks execute a shell command on your machine (like running a formatter or sending a desktop notification). HTTP hooks send an HTTP request to a URL (like posting to a Slack webhook or triggering a CI pipeline). Use command for local actions, HTTP for remote notifications."
+    explanation: "Command hooks execute a shell command on your machine (like running a formatter or sending a desktop notification). HTTP hooks send a webhook to a URL (like posting to Slack or triggering a CI pipeline). Use command for local actions, HTTP for remote notifications."
   - id: "hooks-4"
-    question: "When does the Notification event fire?"
+    question: "Why are hooks considered deterministic while CLAUDE.md is advisory?"
     type: "multiple-choice"
     options:
-      - "Every 5 minutes"
-      - "When Claude needs your attention — waiting for approval, encountered an error, or went idle"
-      - "When you receive an email"
-      - "When a PR is created"
+      - "Hooks use more tokens than CLAUDE.md"
+      - "Hooks always execute via the harness — Claude cannot skip or reinterpret them. CLAUDE.md instructions are guidance the model may or may not follow perfectly."
+      - "CLAUDE.md is for humans"
+      - "There is no real difference"
     correct: 1
-    explanation: "The Notification event fires when Claude needs your attention: it's waiting for permission approval, encountered an error it can't resolve, or has gone idle after completing a task. This is the event to hook into for desktop notifications, sound alerts, or mobile notifications."
+    explanation: "Hooks are executed by the Claude Code harness, not by the model — when a PreToolUse hook exits 2, the action is blocked with zero chance of the model talking itself around it. CLAUDE.md is advisory: the model reads it and usually follows it, but nothing forces compliance. For hard rules you cannot afford to miss, use hooks."
 ---
 
 ## The Hook System
@@ -103,17 +103,19 @@ Send an HTTP request to a URL:
 
 HTTP hooks are ideal for remote notifications — Slack, Discord, webhooks, CI triggers.
 
-## All 11 Hook Events
+## The Five Hook Events
+
+Claude Code exposes five hook events. Every automation you build maps to one of these.
 
 ### 1. PreToolUse
 
 **Fires**: Before Claude executes a tool (Read, Write, Bash, MCP tool).
 
-**Use case**: Safety gates. Block dangerous operations, require confirmation for sensitive actions.
+**Use case**: Safety gates. Block dangerous operations before they happen.
 
 **Exit codes**:
 - `0` — Allow the tool use
-- `2` — Block the tool use (Claude gets an error message)
+- `2` — Block the tool use (Claude sees an error message and must try a different approach)
 
 ```json
 {
@@ -132,7 +134,7 @@ HTTP hooks are ideal for remote notifications — Slack, Discord, webhooks, CI t
 
 **Fires**: After Claude successfully executes a tool.
 
-**Use case**: Auto-formatting, linting, logging, notifications.
+**Use case**: Auto-formatting, linting, type-checking, running tests.
 
 ```json
 {
@@ -153,31 +155,11 @@ HTTP hooks are ideal for remote notifications — Slack, Discord, webhooks, CI t
 
 The `$file` variable contains the path of the affected file.
 
-### 3. UserPromptSubmit
-
-**Fires**: After you submit a prompt, before Claude processes it.
-
-**Use case**: Input validation, logging, telemetry.
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "command": "echo \"$(date): User submitted prompt\" >> ~/.claude/prompt-log.txt"
-      }
-    ]
-  }
-}
-```
-
-Exit code 2 blocks the prompt from being processed.
-
-### 4. SessionStart
+### 3. SessionStart
 
 **Fires**: When a new Claude Code session begins.
 
-**Use case**: Environment setup, server health checks, welcome messages.
+**Use case**: Environment setup, service health checks, status banners.
 
 ```json
 {
@@ -191,11 +173,29 @@ Exit code 2 blocks the prompt from being processed.
 }
 ```
 
+### 4. SessionEnd
+
+**Fires**: When a Claude Code session ends (you quit, or it exits cleanly).
+
+**Use case**: Cleanup, log rotation, summary generation, saving transcripts.
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "command": "echo \"$(date): session ended\" >> ~/.claude/session-history.log"
+      }
+    ]
+  }
+}
+```
+
 ### 5. Notification
 
-**Fires**: When Claude needs your attention — waiting for permission, error, or idle.
+**Fires**: When Claude needs your attention — waiting for permission approval, idle after finishing work, or hit an error it can't resolve.
 
-**Use case**: Desktop notifications, sound alerts, mobile notifications.
+**Use case**: Desktop notifications, sound alerts, Slack messages, mobile pings.
 
 ```json
 {
@@ -209,77 +209,16 @@ Exit code 2 blocks the prompt from being processed.
 }
 ```
 
-### 6. TeammateIdle
+## Let Claude Write Hooks For You
 
-**Fires**: When an agent team member goes idle (waiting for work or blocked).
+You don't have to write hook JSON by hand. Ask Claude:
 
-**Use case**: Agent team coordination, workload balancing.
-
-```json
-{
-  "hooks": {
-    "TeammateIdle": [
-      {
-        "command": "echo 'Agent idle' >> ~/.claude/team-log.txt"
-      }
-    ]
-  }
-}
+```
+"Write a PostToolUse hook that runs eslint --fix after every
+TypeScript file edit."
 ```
 
-### 7. TaskCompleted
-
-**Fires**: When a background task finishes.
-
-**Use case**: Notification that a long-running task is done.
-
-```json
-{
-  "hooks": {
-    "TaskCompleted": [
-      {
-        "command": "osascript -e 'display notification \"Task complete\" with title \"Claude Code\"' && afplay /System/Library/Sounds/Glass.aiff"
-      }
-    ]
-  }
-}
-```
-
-### 8. Elicitation
-
-**Fires**: When an MCP server requests structured input from Claude.
-
-**Use case**: Logging MCP input requests, custom input handling.
-
-### 9. ElicitationResult
-
-**Fires**: When the response to an MCP elicitation is returned.
-
-**Use case**: Logging responses, post-processing elicitation results.
-
-### 10. WorktreeCreate
-
-**Fires**: When a new git worktree is created (for agent isolation).
-
-**Use case**: Setting up worktree-specific environment, installing dependencies.
-
-```json
-{
-  "hooks": {
-    "WorktreeCreate": [
-      {
-        "command": "cd $worktree_path && pnpm install"
-      }
-    ]
-  }
-}
-```
-
-### 11. WorktreeRemove
-
-**Fires**: When a git worktree is cleaned up.
-
-**Use case**: Cleanup scripts, resource deallocation.
+Claude will produce the matcher, the command, and valid JSON, and can drop it straight into `.claude/settings.json`. This is the fastest way to grow your hook library — describe the automation, let Claude translate it to configuration.
 
 ## Matchers
 
@@ -318,18 +257,22 @@ Hooks receive context about the event through environment variables:
 |---|---|---|
 | `$file` | Path of the affected file | PostToolUse (Write) |
 | `$tool` | Name of the tool used | PreToolUse, PostToolUse |
-| `$worktree_path` | Path of the worktree | WorktreeCreate, WorktreeRemove |
 
 ## Configuration Location
 
-Hooks are configured in settings.json — any of the three layers:
+Hooks are configured in `settings.json` at two scopes:
+
+- **Global**: `~/.claude/settings.json` — applies to every project
+- **Project**: `.claude/settings.json` — committed to git, shared with the team
+
+Project hooks require explicit approval the first time Claude Code loads them — this protects you from cloning a repo that tries to run arbitrary commands.
 
 ```json
 // .claude/settings.json (project-level, shared with team)
 {
   "hooks": {
-    "PostToolUse": [...],
     "PreToolUse": [...],
+    "PostToolUse": [...],
     "Notification": [...]
   }
 }
@@ -340,17 +283,23 @@ Hooks are configured in settings.json — any of the three layers:
 | Event | When It Fires | Common Use |
 |---|---|---|
 | PreToolUse | Before tool execution | Safety gates, blocking |
-| PostToolUse | After tool execution | Formatting, linting |
-| UserPromptSubmit | After prompt submission | Logging, validation |
-| SessionStart | Session begins | Environment setup |
-| Notification | Claude needs attention | Desktop alerts |
-| TeammateIdle | Agent goes idle | Team coordination |
-| TaskCompleted | Background task done | Completion alerts |
-| Elicitation | MCP requests input | Input logging |
-| ElicitationResult | MCP input returned | Response logging |
-| WorktreeCreate | Worktree created | Dependency install |
-| WorktreeRemove | Worktree removed | Cleanup |
+| PostToolUse | After tool execution | Formatting, linting, type-check |
+| SessionStart | Session begins | Environment setup, status banner |
+| SessionEnd | Session ends | Cleanup, log summary |
+| Notification | Claude needs attention | Desktop alerts, Slack ping |
+
+## Hooks vs CLAUDE.md
+
+Both shape Claude's behavior, but they work very differently:
+
+| | CLAUDE.md | Hooks |
+|---|---|---|
+| Executed by | The model (reads, tries to follow) | The harness (runs unconditionally) |
+| Reliability | Advisory — usually followed, sometimes missed | Deterministic — always fires |
+| Best for | Conventions, stack, style rules | Hard safety rules, formatting, alerts |
+
+Use CLAUDE.md for "please always use named exports." Use hooks for "never let a write to `.env*` succeed."
 
 ## Key Takeaway
 
-Claude Code's hook system has 11 events covering the full lifecycle of tool use, sessions, agents, and MCP interactions. The two most immediately useful are PostToolUse (auto-format files after Claude writes them) and Notification (get alerted when Claude needs you). Hooks can be shell commands (local actions) or HTTP requests (remote notifications). The exit code 2 in PreToolUse hooks gives you the power to block Claude from performing specific actions — creating safety gates that go beyond static permissions.
+Claude Code has five hook events: PreToolUse, PostToolUse, SessionStart, SessionEnd, and Notification. The two most immediately useful are PostToolUse (auto-format files after Claude writes them) and Notification (get alerted when Claude needs you). Hooks can be shell commands (local actions) or HTTP requests (remote notifications). Exit code 2 in PreToolUse blocks the action entirely — that's how you build safety gates that Claude cannot talk around. And if you don't want to write the JSON yourself, just ask Claude: "write a hook that runs my formatter after every edit."

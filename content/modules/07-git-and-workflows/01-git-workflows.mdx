@@ -9,7 +9,7 @@ objectives:
   - "Use Claude Code for branch creation, commits, and PR workflows"
   - "Understand Claude's git safety guarantees"
   - "Set up GitHub integration with /install-github-app"
-  - "Use --from-pr for PR-linked sessions"
+  - "Use --continue and --resume to pick up sessions across PR work"
 quiz:
   - id: "git-1"
     question: "What git safety rule does Claude Code always follow?"
@@ -22,15 +22,15 @@ quiz:
     correct: 1
     explanation: "Claude follows strict git safety: it never force-pushes, always creates new commits (rather than amending existing ones), and asks for permission before destructive operations like reset --hard. This protects your git history from accidental destruction."
   - id: "git-2"
-    question: "What does claude --from-pr 42 do?"
+    question: "What does `claude --continue` do?"
     type: "multiple-choice"
     options:
-      - "Creates PR #42"
-      - "Starts a session with the context of PR #42 already loaded"
-      - "Merges PR #42"
-      - "Reviews PR #42"
+      - "Creates a new branch"
+      - "Resumes the most recent session in this directory with its full context"
+      - "Merges the current branch"
+      - "Creates a PR"
     correct: 1
-    explanation: "claude --from-pr 42 starts a session pre-loaded with the context of pull request #42 — the diff, description, and file changes. This is useful for reviewing PRs, addressing review comments, or continuing work on a PR's branch."
+    explanation: "`claude --continue` picks up where the last session left off in this directory — the conversation history, loaded files, and working context are all restored. Use `--resume` to pick from a list of past sessions if you had more than one recent one."
   - id: "git-3"
     question: "What does /install-github-app do?"
     type: "multiple-choice"
@@ -164,23 +164,40 @@ Claude uses `gh` (GitHub CLI) to create a PR with:
 a summary of all commits on this branch"
 ```
 
-### PR-Linked Sessions
+### Working on a PR's Branch
 
-Start a session pre-loaded with a PR's context:
+To hand Claude the context of an existing PR, check it out locally with the GitHub CLI, then ask Claude to load the diff and discussion:
 
 ```bash
-claude --from-pr 42
+gh pr checkout 42
+claude
 ```
 
-This loads PR #42's diff, description, and comments into the session. You can then:
+Then in the session:
 
-```bash
+```
+"Load PR #42. Read the diff against main and the review comments
+(gh pr view 42 --comments), then address the reviewer's feedback."
+```
+
+Claude uses `gh pr view` and `git diff main...HEAD` to pick up the full PR context. You can then ask it to:
+
+```
 "Address the review comments on this PR"
 "The reviewer asked about error handling in the webhook handler — fix it"
 "Add the test cases the reviewer requested"
 ```
 
-Claude has the full PR context, so it knows exactly what the reviewer asked for and what code needs to change.
+### Resuming the PR Session Later
+
+If you step away from a PR and come back, don't start from scratch — resume the session:
+
+```bash
+claude --continue    # resumes the most recent session in this directory
+claude --resume      # pick from a list of past sessions
+```
+
+Either restores the conversation history, file context, and any plan you were mid-way through. Combine with `gh pr checkout` to jump back into the exact state you left a PR in yesterday.
 
 ## Code Review
 
@@ -223,8 +240,8 @@ The app runs as part of your GitHub Actions workflow, so reviews happen automati
 
 ```bash
 # Start the feature
-claude -n "order-cancellation"
-"Create a feature branch from main for order cancellation"
+claude
+"Create a feature branch from main called feature/order-cancellation"
 
 # Implement
 "Implement the order cancellation endpoint following our API conventions"
@@ -242,10 +259,14 @@ claude -n "order-cancellation"
 ### Bug Fix Workflow
 
 ```bash
-# Start from the bug report
-claude --from-pr 87
-"This PR introduced a regression. What changed that could cause
-the timeout errors described in the bug report?"
+# Check out the PR that introduced the regression
+gh pr checkout 87
+claude
+
+# Load the PR context
+"Read the diff for this branch against main and the description of
+PR #87 (gh pr view 87). Which change is most likely causing the
+timeout errors described in the bug report?"
 
 # Fix
 "Fix the timeout issue — the connection pool was being exhausted"
@@ -258,7 +279,7 @@ the timeout errors described in the bug report?"
 ### Release Workflow
 
 ```bash
-claude -n "release-v2.3.0"
+claude
 "Generate a changelog from all commits since the last tag (v2.2.0)"
 "Create a release branch from main"
 "Tag the release as v2.3.0 with the changelog as the tag message"
@@ -281,4 +302,4 @@ claude -n "release-v2.3.0"
 
 ## Key Takeaway
 
-Claude Code integrates deeply with Git while maintaining strict safety guarantees — no force pushes, no amending, no destructive operations without permission. Use `/commit` for quick, well-messaged commits. Use `--from-pr` for PR-linked sessions. Install the GitHub App for automated reviews. Claude handles the git mechanics so you can focus on the code, not the commands.
+Claude Code integrates deeply with Git while maintaining strict safety guarantees — no force pushes, no amending, no destructive operations without permission. Use `/commit` for quick, well-messaged commits. Combine `gh pr checkout` with `claude --continue` / `--resume` to pick up PR work right where you left off. Install the GitHub App (`/install-github-app`) for automated reviews. Claude handles the git mechanics so you can focus on the code, not the commands.

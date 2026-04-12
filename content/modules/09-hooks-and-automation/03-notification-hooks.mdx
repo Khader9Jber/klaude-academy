@@ -186,16 +186,16 @@ If you prefer using curl (and have it allowed):
 
 Note: This requires `Bash(curl *)` to be allowed in your permissions.
 
-## Task Completion Notifications
+## Session End Summaries
 
-Separate from the Notification event, the TaskCompleted event fires when a background task finishes:
+The SessionEnd event fires when a Claude Code session ends. Use it to log a summary or play a "done" sound when you quit a long working session:
 
 ```json
 {
   "hooks": {
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "osascript -e 'display notification \"Background task completed\" with title \"Claude Code\" sound name \"Hero\"'"
+        "command": "osascript -e 'display notification \"Session ended\" with title \"Claude Code\" sound name \"Hero\"'"
       }
     ]
   }
@@ -206,7 +206,7 @@ The `sound name` parameter in osascript plays a named system sound directly, wit
 
 ## Combining Notification Strategies
 
-For the best coverage, combine local and remote notifications:
+For the best coverage, combine local and remote notifications on the Notification event:
 
 ```json
 {
@@ -223,16 +223,9 @@ For the best coverage, combine local and remote notifications:
         "body": { "text": ":eyes: Claude Code needs your attention" }
       }
     ],
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "osascript -e 'display notification \"Task complete!\" with title \"Claude Code\" sound name \"Hero\"'"
-      },
-      {
-        "type": "http",
-        "url": "https://hooks.slack.com/services/xxx/yyy/zzz",
-        "method": "POST",
-        "headers": { "Content-Type": "application/json" },
-        "body": { "text": ":white_check_mark: Claude Code task completed" }
+        "command": "osascript -e 'display notification \"Session wrapped\" with title \"Claude Code\" sound name \"Hero\"'"
       }
     ]
   }
@@ -242,32 +235,27 @@ For the best coverage, combine local and remote notifications:
 This gives you:
 - **Desktop notification** when Claude needs attention (you're at your computer)
 - **Slack message** when Claude needs attention (you're away from your computer)
-- **Desktop + Slack** when a background task completes
+- **Session-end ping** when you close the session
 
 ## Practical Patterns
 
 ### The "Away from Desk" Setup
 
-When you're running a long task and stepping away:
+When you're running a long task and stepping away, the Notification event is your alert — it fires when Claude goes idle waiting for input or after finishing its work:
 
 ```json
 {
   "hooks": {
     "Notification": [
       {
-        "command": "osascript -e 'display notification \"Come back! Claude needs you.\" with title \"Claude Code\" sound name \"Ping\"'"
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "command": "osascript -e 'display notification \"Done! Check Claude Code.\" with title \"Claude Code\" sound name \"Hero\"' && afplay /System/Library/Sounds/Hero.aiff && afplay /System/Library/Sounds/Hero.aiff"
+        "command": "osascript -e 'display notification \"Come back — Claude needs you\" with title \"Claude Code\" sound name \"Ping\"' && afplay /System/Library/Sounds/Ping.aiff"
       }
     ]
   }
 }
 ```
 
-The double sound play on TaskCompleted makes it harder to miss.
+The extra `afplay` call doubles up the sound so you're more likely to catch it from another room.
 
 ### The "Meeting-Safe" Setup
 
@@ -291,4 +279,4 @@ Silent during meetings — Slack only, no sounds:
 
 ## Key Takeaway
 
-Notification hooks ensure you never miss when Claude needs your attention. On macOS, use `osascript` for desktop notifications and `afplay` for sounds. On Linux, use `notify-send`. For remote notifications, use HTTP hooks to Slack or Discord webhooks. Combine desktop and remote notifications for full coverage — desktop when you're at your computer, Slack when you're away. Set up Notification events (Claude needs you) and TaskCompleted events (work is done) for the two most important alert types.
+Notification hooks ensure you never miss when Claude needs your attention. On macOS, use `osascript` for desktop notifications and `afplay` for sounds. On Linux, use `notify-send`. For remote notifications, use HTTP hooks to Slack or Discord webhooks. Combine desktop and remote notifications for full coverage — desktop when you're at your computer, Slack when you're away. Use the Notification event for "Claude is waiting on you" alerts, and SessionEnd for wrap-up pings when you close the session.

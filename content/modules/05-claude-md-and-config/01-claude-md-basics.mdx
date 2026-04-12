@@ -150,6 +150,38 @@ Tell Claude how to build, test, and run your project:
 - `pnpm db:seed` — seed development database
 ```
 
+## Generate a Starter With `/init`
+
+You don't have to write CLAUDE.md from scratch. In any Claude Code session, run:
+
+```
+/init
+```
+
+Claude scans the project (package manifests, folder structure, README, important configs) and drafts a CLAUDE.md based on what it sees. Review the draft, trim what you don't need, and commit it. This gets you 80% of the way to a good CLAUDE.md in one command.
+
+## Import Other Files With `@`
+
+CLAUDE.md supports imports — use `@path/to/import` to pull in another file's contents at load time:
+
+```markdown
+## Architecture
+@docs/architecture.md
+
+## API conventions
+@docs/api-conventions.md
+```
+
+Use this when you have longer docs that some sessions need in full context. Keep the top-level CLAUDE.md focused, and let imports pull in detail on demand.
+
+## The "Would Removing This Cause Mistakes?" Test
+
+Anthropic's own guidance is: keep CLAUDE.md **short and human-readable**. The easiest filter: for every line, ask "if I delete this, would Claude make a mistake it wouldn't otherwise make?" If the answer is no, cut it. This one rule does more to keep CLAUDE.md useful than any stylistic advice.
+
+## CLAUDE.md Is Advisory, Not Enforced
+
+An important mental model: CLAUDE.md is **advisory**. The model reads it and tries to follow it, but nothing forces compliance — Claude might still slip up on a rule in a long session. For rules you cannot afford to have missed ("never edit `.env`", "always run tests before committing"), use **hooks** (Module 09) — those are executed by the harness, not suggested to the model. Use CLAUDE.md for conventions, hooks for guarantees.
+
 ## Your First CLAUDE.md
 
 Here's a complete, minimal CLAUDE.md you can adapt:

@@ -8,8 +8,8 @@ tags: ["hooks", "quality-gates", "security", "advanced"]
 objectives:
   - "Chain hooks into a quality gate pipeline"
   - "Build PreToolUse guards that block dangerous operations"
-  - "Use UserPromptSubmit for input validation"
-  - "Coordinate agent teams with TeammateIdle hooks"
+  - "Run conditional checks that provide feedback without blocking"
+  - "Wire up SessionStart and SessionEnd for environment setup and cleanup"
 quiz:
   - id: "adv-hooks-1"
     question: "How do you create a hook that blocks Claude from writing to production config files?"
@@ -32,15 +32,15 @@ quiz:
     correct: 1
     explanation: "Permissions are binary (allow or deny). Hooks can run arbitrary logic — check the current branch, verify test status, inspect file contents, and provide a detailed error message explaining why the action was blocked. This gives you conditional, context-aware safety controls."
   - id: "adv-hooks-3"
-    question: "What does a UserPromptSubmit hook allow you to do?"
+    question: "What does a SessionStart hook let you do?"
     type: "multiple-choice"
     options:
       - "Change Claude's model"
-      - "Validate or transform user input before Claude processes it"
-      - "Submit prompts automatically"
+      - "Run setup commands, health checks, or print a status banner when a session begins"
+      - "Block the session from starting"
       - "Record audio"
     correct: 1
-    explanation: "UserPromptSubmit fires after you submit a prompt but before Claude processes it. You can use it to validate input (exit 2 to block), log prompts for auditing, or add pre-processing logic. This is useful for team environments where you want to enforce prompt guidelines."
+    explanation: "SessionStart fires once when a new Claude Code session starts. Use it to check that services are running (docker compose ps), print a banner showing which quality gates are active, or remind yourself which branch you're on. It's the natural place for session-level setup."
   - id: "adv-hooks-4"
     question: "How do you chain multiple hooks into a pipeline?"
     type: "multiple-choice"
@@ -152,57 +152,41 @@ After every TypeScript file write: format with Prettier, then run the type check
 
 After writing a service file, if a corresponding test file exists, run those tests. Claude immediately sees if its changes broke anything.
 
-## UserPromptSubmit: Input Validation
+## SessionStart: Environment Setup
 
-UserPromptSubmit fires after you submit a prompt but before Claude processes it. Use it for:
-
-### Prompt Logging
+SessionStart fires once when a new Claude Code session begins. Use it to check the environment and print a banner so you know which guards are active:
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": [
+    "SessionStart": [
       {
-        "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S'): prompt submitted\" >> ~/.claude/prompt-audit.log"
+        "command": "echo '--- Quality gates active ---' && echo 'Guards: prod config, generated files, force-push' && echo 'Formatters: prettier (ts/tsx), black (py)' && echo 'Checks: tsc --noEmit'"
       }
     ]
   }
 }
 ```
 
-Creates an audit trail of when prompts are submitted. Useful for teams tracking Claude Code usage.
+You can also run health checks — verify that docker is up, the database accepts connections, or your `.env` file has the vars you need.
 
-### Content Filtering
+## SessionEnd: Cleanup and Summary
+
+SessionEnd fires when the session closes. Use it for cleanup, log rotation, or a simple "done" summary:
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": [
+    "SessionEnd": [
       {
-        "command": "echo \"$prompt\" | grep -qi 'deploy to production' && echo 'BLOCKED: Use the deploy pipeline, not Claude Code, for production deployments.' && exit 2 || true"
+        "command": "echo \"$(date): session ended from $(pwd)\" >> ~/.claude/session-history.log"
       }
     ]
   }
 }
 ```
 
-Blocks prompts that mention deploying to production — directing users to the proper deployment pipeline instead.
-
-## TeammateIdle: Agent Coordination
-
-When using agent teams (Module 10), TeammateIdle fires when an agent has no work:
-
-```json
-{
-  "hooks": {
-    "TeammateIdle": [
-      {
-        "command": "echo \"$(date): Agent idle, checking for unassigned tasks\" >> ~/.claude/team-log.txt"
-      }
-    ]
-  }
-}
-```
+Together, SessionStart and SessionEnd bracket your session with setup and teardown — the same pattern as `beforeAll`/`afterAll` in a test suite.
 
 ## The Complete Quality Gate Pipeline
 
@@ -244,14 +228,14 @@ Here's a full quality gate configuration that combines guards, formatters, check
         "command": "osascript -e 'display notification \"Claude needs your attention\" with title \"Claude Code\" sound name \"Glass\"'"
       }
     ],
-    "TaskCompleted": [
-      {
-        "command": "osascript -e 'display notification \"Task complete!\" with title \"Claude Code\" sound name \"Hero\"'"
-      }
-    ],
     "SessionStart": [
       {
         "command": "echo 'Quality gates active: production config guard, auto-format, type-check'"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "command": "echo \"$(date): Claude session ended\" >> ~/.claude/session-history.log"
       }
     ]
   }
@@ -260,12 +244,12 @@ Here's a full quality gate configuration that combines guards, formatters, check
 
 ### What This Pipeline Does
 
-1. **SessionStart**: Logs that quality gates are active
+1. **SessionStart**: Prints a banner showing that quality gates are active
 2. **PreToolUse guards**: Blocks production config changes, generated file edits, and force pushes
 3. **PostToolUse formatters**: Auto-formats TypeScript and Python files
 4. **PostToolUse type check**: Runs TypeScript type checking after writes
 5. **Notification**: Desktop alert when Claude needs you
-6. **TaskCompleted**: Sound + visual alert when a background task finishes
+6. **SessionEnd**: Appends a timestamped entry to your session history
 
 ### The Flow
 
@@ -306,4 +290,4 @@ Execution order: A → B → C. If command-A fails, B and C still run.
 
 ## Key Takeaway
 
-Advanced hooks create quality gates that enforce standards automatically. PreToolUse guards block dangerous operations (production configs, force pushes, generated files) with exit code 2. PostToolUse chains formatters and type checkers so Claude's output is always clean. UserPromptSubmit validates input before processing. The complete quality gate pipeline — guards, formatters, checks, notifications — runs silently in the background, catching issues before they reach your codebase.
+Advanced hooks create quality gates that enforce standards automatically. PreToolUse guards block dangerous operations (production configs, force pushes, generated files) with exit code 2. PostToolUse chains formatters and type checkers so Claude's output is always clean. SessionStart and SessionEnd bracket each session with setup and teardown. The complete quality gate pipeline — guards, formatters, checks, notifications — runs silently in the background, catching issues before they reach your codebase.

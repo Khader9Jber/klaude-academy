@@ -126,7 +126,6 @@ Format your response as:
 
 If there are no issues in a category, write 'None found.'
 Be specific — include file names, line numbers, and code snippets." \
-  --output-format text \
   --max-turns 5 \
   --allowedTools "Read" "Bash(git *)"
 ```
@@ -182,8 +181,7 @@ jobs:
           APPROVE, REQUEST_CHANGES, or COMMENT with a one-line explanation.
 
           Be concise. Only flag real issues, not style preferences." \
-            --output-format text \
-            --max-turns 3 \
+                      --max-turns 3 \
             --allowedTools "Read" > review.md
 
       - name: Post Review Comment
@@ -339,7 +337,7 @@ Run a quick Claude review before every push:
 
 echo "Running Claude review..."
 
-REVIEW=$(git diff origin/main...HEAD | claude -p "Quick review: any critical security or correctness issues in this diff? Answer YES or NO with a one-line explanation." --max-turns 1 --output-format text 2>/dev/null)
+REVIEW=$(git diff origin/main...HEAD | claude -p "Quick review: any critical security or correctness issues in this diff? Answer YES or NO with a one-line explanation." --max-turns 1 2>/dev/null)
 
 if echo "$REVIEW" | grep -qi "YES"; then
   echo "Claude found potential issues:"

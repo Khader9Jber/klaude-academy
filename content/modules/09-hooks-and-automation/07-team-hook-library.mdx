@@ -283,7 +283,7 @@ Reminds Claude to update docs when it changes public APIs.
 
 ## Hook 10: Desktop Notifications with Context
 
-Rich notifications when Claude needs attention or finishes a task.
+Rich notifications when Claude needs attention, plus a session-end log.
 
 ### settings.json (macOS)
 
@@ -295,9 +295,9 @@ Rich notifications when Claude needs attention or finishes a task.
         "command": "osascript -e 'display notification \"Claude needs your input\" with title \"Claude Code\" subtitle \"Check your terminal\" sound name \"Glass\"'"
       }
     ],
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "osascript -e 'display notification \"Task complete — review the changes\" with title \"Claude Code\" subtitle \"Ready for review\" sound name \"Hero\"'"
+        "command": "osascript -e 'display notification \"Session wrapped\" with title \"Claude Code\" subtitle \"Review the changes\" sound name \"Hero\"'"
       }
     ]
   }
@@ -314,16 +314,16 @@ Rich notifications when Claude needs attention or finishes a task.
         "command": "notify-send 'Claude Code' 'Claude needs your input' --urgency=normal"
       }
     ],
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "notify-send 'Claude Code' 'Task complete — review the changes' --urgency=normal"
+        "command": "notify-send 'Claude Code' 'Session wrapped — review the changes' --urgency=normal"
       }
     ]
   }
 }
 ```
 
-**Usage note**: These fire when Claude finishes a long-running task or needs user input. Essential when you are working on something else while Claude implements a feature.
+**Usage note**: The Notification hook fires when Claude is waiting for you (idle, permission prompt, or a resolved error). SessionEnd fires when you quit the session — a good moment to log or play a "done" sound.
 
 ## Combining Hooks: The Full Team Config
 

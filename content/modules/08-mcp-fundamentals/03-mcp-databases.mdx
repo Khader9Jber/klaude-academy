@@ -16,11 +16,11 @@ quiz:
     type: "multiple-choice"
     options:
       - "Install a PostgreSQL plugin"
-      - "claude mcp add postgres -e DATABASE_URL=postgresql://... --transport stdio npx -y @modelcontextprotocol/server-postgres"
+      - "claude mcp add postgres -e DATABASE_URL=postgresql://... -- npx -y @modelcontextprotocol/server-postgres"
       - "Connect via psql"
       - "Add a postgres section to package.json"
     correct: 1
-    explanation: "Set up the PostgreSQL MCP server with: claude mcp add postgres -e DATABASE_URL=postgresql://... --transport stdio npx -y @modelcontextprotocol/server-postgres. This passes your connection string and starts the server. Claude can then query your database directly."
+    explanation: "Set up the PostgreSQL MCP server with: claude mcp add postgres -e DATABASE_URL=postgresql://... -- npx -y @modelcontextprotocol/server-postgres. This passes your connection string and starts the server. Claude can then query your database directly."
   - id: "mcp-db-2"
     question: "Why should you use a read-only database user for the MCP connection?"
     type: "multiple-choice"
@@ -73,8 +73,7 @@ This is transformative for database work. Instead of describing your schema to C
 ```bash
 claude mcp add postgres \
   -e DATABASE_URL=postgresql://user:password@localhost:5432/mydb \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-postgres
+  -- npx -y @modelcontextprotocol/server-postgres
 ```
 
 ### Using a Connection String from Environment
@@ -84,8 +83,7 @@ If your DATABASE_URL is already in your shell environment:
 ```bash
 claude mcp add postgres \
   -e DATABASE_URL=$DATABASE_URL \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-postgres
+  -- npx -y @modelcontextprotocol/server-postgres
 ```
 
 ### Verify Connection
@@ -262,8 +260,7 @@ PostgreSQL is the most common, but MCP servers exist for other databases:
 ```bash
 claude mcp add mysql \
   -e MYSQL_URL=mysql://user:pass@localhost:3306/mydb \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-mysql
+  -- npx -y @modelcontextprotocol/server-mysql
 ```
 
 ### SQLite
@@ -271,8 +268,15 @@ claude mcp add mysql \
 ```bash
 claude mcp add sqlite \
   -e DB_PATH=./data/app.db \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-sqlite
+  -- npx -y @modelcontextprotocol/server-sqlite
+```
+
+### MongoDB
+
+```bash
+claude mcp add mongo \
+  -e MONGO_URI=mongodb://localhost:27017/mydb \
+  -- npx -y mongodb-mcp-server
 ```
 
 The workflow is the same regardless of the database engine — Claude queries through the MCP server and gets structured results.

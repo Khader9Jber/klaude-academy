@@ -164,9 +164,9 @@ Notice the ordering: format first, then type-check, then run tests. Each hook ge
 
 **Common mistake:** Running `tsc --noEmit` on every single file write can be slow in large projects. Consider limiting it to specific directories or running it only on service/route files.
 
-## Stage 4: Notify (Notification + TaskCompleted)
+## Stage 4: Notify (Notification + SessionEnd)
 
-Alert yourself when Claude finishes work or needs attention:
+Alert yourself when Claude needs attention, and log when a session wraps up:
 
 ```json
 {
@@ -176,9 +176,9 @@ Alert yourself when Claude finishes work or needs attention:
         "command": "osascript -e 'display notification \"Claude needs your attention\" with title \"Claude Code\" sound name \"Glass\"'"
       }
     ],
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "osascript -e 'display notification \"Task complete! Check the results.\" with title \"Claude Code\" sound name \"Hero\"'"
+        "command": "echo \"$(date): session ended\" >> ~/.claude/session-history.log && osascript -e 'display notification \"Session wrapped\" with title \"Claude Code\" sound name \"Hero\"'"
       }
     ]
   }
@@ -189,7 +189,7 @@ On Linux, replace `osascript` with `notify-send`:
 
 ```json
 {
-  "command": "notify-send 'Claude Code' 'Task complete!' --icon=dialog-information"
+  "command": "notify-send 'Claude Code' 'Claude needs your attention' --icon=dialog-information"
 }
 ```
 
@@ -242,9 +242,9 @@ Here's everything combined into a production-ready `settings.json`:
         "command": "osascript -e 'display notification \"Claude needs input\" with title \"Claude Code\" sound name \"Glass\"'"
       }
     ],
-    "TaskCompleted": [
+    "SessionEnd": [
       {
-        "command": "osascript -e 'display notification \"Task done!\" with title \"Claude Code\" sound name \"Hero\"'"
+        "command": "osascript -e 'display notification \"Session wrapped\" with title \"Claude Code\" sound name \"Hero\"'"
       }
     ]
   }

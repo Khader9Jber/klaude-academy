@@ -64,8 +64,7 @@ Connect Claude to your team's Slack workspace:
 ```bash
 claude mcp add slack \
   -e SLACK_BOT_TOKEN=xoxb-xxxx \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-slack
+  -- npx -y @modelcontextprotocol/server-slack
 ```
 
 ### What You Can Do
@@ -110,8 +109,7 @@ Connect Claude to your team's Notion workspace:
 ```bash
 claude mcp add notion \
   -e NOTION_TOKEN=secret_xxxx \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-notion
+  -- npx -y @modelcontextprotocol/server-notion
 ```
 
 ### What You Can Do
@@ -136,8 +134,7 @@ Connect to Linear for issue and project management:
 ```bash
 claude mcp add linear \
   -e LINEAR_API_KEY=lin_xxxx \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-linear
+  -- npx -y @modelcontextprotocol/server-linear
 ```
 
 ### What You Can Do
@@ -162,8 +159,7 @@ Connect to Sentry for error tracking:
 claude mcp add sentry \
   -e SENTRY_AUTH_TOKEN=sntrys_xxxx \
   -e SENTRY_ORG=my-org \
-  --transport stdio \
-  npx -y @modelcontextprotocol/server-sentry
+  -- npx -y @modelcontextprotocol/server-sentry
 ```
 
 ### What You Can Do
@@ -188,9 +184,10 @@ Connect Playwright for browser automation:
 
 ```bash
 claude mcp add playwright \
-  --transport stdio \
-  npx -y @anthropic-ai/mcp-server-playwright
+  -- npx -y @modelcontextprotocol/server-puppeteer
 ```
+
+Playwright and Puppeteer MCP servers are often interchangeable for these workflows. Use whichever the ecosystem is shipping for your stack.
 
 ### What You Can Do
 
@@ -215,8 +212,7 @@ Context7 provides up-to-date documentation for libraries:
 
 ```bash
 claude mcp add context7 \
-  --transport stdio \
-  npx -y @context7/mcp-server
+  -- npx -y @upstash/context7-mcp
 ```
 
 ### What It Does
@@ -267,19 +263,26 @@ read the relevant code, diagnose the issue, and post a summary in
 
 ## Popular MCP Servers Reference
 
-| Server | Package | Use Case |
-|---|---|---|
-| GitHub | @modelcontextprotocol/server-github | PRs, issues, repos |
-| PostgreSQL | @modelcontextprotocol/server-postgres | Database queries |
-| Slack | @modelcontextprotocol/server-slack | Team messaging |
-| Notion | @modelcontextprotocol/server-notion | Documentation, wikis |
-| Linear | @modelcontextprotocol/server-linear | Issue tracking |
-| Sentry | @modelcontextprotocol/server-sentry | Error monitoring |
-| Playwright | @anthropic-ai/mcp-server-playwright | Browser automation |
-| Context7 | @context7/mcp-server | Live library docs |
-| Figma | Official Figma MCP | Design-to-code |
-| Datadog | @modelcontextprotocol/server-datadog | Monitoring |
-| Redis | @modelcontextprotocol/server-redis | Cache inspection |
+| Server | Use Case |
+|---|---|
+| GitHub MCP | PRs, issues, repos |
+| PostgreSQL MCP | Database queries |
+| MongoDB MCP | Document database queries |
+| Slack MCP | Team messaging |
+| Notion MCP | Documentation, wikis |
+| Linear MCP | Issue tracking |
+| Sentry MCP | Error monitoring |
+| Puppeteer/Browser MCP | Browser automation |
+| Context7 | Live library docs |
+| Figma MCP | Design-to-code |
+| Cloudflare MCP | Cloudflare API access |
+| Next.js MCP | Framework-specific helpers |
+| dbt MCP | Data modeling workflows |
+| Fetch | Generic HTTP requests |
+| Filesystem | Scoped local file access |
+| Memory | Persistent cross-session notes |
+
+Check [modelcontextprotocol.io/examples](https://modelcontextprotocol.io/examples), [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers), and [mcpservers.org](https://mcpservers.org) for current package names and install commands — the ecosystem moves fast.
 
 ## The Connection Budget
 

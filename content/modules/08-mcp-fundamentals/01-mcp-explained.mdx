@@ -1,5 +1,5 @@
 ---
-title: "MCP: The Protocol That Changes Everything"
+title: "MCP: The Protocol for Connecting Claude to Your Stack"
 slug: "mcp-explained"
 order: 1
 difficulty: "intermediate"
@@ -7,7 +7,7 @@ duration: 15
 tags: ["mcp", "protocol", "integrations", "architecture"]
 objectives:
   - "Understand what MCP is and why it exists"
-  - "Know the client-server architecture"
+  - "Know the client-server architecture and the three primitives (Tools, Resources, Prompts)"
   - "Understand how MCP tools appear in Claude Code"
   - "Be aware of the token cost of MCP connections"
 quiz:
@@ -71,7 +71,7 @@ Every external tool requires manual copy-paste. Every data source requires manua
 
 ## What Is MCP?
 
-**Model Context Protocol (MCP)** is an open standard created by Anthropic for connecting AI models to external data sources and tools. Think of it as a USB port for AI — a standardized way to plug in databases, APIs, services, and tools.
+**Model Context Protocol (MCP)** is an open standard released by Anthropic in November 2024 for connecting AI models to external data sources and tools. Think of it as a USB port for AI — a standardized way to plug in databases, APIs, services, and tools.
 
 With MCP, Claude can:
 - **Query your database** directly (through a PostgreSQL/MySQL MCP server)
@@ -81,6 +81,16 @@ With MCP, Claude can:
 - **Access any API** (through custom MCP servers)
 
 All without you copying or pasting anything.
+
+### The Three Primitives
+
+Every MCP server exposes its functionality through three primitives:
+
+- **Tools** — Actions Claude can invoke (run a query, create a PR, send a message). This is what most people mean when they say "MCP tool."
+- **Resources** — Data the server can serve up on demand (a file, a database row, a Notion page). Claude can read them when relevant.
+- **Prompts** — Pre-built prompt templates the server offers (for example, a "review pull request" prompt with a specific structure).
+
+Most servers you install are tool-heavy. Resources are useful when a server exposes documents or datasets, and prompts are used for guided workflows.
 
 ## Architecture: Client ↔ Server
 
@@ -178,21 +188,40 @@ Only connect the MCP servers you're actively using. If you're doing a code revie
 
 ## What MCP Can Connect
 
-MCP servers exist for a wide range of tools and services:
+MCP servers exist for a wide range of tools and services. The official reference servers maintained by Anthropic cover the basics:
+
+- **Everything** — kitchen-sink server for testing
+- **Fetch** — HTTP requests
+- **Filesystem** — scoped local file access
+- **Git** — local git operations
+- **Memory** — persistent notes across sessions
+- **Sequential Thinking** — structured reasoning helper
+
+Beyond those, the third-party ecosystem covers almost every popular developer tool:
 
 | Category | Examples |
 |---|---|
-| **Version Control** | GitHub, GitLab, Bitbucket |
-| **Databases** | PostgreSQL, MySQL, SQLite, MongoDB |
-| **Communication** | Slack, Discord, Telegram |
-| **Project Management** | Linear, Jira, Notion, Asana |
-| **Monitoring** | Sentry, Datadog, PagerDuty |
-| **Cloud** | AWS, GCP, Cloudflare |
-| **Browser** | Playwright (automation/testing) |
-| **Documentation** | Context7 (live docs), Notion |
-| **Custom** | Any API you build a server for |
+| **Version Control** | GitHub MCP, GitLab, Bitbucket |
+| **Databases** | PostgreSQL MCP, MongoDB MCP, MySQL, SQLite |
+| **Communication** | Slack MCP, Discord, Telegram |
+| **Project Management** | Linear MCP, Notion MCP, Jira |
+| **Monitoring** | Sentry MCP, Datadog, PagerDuty |
+| **Cloud** | Cloudflare MCP, AWS, GCP |
+| **Browser** | Puppeteer/Browser MCP (automation/testing) |
+| **Documentation** | Context7 (live docs), Notion MCP |
+| **Data tooling** | dbt MCP |
+| **Frameworks** | Next.js MCP |
+| **Design** | Figma MCP |
 
-The ecosystem is growing rapidly. If an MCP server doesn't exist for your tool, you can build one (covered in Module 12).
+### Where to Find Servers
+
+Three registries aggregate available MCP servers:
+
+- [modelcontextprotocol.io/examples](https://modelcontextprotocol.io/examples) — official reference list
+- [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) — the reference server repo
+- [mcpservers.org](https://mcpservers.org) — community directory
+
+If the server you want doesn't exist, you can build one (covered later in this module).
 
 ## MCP vs. Other Integrations
 

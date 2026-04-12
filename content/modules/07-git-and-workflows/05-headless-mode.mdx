@@ -265,7 +265,6 @@ jobs:
           claude -p "Review the changes in this PR for security issues, \
             performance problems, and convention violations. Output a \
             markdown report." \
-            --output-format text \
             --max-turns 15 \
             --allowedTools "Read" "Bash(git diff *)" > review.md
       
